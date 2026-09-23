@@ -31,9 +31,9 @@ Mặc dù trọng tâm là phân tích dữ liệu, mình cũng đã học cách
 
 ```mermaid
 graph LR
-    A(Hạ tầng Data Engineering\nPostgres, Airflow, Docker) -->|Truy xuất dữ liệu\n(SQL)| B[Data Analyst]
-    B -->|Phân tích BRD\nĐối soát Logic| C{Kiểm tra SIT/UAT}
-    B -->|Data Modeling\nDAX| D[Power BI Dashboard]
+    A["Hạ tầng Data Engineering<br>(Postgres, Airflow, Docker)"] -->|"Truy xuất dữ liệu (SQL)"| B["Data Analyst"]
+    B -->|"Phân tích BRD & Đối soát"| C{"Kiểm tra SIT/UAT"}
+    B -->|"Data Modeling & DAX"| D["Power BI Dashboard"]
     
     style A fill:#3776AB,color:#fff
     style B fill:#F2C811,color:#000
