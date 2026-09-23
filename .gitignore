@@ -16,6 +16,8 @@ __pycache__/
 *.tar.gz
 *.csv
 
-# OS generated files
+# OS and Office temporary files
 .DS_Store
 Thumbs.db
+~$*
+
