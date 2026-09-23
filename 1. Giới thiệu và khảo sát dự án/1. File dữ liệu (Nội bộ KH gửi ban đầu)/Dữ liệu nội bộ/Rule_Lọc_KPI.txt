@@ -1,0 +1,8 @@
+Báo cáo Quản trị Hoạt động Tài chính:
+- Chỉ tiêu Dư nợ ngắn hạn (Vay và nợ tài chính): Lấy dữ liệu ở tổng cột "Dư có" trong "Sổ chi tiết các tài khoản" ở phần mềm MISA. Chỉ quan tâm đến tài khoản vay và nợ tài chính (341), bắt buộc phải lọc chính xác các mã: 34111, 34113, 34114.  
+- Chỉ tiêu Dư nợ dài hạn (Vay và nợ tài chính): Lấy ở tổng cột "Dư có" trong "Sổ chi tiết các tài khoản" ở MISA. Chỉ quan tâm vay và nợ tài chính, bắt buộc lọc chính xác mã: 34112.  
+Báo cáo Quản trị Dòng tiền:
+- Chỉ tiêu Dòng tiền ra/vào (Dòng chi/thu): Lấy từ Sổ chi tiết các tài khoản MISA. Bắt buộc phải dùng cột "Số chứng từ" và "Tài khoản đối ứng" để lọc bỏ các giao dịch chuyển tiền nội bộ (CTNB) và nộp tiền mặt vào tài khoản (NTTK). Cụ thể, kiểm tra phần "Số chứng từ", nếu lặp khoản ra và khoản vào thì quy vào chuyển nội bộ và loại bỏ.(Không chỉ ở báo cáo này mà những báo cáo khác nếu có liên quan đến dòng thu/chi thì đều cần lọc nội bộ)  
+Báo cáo Quản trị Tiền gửi (và Thanh khoản):
+- Chỉ tiêu Thu nhập lãi: Tính bằng tổng cột "Phát sinh có" trong Sổ chi tiết các tài khoản trên MISA, chỉ cần lọc mã tài khoản 515.
+Tồn kho:  Chỉ tiêu liên quan nhập khẩu là các tài nguyên có tỷ giá > 1

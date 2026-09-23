@@ -1,0 +1,5 @@
+*.xlsx
+*.xlsm
+config/*.json
+*.pyc
+data/raw/misa/_errors/

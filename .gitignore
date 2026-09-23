@@ -1,0 +1,21 @@
+# Environments
+venv/
+env/
+.env
+.venv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Data and large files
+*.rar
+*.zip
+*.tar.gz
+*.csv
+
+# OS generated files
+.DS_Store
+Thumbs.db
