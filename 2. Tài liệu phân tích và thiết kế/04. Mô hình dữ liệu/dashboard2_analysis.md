@@ -57,10 +57,10 @@
 
 | Mã | Tên | Loại Chart | Nguồn / Cột gốc | Chiều |
 |:---|:---|:---|:---|:---|
-| 2.1 | **Số lượng & Giá trị HTK theo thời gian** | Combo (Line & Column) | `Tong_hop_ton_kho`: ending_quantity, ending_value LASTDATE mỗi tháng | Theo tháng |
-| 2.2 | **Vòng quay HTK theo thời gian — TT vs KH** | Combo (Line & Column) | B02_DN (GVHB TT) + `Ke_hoach_KD` (Target vòng quay / 12) | Theo tháng |
-| 2.3 | **Inventory to Sales theo thời gian** | Line Chart | `Tong_hop_ton_kho` (ending_value) + B02_DN (DT thuần Mã 10) | Theo tháng |
-| 2.4 | **Waterfall Nhập – Xuất – Tồn** | Waterfall Chart | [Tồn đầu kỳ] + [Nhập] − [Xuất] = [Tồn cuối kỳ] từ `Tong_hop_ton_kho` | Theo kỳ |
+| 2.1 | **Số lượng & Giá trị HTK theo thời gian** | Line & Clustered Column Chart | `Tong_hop_ton_kho`: ending_quantity, ending_value LASTDATE mỗi tháng | Theo tháng |
+| 2.2 | **Vòng quay HTK theo thời gian — TT vs KH** | Area Chart | B02_DN (GVHB TT) + `Ke_hoach_KD` (Target vòng quay / 12) | Theo tháng |
+| 2.3 | **Inventory to Sales theo thời gian** | Line & Clustered Column Chart | `Tong_hop_ton_kho` (ending_value) + B02_DN (DT thuần Mã 10) | Theo tháng |
+| 2.4 | **Waterfall Nhập – Xuất – Tồn** | Clustered Column Chart | [Tồn đầu kỳ] + [Nhập] − [Xuất] = [Tồn cuối kỳ] từ `Tong_hop_ton_kho` | Theo kỳ |
 | 2.5 | **Top 10 mặt hàng tồn lớn nhất** (Giá/SL) | Bar Chart | `Tong_hop_ton_kho`: ending_value hoặc ending_quantity TOP 10 | Theo SP |
 | 2.6 | **Red Flag — Hàng chậm luân chuyển** | Table | Tên SP, Kho, Tồn cuối kỳ, **Số ngày tồn kho** (từ lần nhập/xuất gần nhất). Highlight đỏ nếu > 90 ngày | Theo SP/Kho |
 

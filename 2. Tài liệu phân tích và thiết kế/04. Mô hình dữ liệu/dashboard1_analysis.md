@@ -75,13 +75,13 @@
 
 | Mã | Tên biểu đồ | Loại Chart | Nguồn file gốc / Cột gốc | Chiều phân tích |
 |:---|:---|:---|:---|:---|
-| 2.1 | **Nợ NH / Nợ DH / Tổng dư nợ theo Tháng** | Line & Stacked Column | MISA — Sổ chi tiết TK 341: cột "Dư có" các khoản "vay ngắn hạn" / "vay dài hạn" | Theo tháng |
+| 2.1 | **Nợ NH / Nợ DH / Tổng dư nợ theo Tháng** | Line & Stacked Column Chart | MISA — Sổ chi tiết TK 341: cột "Dư có" các khoản "vay ngắn hạn" / "vay dài hạn" | Theo tháng |
 | 2.2 | **Chi phí nợ (Tháng) — TT vs KH** | Line Chart | B02_DN (MISA): cột "Phát sinh" chỉ tiêu Chi phí lãi vay + `Ke_hoach_kinh_doanh` | Theo tháng |
 | 2.3 | **Lãi suất bình quân theo ngân hàng** | Bar Chart | `bc_tin_dung_2026.xlsx`: AVERAGE cột "Lãi xuất" GROUP BY "Tổ chức tín dụng" | Theo NH |
-| 2.4 | **Dư nợ tại từng ngân hàng** | Bar Chart | `bc_tin_dung_2026.xlsx`: SUM cột "Dư nợ gốc vay đến hiện tại" GROUP BY "Tổ chức tín dụng" | Theo NH |
-| 2.5 | **Chi phí lãi vay TT và KH** | Combo Chart | B02_DN (MISA): chi phí lãi vay phát sinh ÷ Kế hoạch / 12 tháng | Theo tháng |
-| 2.6 | **Phân tích dòng thu theo ngân hàng** | Bar Chart | `So_chi_tiet_cac_tai_khoan.xlsx`: SUM "Phát sinh Nợ" TK 112 GROUP BY Tên ngân hàng | Theo NH |
-| 2.7 | **Phân tích dòng chi theo ngân hàng** | Bar Chart | `So_chi_tiet_cac_tai_khoan.xlsx`: SUM "Phát sinh Có" TK 112 GROUP BY Tên ngân hàng | Theo NH |
+| 2.4 | **Dư nợ tại từng ngân hàng** | Column Chart | `bc_tin_dung_2026.xlsx`: SUM cột "Dư nợ gốc vay đến hiện tại" GROUP BY "Tổ chức tín dụng" | Theo NH |
+| 2.5 | **Chi phí lãi vay TT và KH** | Clustered Column Chart | B02_DN (MISA): chi phí lãi vay phát sinh ÷ Kế hoạch / 12 tháng | Theo tháng |
+| 2.6 | **Phân tích dòng thu theo ngân hàng** | Horizontal Bar Chart | `So_chi_tiet_cac_tai_khoan.xlsx`: SUM "Phát sinh Nợ" TK 112 GROUP BY Tên ngân hàng | Theo NH |
+| 2.7 | **Phân tích dòng chi theo ngân hàng** | Horizontal Bar Chart | `So_chi_tiet_cac_tai_khoan.xlsx`: SUM "Phát sinh Có" TK 112 GROUP BY Tên ngân hàng | Theo NH |
 
 **3 Tables/Matrix:**
 

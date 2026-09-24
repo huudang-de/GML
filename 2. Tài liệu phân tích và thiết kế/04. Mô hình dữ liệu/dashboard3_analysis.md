@@ -54,11 +54,11 @@
 
 | Mã | Tên | Loại | Nguồn / Cột gốc |
 |:---|:---|:---|:---|
-| 2.1 | **Khoản phải thu theo tháng** | Column Chart | Dư Nợ TK131 LASTDATE mỗi tháng |
-| 2.2 | **Vòng quay phải thu theo tháng** | Line Chart | DT thuần B02_DN + Dư PT |
-| 2.3 | **Biểu đồ Tuổi nợ (Aging)** | Column Chart | Phân vào 7 bucket, highlight đỏ > 90 ngày |
-| 2.4 | **Top 10 KH theo tổng số dư** | Bar Chart | SUM dư nợ GROUP BY KH, TOP 10 |
-| 2.5 | **Top 10 KH theo nợ quá hạn** | Bar Chart | SUM dư nợ quá hạn (ngày > 0) GROUP BY KH, TOP 10 |
+| 2.1 | **Khoản phải thu theo tháng** | Stacked Column & Line Chart | Dư Nợ TK131 LASTDATE mỗi tháng |
+| 2.2 | **Vòng quay phải thu theo tháng** | Area Chart | DT thuần B02_DN + Dư PT |
+| 2.3 | **Biểu đồ Tuổi nợ (Aging)** | Stacked Column Chart | Phân vào 7 bucket, highlight đỏ > 90 ngày |
+| 2.4 | **Top 10 KH theo tổng số dư** | Horizontal Bar Chart | SUM dư nợ GROUP BY KH, TOP 10 |
+| 2.5 | **Top 10 KH theo nợ quá hạn** | Horizontal Bar Chart | SUM dư nợ quá hạn (ngày > 0) GROUP BY KH, TOP 10 |
 | 2.6 | **Bảng chi tiết nợ theo Khách hàng** | Table | Mã KH, Tên KH, Tổng dư nợ, Trong hạn, Quá hạn, Tỷ lệ nợ xấu |
 | 2.7 | **Bảng chi tiết các hóa đơn đang nợ** | Table | Tên KH, Số HD, Ngày HD, Trị giá HD, Đã trả, Dư nợ, Trạng thái, Tuổi nợ (bôi đỏ > 90 ngày) |
 

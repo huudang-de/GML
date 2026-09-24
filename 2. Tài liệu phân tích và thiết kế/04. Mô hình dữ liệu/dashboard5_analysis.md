@@ -61,13 +61,13 @@
 
 | Mã | Tên | Loại | Nguồn | Nội dung |
 |:---|:---|:---|:---|:---|
-| 2.1 | **Thu/Chi/Dư quỹ theo tháng** | Combo (Cột + Đường) | `So_chi_tiet` | Cột: Thu + Chi; Đường: Số dư quỹ cuối tháng |
-| 2.2 | **TH kế hoạch Thu theo tháng** | Combo | `So_chi_tiet` + `Ke_hoach` | Cột TT vs Đường KH (÷12) |
-| 2.3 | **TH kế hoạch Chi theo tháng** | Combo | `So_chi_tiet` + `Ke_hoach` | Cột TT vs Đường KH (÷12) |
-| 2.4 | **Tồn đầu kỳ → Thặng dư/Thâm hụt → Tồn cuối kỳ** | Cột ghép (Waterfall-like) | `So_chi_tiet` + B01_DN | Biểu đồ dịch chuyển trạng thái dòng tiền |
+| 2.1 | **Thu/Chi/Dư quỹ theo tháng** | Stacked Column & Line Chart | `So_chi_tiet` | Cột: Thu + Chi; Đường: Số dư quỹ cuối tháng |
+| 2.2 | **TH kế hoạch Thu theo tháng** | Stacked Column Chart | `So_chi_tiet` + `Ke_hoach` | Cột TT vs Đường KH (÷12) |
+| 2.3 | **TH kế hoạch Chi theo tháng** | Stacked Column Chart | `So_chi_tiet` + `Ke_hoach` | Cột TT vs Đường KH (÷12) |
+| 2.4 | **Tồn đầu kỳ → Thặng dư/Thâm hụt → Tồn cuối kỳ** | Clustered Column Chart | `So_chi_tiet` + B01_DN | Biểu đồ dịch chuyển trạng thái dòng tiền |
 | 2.5 | **Tỷ lệ đóng góp của hoạt động Thu** | Pie Chart | `So_chi_tiet` (phân loại theo ĐK4) | Tỷ trọng: Thu bán hàng, Thu đi vay, Thu lãi... |
 | 2.6 | **Tỷ lệ đóng góp của hoạt động Chi** | Pie Chart | `So_chi_tiet` (phân loại theo ĐK4) | Tỷ trọng: Chi NCC, Chi lương, Chi trả nợ... |
-| 2.7 | **TSNH / Nợ NH / Vốn lưu động** | Cột ghép | B01_DN | Cột: Mã100 + Mã310; Đường: TSNH - Nợ NH |
+| 2.7 | **TSNH / Nợ NH / Vốn lưu động** | Column Chart | B01_DN | Cột: Mã100 + Mã310; Đường: TSNH - Nợ NH |
 | 3.1 | **Bảng Chu kỳ tiền mặt (CCC)** | Table | B01_DN + B02_DN | Số ngày tồn kho + Số ngày PT − Số ngày PTra = CCC (ngày) |
 
 ---
