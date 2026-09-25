@@ -28,13 +28,12 @@
 
 ---
 
-### 8.2 Filter — 3 bộ lọc
+### 8.2 Filter — 2 bộ lọc
 
 | STT | Bộ lọc | Mô tả | Giá trị mẫu | Bắt buộc? |
 |:---:|:---|:---|:---|:---|
 | 1 | **Thời gian** | Tháng, Quý, Năm | Tháng 1/2026, Q1 2026 | Bắt buộc |
 | 2 | **Nhóm sản phẩm** | Phân loại theo mảng kinh doanh | Giấy, Nẹp, Ván, Khác | Bắt buộc |
-| 3 | **Kho lưu vực** | Lọc kho cụ thể (thành phẩm vs vật tư) | HANG HOA, NVL CHINH, THANH PHAM | Tùy chọn |
 
 ---
 

@@ -10,8 +10,7 @@
 
 ## 2. Bộ lọc (Slicers)
 - **Thời gian:** `Dim_Date[Date]`
-- **Kho:** `dim_warehouse[Warehouse_Name]`
-- **Nhóm Sản Phẩm:** `dim_product[Product_Group]`
+- **Nhóm Sản Phẩm:** `dim_product[product_category]`
 
 ---
 
@@ -25,31 +24,40 @@
 Giá trị HTK (Tỷ) = 
 CALCULATE(
     SUM('fact_inventory_balance'[ending_value]),
-    LASTDATE('Dim_Date'[Date]) -- Hoặc MAX('fact_inventory_balance'[Snapshot_Date]) để bọc lỗi lịch
+    'Dim_Date'[Date] = MAX('fact_inventory_balance'[snapshot_date])
 ) / 1000000000
 ```
 
 ### 1.2 Vòng quay Hàng tồn kho
 - **DAX:**
+Bạn tạo lần lượt các Measure sau (tạo từng cái một):
+
 ```dax
-Vòng quay HTK = 
-VAR GiaVon = CALCULATE(SUM('fact_incomestatement'[Current_Period_Amount]), 'fact_incomestatement'[Indicator_Code] = "B02-DN_11")
-VAR TonKhoBQ = ( [Giá trị HTK Đầu Kỳ] + [Giá trị HTK Cuối Kỳ] ) / 2
-RETURN DIVIDE(GiaVon, TonKhoBQ, 0)
+Giá vốn hàng bán = CALCULATE(SUM('fact_incomestatement'[current_period_amount]), 'fact_incomestatement'[indicator_code] = "B02-DN_11")
+
+HTK Cuối Kỳ = CALCULATE(SUM('fact_inventory_balance'[ending_value]), 'Dim_Date'[Date] = MAX('fact_inventory_balance'[snapshot_date]))
+
+HTK Đầu Kỳ = CALCULATE([HTK Cuối Kỳ], PREVIOUSMONTH('Dim_Date'[Date]))
+
+Tồn kho BQ = ([HTK Đầu Kỳ] + [HTK Cuối Kỳ]) / 2
+
+Vòng quay HTK = DIVIDE([Giá vốn hàng bán], [Tồn kho BQ], 0)
 ```
 
 ### 1.3 Tỷ lệ tồn kho / Doanh thu (I/S Ratio)
 - **DAX:**
+Tạo Doanh thu riêng rồi mới chia:
+
 ```dax
-Tỷ lệ I/S (%) = 
-VAR DoanhThu = CALCULATE(SUM('fact_incomestatement'[Current_Period_Amount]), 'fact_incomestatement'[Indicator_Code] = "B02-DN_01")
-RETURN DIVIDE([Giá trị HTK (Tỷ)], DoanhThu, 0)
+Doanh thu thuần = CALCULATE(SUM('fact_incomestatement'[current_period_amount]), 'fact_incomestatement'[indicator_code] = "B02-DN_01")
+
+Tỷ lệ I/S (%) = DIVIDE([HTK Cuối Kỳ], [Doanh thu thuần], 0)
 ```
 
 ### 1.4 & 1.5 Số lượng và Phân loại
 - **DAX:**
 ```dax
-Số lượng HTK = CALCULATE(SUM('fact_inventory_balance'[ending_quantity]), LASTDATE('Dim_Date'[Date]))
+Số lượng HTK = CALCULATE(SUM('fact_inventory_balance'[ending_quantity]), 'Dim_Date'[Date] = MAX('fact_inventory_balance'[snapshot_date]))
 Tổng mã SP đang tồn = CALCULATE(DISTINCTCOUNT('fact_inventory_balance'[product_code]), 'fact_inventory_balance'[ending_quantity] > 0)
 ```
 

@@ -105,8 +105,8 @@ RETURN DIVIDE(TongNo, VonCSH, 0)
 - **Trục X:** `Dim_Date[Month Year]`
 - **Trục Y:** Kéo 2 Measure sau vào:
 ```dax
-CP Lãi Vay (Thực tế) = CALCULATE(SUM('fact_incomestatement'[Current_Period_Amount]), 'fact_incomestatement'[Indicator_Code] = "B02-DN_23")
-CP Lãi Vay (Kế hoạch) = CALCULATE(SUM('fact_businessplan'[Target_Amount]), 'fact_businessplan'[Indicator_Code] = "Chi_phi_lai_vay")
+CP Lãi Vay (Thực tế) = CALCULATE(SUM('fact_incomestatement'[Current_Period_Amount]), 'fact_incomestatement'[Indicator_Code] = "B02-DN_24")
+CP Lãi Vay (Kế hoạch) = CALCULATE(SUM('fact_businessplan'[Target_Amount]), 'fact_businessplan'[Indicator_Code] = "B02-DN_24")
 ```
 
 ### 2.3 Lãi suất bình quân từng bank
