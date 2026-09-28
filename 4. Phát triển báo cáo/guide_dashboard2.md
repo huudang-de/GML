@@ -98,23 +98,88 @@ CALCULATE(
 - **Trục X:** `Dim_Date[Month]`
 - **Trục Y:** Kéo 3 Measure: `Tổng Nhập`, `Tổng Xuất`, `Tồn Cuối Kỳ` để xếp cạnh nhau so sánh xu hướng luân chuyển.
 
-### 2.5 Top 10 dư tồn kho
-- **Loại:** Bar Chart (Ngang)
+### 2.5 Top 10 dư tồn kho cuối kỳ theo chỉ số chọn (Giá/Số lượng)
+- **Chuẩn bị (Tạo Nút bấm chuyển đổi):** 
+  Vào thanh menu `Modeling` > `New Parameter` > `Fields`. Kéo 2 measure là `[Giá trị HTK]` và `[Số lượng HTK]` vào. Đặt tên tham số là "Chỉ số tùy chọn". Power BI sẽ sinh ra 1 Slicer để chọn trên màn hình.
+- **Loại biểu đồ:** Clustered Bar Chart (Ngang - để dễ đọc tên sản phẩm dài)
 - **Trục Y:** `dim_product[Product_Name]`
-- **Trục X:** `Giá trị HTK (Tỷ)`
-- **Lọc (Filter Pane):** Kéo `Product_Name` vào Filter, chọn Top N = 10 theo `Giá trị HTK`.
+- **Trục X:** Kéo trường *Chỉ số tùy chọn* vừa tạo ở bước chuẩn bị vào.
+- **Lọc (Filter Pane):** Kéo `Product_Name` vào mục Filters của biểu đồ, chọn chế độ lọc `Top N` = `10`. Tại ô *By value*, kéo tham số *Chỉ số tùy chọn* vào > Bấm **Apply**. (Khi đó, nếu bấm nút Giá hay nút Số lượng trên màn hình, danh sách Top 10 sẽ tự động trượt và sắp xếp lại tương ứng).
 
 ---
 
 ## 5. Bảng Dữ Liệu Chi Tiết (Tables & Matrix)
 
-### 2.6 Bảng Red Flag hàng chậm luân chuyển
-- **Loại:** Table
-- **Mục đích:** Cảnh báo hàng tồn trong kho quá lâu (ví dụ > 90 ngày) không có giao dịch xuất.
-- **DAX tính Ngày tồn kho:** Dùng hàm `DATEDIFF` giữa Ngày hiện tại (hoặc cuối kỳ BC) và Ngày nhập kho gần nhất (`MAX(fact_inventoryinward[Date])`).
-- **Conditional Formatting:** Format màu nền Cột Số ngày tồn kho: >90 ngày (Đỏ), 60-90 (Vàng).
+### 2.6 Bảng Red Flag hàng chậm luân chuyển (Chi tiết DAX & UI)
+- **Loại:** Table (Bảng dữ liệu)
+- **Mục đích:** Cảnh báo hàng tồn đọng quá lâu không xuất kho, gây giam vốn.
 
-### 3.1 Bảng tổng hợp hàng xuất kho vs Kế hoạch
-- **Loại:** Table / Matrix
-- **Columns:** Mã SP, Tên SP, Giá trị xuất Thực tế, Giá trị KH, Chênh lệch (%), Cảnh báo.
-- **Biểu tượng cảnh báo:** Sử dụng Conditional Formatting > Icons. Nếu Chênh lệch vượt quá 5% (Thực tế > Kế hoạch 105%), gắn cờ Đỏ (Red Flag).
+**Bước 1: Viết 2 công thức DAX tính Số ngày tồn kho**
+Tạo lần lượt 2 Measure sau:
+```dax
+Ngày giao dịch gần nhất = 
+CALCULATE(
+    MAX('fact_inventoryinward'[Posting_Date]),
+    'fact_inventory_balance'[ending_quantity] > 0
+)
+
+Số ngày tồn kho = 
+VAR NgayBaoCao = MAX('fact_inventory_balance'[snapshot_date]) -- Fix: Lấy ngày chốt tồn kho thực tế thay vì lịch Dim_Date
+RETURN
+IF(
+    ISBLANK([Ngày giao dịch gần nhất]), 
+    BLANK(), 
+    DATEDIFF([Ngày giao dịch gần nhất], NgayBaoCao, DAY)
+)
+```
+
+**Bước 2: Cấu hình Bảng (Table)**
+- Trong ô **Columns**, kéo lần lượt: `dim_warehouse[Warehouse_Name]`, `dim_product[Product_Name]`, `[Số lượng HTK]`, và `[Số ngày tồn kho]`.
+
+**Bước 3: Tô màu Cảnh báo (Conditional Formatting)**
+1. Tại khu vực Visual, bấm vào mũi tên trỏ xuống của trường `[Số ngày tồn kho]` đang nằm trong ô Columns của biểu đồ.
+2. Chọn **Conditional formatting** > **Background color**.
+3. Trong hộp thoại hiện ra, phần *Format style* chọn **Rules**.
+4. Thiết lập 2 quy tắc sau (⚠️ **Quan trọng:** Nhớ đổi cái đuôi `Percent` mặc định thành `Number` ở tất cả các ô nhé):
+   - **Rule 1:** Nếu giá trị `>= 60` và `< 90` -> Chọn màu **Vàng (Cảnh báo)**.
+   - **Rule 2:** Bấm `+ New rule`. Nếu giá trị `>= 90` và `< 99999` -> Chọn màu **Đỏ (Nguy hiểm)**.
+5. Bấm **OK**. Lập tức hàng nào nằm kho trên 90 ngày sẽ đỏ rực lên.
+
+### 3.1 Bảng tổng hợp Giá vốn hàng bán (Xuất kho) vs Kế hoạch
+- **Loại:** Table hoặc Clustered Column Chart (Biểu đồ cột)
+- **Mục đích:** Do dữ liệu Kế hoạch kinh doanh (`fact_businessplan`) của công ty chỉ giao chỉ tiêu theo **Tổng Giá Vốn Toàn Công Ty từng tháng**, không có chỉ tiêu chi tiết cho từng mã sản phẩm, nên bảng này dùng để xem công ty có bị lố ngân sách xuất kho hàng tháng hay không.
+
+**Bước 1: Viết 3 công thức DAX cơ sở**
+*(Lưu ý: Chỉ tiêu Giá vốn hàng bán trong bảng Kế hoạch kinh doanh là mã `B02-DN_11`)*
+
+```dax
+Tổng Giá Trị Xuất (Thực tế) = 
+SUM('fact_inventoryoutward'[outward_value])
+
+Kế Hoạch Giá Vốn = 
+CALCULATE(
+    SUM('fact_businessplan'[target_amount]),
+    'fact_businessplan'[indicator_code] = "B02-DN_11"
+)
+
+Tỷ lệ hoàn thành Xuất kho (%) = 
+DIVIDE([Tổng Giá Trị Xuất (Thực tế)], [Kế Hoạch Giá Vốn], 0)
+```
+
+**Bước 2: Cấu hình Bảng (Table)**
+- **Columns:** Kéo `Dim_Date[Month]` vào (Tuyệt đối không kéo Sản phẩm vào đây vì Kế hoạch không chia theo sản phẩm, kéo vào số sẽ bị lặp lặp sai bét).
+- Sau đó kéo lần lượt `[Tổng Giá Trị Xuất (Thực tế)]`, `[Kế Hoạch Giá Vốn]`, và `[Tỷ lệ hoàn thành Xuất kho (%)]` vào.
+
+**Bước 3: Cắm Cờ Cảnh Báo (Conditional Formatting > Icons)**
+Đây là cái "bẫy" dễ sai nhất, bạn làm thật chậm theo các thông số sau:
+1. Bấm vào mũi tên ở Measure `[Tỷ lệ hoàn thành Xuất kho (%)]` > Chọn **Conditional formatting** > **Icons**.
+2. Phần *Format style* chọn **Rules**.
+3. **QUAN TRỌNG NHẤT:** Ở TẤT CẢ các ô chứa chữ `Percent` (Phần trăm) ở đuôi, bạn phải bấm mũi tên đổi hết thành chữ `Number` (Số). (Kể cả khi cột của bạn đang hiển thị là %, trong cái bảng Rule này Power BI chỉ hiểu số thập phân).
+4. Khai báo 3 Rules y hệt như sau:
+   - **Rule 1 (Cờ Vàng - Hụt kế hoạch):** 
+     If value `>= 0` (Number) and `< 0.95` (Number) -> Chọn Icon Cờ Vàng.
+   - **Rule 2 (Cờ Xanh - Đạt chuẩn ±5%):** Bấm `+ New rule`. 
+     If value `>= 0.95` (Number) and `< 1.05` (Number) -> Chọn Icon Cờ Xanh ⛳.
+   - **Rule 3 (Cờ Đỏ - Vượt lố >5%):** Bấm `+ New rule`. 
+     If value `>= 1.05` (Number) and `< 9999` (Number) -> Chọn Icon Cờ Đỏ 🚩.
+5. Bấm **OK**.

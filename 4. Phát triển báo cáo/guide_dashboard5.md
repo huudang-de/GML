@@ -10,8 +10,8 @@
 * **Vùng 6 (H: 450px):** Khối Cơ cấu Dòng tiền (2 Pie Charts 2.5 & 2.6) + Bảng (3.1).
 
 ## 2. Bộ lọc (Slicers)
-- **Thời gian (Tháng):** `Dim_Date[Month Year]`
-- **Ngân hàng & TK (Bank/Account):** `dim_bank[Bank_Name]`, `dim_bank_account[Account_No]`
+- **Thời gian (Tháng):** `silver dim_date[Month Year]`
+- **Ngân hàng & TK (Bank/Account):** `silver dim_bank[Bank_Name]`, `silver dim_bank_account[Account_No]`
 
 ---
 
@@ -24,13 +24,13 @@
 ### 1.1 Dòng tiền vào (Total Inflow)
 - **DAX:**
 ```dax
-Dòng tiền vào (Tỷ) = SUM('fact_cashflow'[debit_amount]) / 1000000000
+Dòng tiền vào (Tỷ) = SUM('silver fact_cashflow'[debit_amount]) / 1000000000
 ```
 
 ### 1.2 Dòng tiền ra (Total Outflow)
 - **DAX:**
 ```dax
-Dòng tiền ra (Tỷ) = SUM('fact_cashflow'[credit_amount]) / 1000000000
+Dòng tiền ra (Tỷ) = SUM('silver fact_cashflow'[credit_amount]) / 1000000000
 ```
 
 ### 1.3 Số dư tiền mặt
@@ -39,18 +39,28 @@ Dòng tiền ra (Tỷ) = SUM('fact_cashflow'[credit_amount]) / 1000000000
 ```dax
 Số dư tiền cuối kỳ (Tỷ) = 
 CALCULATE(
-    SUM('fact_balancesheet'[ending_balance]),
-    'fact_balancesheet'[Indicator_Code] = "110",
-    MAX('fact_balancesheet'[Reporting_Date])
+    SUM('silver fact_balancesheet'[ending_balance]),
+    'silver fact_balancesheet'[Indicator_Code] = "B01-DN_110",
+    'silver fact_balancesheet'[Reporting_Date] = MAX('silver fact_balancesheet'[Reporting_Date])
 ) / 1000000000
 ```
 
-### 1.4 Dòng tiền thuần (Net Cashflow)
+### 1.4 Dự báo thời gian sống của tiền mặt
+- **Mô tả:** Nếu công ty không thu được thêm đồng nào, với số tiền mặt hiện có và tốc độ chi tiêu hiện tại, công ty sẽ "sống" được bao nhiêu ngày.
 - **DAX:**
 ```dax
-Dòng tiền Thuần (Tỷ) = [Dòng tiền vào (Tỷ)] - [Dòng tiền ra (Tỷ)]
+Thời gian sống của tiền (Ngày) = 
+DIVIDE(
+    CALCULATE(
+        SUM('silver fact_balancesheet'[ending_balance]),
+        'silver fact_balancesheet'[Indicator_Code] = "B01-DN_110",
+        'silver fact_balancesheet'[Reporting_Date] = MAX('silver fact_balancesheet'[Reporting_Date])
+    ),
+    DIVIDE(SUM('silver fact_cashflow'[credit_amount]), 30, 0),
+    0
+)
 ```
-- *Mẹo Conditional Formatting:* Định dạng màu Chữ cho Card này: Trị giá > 0 (Màu Xanh), Trị giá < 0 (Màu Đỏ).
+- *Mẹo:* Nếu con số này nhỏ hơn 30 ngày (tức là không đủ tiền tiêu trong 1 tháng tới), bạn có thể cài Conditional Formatting cho Card chuyển sang màu Đỏ rực để báo động cho Sếp!
 
 ---
 
@@ -58,37 +68,122 @@ Dòng tiền Thuần (Tỷ) = [Dòng tiền vào (Tỷ)] - [Dòng tiền ra (T�
 
 ### 2.1 Thu / Chi / Dư quỹ theo thời gian
 - **Loại:** Stacked Column & Line Chart
-- **Trục X:** `Dim_Date[Month Year]`
+- **Trục X:** `silver dim_date[Month Year]`
 - **Column Y-axis:** Measure `Dòng tiền vào` và `Dòng tiền ra` (Tạo màu Xanh cho Thu, Đỏ/Cam cho Chi).
 - **Line Y-axis:** Measure `Số dư tiền cuối kỳ`.
 
-### 2.2 & 2.3 Thực hiện kế hoạch Thu / Chi
-- **Loại:** Stacked Column Chart
-- **Trục X:** `Dim_Date[Month Year]`
-- **Trục Y:** Kéo `Thu Thực tế` và `Thu Kế hoạch` vào. (Làm tương tự cho Biểu đồ Chi).
+### 2.2 Thực hiện kế hoạch Thu
+- **Loại:** Line and Stacked Column Chart (Cột kết hợp Đường)
+- **Trục X:** `silver dim_date[Month Year]`
+- **Cột/Đường (Y-axis):** Bạn tạo 2 Measure sau để so sánh (Lấy Doanh thu thuần làm mốc kế hoạch thu):
+```dax
+Thu Thực tế (Tỷ) = SUM('silver fact_cashflow'[debit_amount]) / 1000000000
 
-### 2.4 Dư quỹ đầu kỳ / Kế hoạch thực hiện (Biểu đồ Waterfall / Clustered)
-- **Loại:** Clustered Column Chart (hoặc Waterfall Chart nếu có thể)
-- **Trục X:** Các trạng thái (Tồn đầu kỳ -> Thu -> Chi -> Tồn cuối kỳ)
-- **Giá trị:** Tạo một measure tổng hợp giả lập bảng để Power BI vẽ dịch chuyển trạng thái.
+Thu Kế hoạch (Tỷ) = 
+CALCULATE(
+    SUM('silver fact_businessplan'[target_amount]),
+    'silver fact_businessplan'[Indicator_Code] = "B02-DN_10"
+) / 1000000000
+```
+- *Mẹo UX:* Kéo `Thu Thực tế` làm Cột (Màu Xanh), kéo `Thu Kế hoạch` làm Đường (Line) để thấy rõ thực tế có vượt chỉ tiêu hay không.
+
+### 2.3 Thực hiện kế hoạch Chi
+- **Loại:** Line and Stacked Column Chart (Cột kết hợp Đường)
+- **Trục X:** `silver dim_date[Month Year]`
+- **Cột/Đường (Y-axis):** Tạo 2 Measure sau (Lấy Tổng chi phí Giá vốn + Bán hàng + QLDN làm mốc kế hoạch chi):
+```dax
+Chi Thực tế (Tỷ) = SUM('silver fact_cashflow'[credit_amount]) / 1000000000
+
+Chi Kế hoạch (Tỷ) = 
+CALCULATE(
+    SUM('silver fact_businessplan'[target_amount]),
+    'silver fact_businessplan'[Indicator_Code] IN {"B02-DN_11", "B02-DN_25", "B02-DN_26"}
+) / 1000000000
+```
+- *Mẹo UX:* Kéo `Chi Thực tế` làm Cột (Màu Cam), kéo `Chi Kế hoạch` làm Đường (Line).
+
+### 2.4 Dư quỹ đầu kỳ / Kế hoạch thực hiện (Phân tách trạng thái)
+- **Loại:** Clustered Column Chart (Biểu đồ cột cụm)
+- **Mô tả:** Thể hiện sự dịch chuyển trạng thái dòng tiền với 4 cột phân tách: Tồn đầu kỳ, Tổng Thu, Tổng Chi, Tồn cuối kỳ.
+- **Trục X (X-axis):** Bạn tạo một bảng phụ (Disconnected Table) gồm 4 dòng: `Tồn đầu kỳ`, `Tổng Thu`, `Tổng Chi`, `Tồn cuối kỳ`. Kéo cột đó vào Trục X.
+- **Trục Y (Y-axis):** Tạo 1 Measure tổng hợp dùng hàm SWITCH() để xuất ra 4 cột đứng cạnh nhau:
+```dax
+Trạng thái Dòng tiền (Tỷ) = 
+SWITCH(
+    SELECTEDVALUE('Bảng_Trạng_Thái'[Trạng thái]),
+    "Tồn đầu kỳ", CALCULATE(SUM('silver fact_balancesheet'[beginning_balance]), 'silver fact_balancesheet'[Indicator_Code] = "B01-DN_110") / 1000000000,
+    "Tổng Thu", [Dòng tiền vào (Tỷ)],
+    "Tổng Chi", [Dòng tiền ra (Tỷ)],
+    "Tồn cuối kỳ", CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[Indicator_Code] = "B01-DN_110") / 1000000000
+)
+```
+- *Mẹo UX:* Tô màu khác nhau cho từng cột (Ví dụ: Đầu kỳ Xanh dương, Thu Xanh lá, Chi Đỏ, Cuối kỳ Cam) để Sếp dễ phân biệt 4 trạng thái dòng tiền.
 
 ### 2.5 & 2.6 Tỷ lệ đóng góp hoạt động Thu / Chi
-- **Loại:** Pie Chart
-- **Trục Legend:** `dim_account[cashflow_category]` (Dùng bảng Map tài khoản để gom nhóm dòng tiền như: Thu bán hàng, Chi NCC, Thu từ đi vay...).
-- **Trục Values:** Measure `Dòng tiền vào` (cho 2.5) và `Dòng tiền ra` (cho 2.6).
+- **Loại:** Pie Chart (Biểu đồ tròn)
+- **Trục Legend:** Kéo cột `reciprocal_account` (Tài khoản đối ứng) từ bảng `silver fact_cashflow` vào. Cột này giúp phân rã chính xác nguồn tiền (VD: Thu 131, Chi 331).
+- **Trục Values:** 
+  - Biểu đồ 2.5 (Thu): Kéo Measure `Dòng tiền vào (Tỷ)` (Đã tạo ở mục 1.1)
+  - Biểu đồ 2.6 (Chi): Kéo Measure `Dòng tiền ra (Tỷ)` (Đã tạo ở mục 1.2)
+- *Mẹo UX:* Cài Data labels hiển thị `% of total` để thấy rõ tiền thu từ bán hàng hay đi vay chiếm tỷ trọng bao nhiêu.
 
 ### 2.7 Tài sản ngắn hạn / Nợ ngắn hạn / Vốn lưu động
-- **Loại:** Line and Clustered Column Chart
-- **Trục X:** `Dim_Date[Month Year]`
-- **Column Y-axis:** TSNH (Mã 100) và Nợ NH (Mã 310) trong `fact_balancesheet`.
-- **Line Y-axis:** Vốn lưu động = (Mã 100) - (Mã 310).
+- **Loại:** Line and Stacked Column Chart (Cột kết hợp Đường)
+- **Trục X:** `silver dim_date[Month Year]`
+- **Cột/Đường (Y-axis):** Tạo 3 Measure sau:
+```dax
+Tài sản ngắn hạn (Tỷ) = 
+CALCULATE(
+    SUM('silver fact_balancesheet'[ending_balance]),
+    'silver fact_balancesheet'[Indicator_Code] = "B01-DN_100"
+) / 1000000000
+
+Nợ ngắn hạn (Tỷ) = 
+CALCULATE(
+    SUM('silver fact_balancesheet'[ending_balance]),
+    'silver fact_balancesheet'[Indicator_Code] = "B01-DN_310"
+) / 1000000000
+
+Vốn lưu động ròng (Tỷ) = [Tài sản ngắn hạn (Tỷ)] - [Nợ ngắn hạn (Tỷ)]
+```
+- *Mẹo UX:* Kéo `Tài sản ngắn hạn` và `Nợ ngắn hạn` làm Cột (bạn có thể đổi sang biểu đồ Clustered Column Chart để 2 cột đứng cạnh nhau), kéo `Vốn lưu động ròng` làm Đường (Line).
 
 ---
 
 ## 5. Bảng Dữ Liệu Chi Tiết (Tables & Matrix)
 
 ### 3.1 Bảng Chu kỳ tiền mặt (Cash Conversion Cycle - CCC)
-- **Loại:** Table
-- **Công thức Tài chính:** CCC = Số ngày tồn kho (DIO) + Số ngày thu tiền (DSO) - Số ngày trả tiền (DPO).
-- **Cấu hình Cột:** Kỳ báo cáo, DIO, DSO, DPO, Chu kỳ tiền mặt (CCC).
-- **Lợi ích:** Theo dõi chu kỳ ròng để đánh giá hiệu quả giải phóng dòng tiền mặt của Gỗ Minh Long.
+- **Loại:** Table (Bảng phẳng)
+- **Mô tả:** Đánh giá dòng tiền bị "giam" trong bao nhiêu ngày.
+- **DAX:** Tạo lần lượt các Measure sau (với giả định tính cho năm = 365 ngày):
+```dax
+Vòng quay Hàng tồn kho = 
+DIVIDE(
+    CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_11"),
+    CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[Indicator_Code] = "B01-DN_140"),
+    0
+)
+
+Số ngày Tồn kho (DIO) = DIVIDE(365, [Vòng quay Hàng tồn kho], 0)
+
+Vòng quay Phải thu = 
+DIVIDE(
+    CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_10"),
+    CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[Indicator_Code] = "B01-DN_130"),
+    0
+)
+
+Số ngày Thu tiền (DSO) = DIVIDE(365, [Vòng quay Phải thu], 0)
+
+Vòng quay Phải trả = 
+DIVIDE(
+    CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_11"),
+    CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[Indicator_Code] = "B01-DN_311"),
+    0
+)
+
+Số ngày Trả tiền (DPO) = DIVIDE(365, [Vòng quay Phải trả], 0)
+
+Chu kỳ tiền mặt (CCC) = [Số ngày Tồn kho (DIO)] + [Số ngày Thu tiền (DSO)] - [Số ngày Trả tiền (DPO)]
+```
+- **Cấu hình Cột:** Kéo thả lần lượt các trường sau vào Table: `silver dim_date[Month Year]`, `Số ngày Tồn kho (DIO)`, `Số ngày Thu tiền (DSO)`, `Số ngày Trả tiền (DPO)`, `Chu kỳ tiền mặt (CCC)`.
