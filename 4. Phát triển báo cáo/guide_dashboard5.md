@@ -11,7 +11,7 @@
 
 ## 2. Bộ lọc (Slicers)
 - **Thời gian (Tháng):** `silver dim_date[Month Year]`
-- **Ngân hàng & TK (Bank/Account):** `silver dim_bank[Bank_Name]`, `silver dim_bank_account[Account_No]`
+- **Ngân hàng & TK (Bank/Account):** `silver dim_bank[Bank_Name]`, `silver dim_account[Account_No]`
 
 ---
 
@@ -175,31 +175,34 @@ Vốn lưu động ròng (Tỷ) = [Tài sản ngắn hạn (Tỷ)] - [Nợ ngắ
 - **DAX:** Tạo lần lượt các Measure sau (với giả định tính cho năm = 365 ngày):
 ```dax
 Vòng quay Hàng tồn kho = 
-DIVIDE(
-    CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_11"),
-    CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[Indicator_Code] = "B01-DN_140"),
-    0
-)
+VAR MaxDate = MAX('silver fact_balancesheet'[reporting_date])
+VAR GiaVon = CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_11")
+VAR TonKho = CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[Indicator_Code] = "B01-DN_140", 'silver fact_balancesheet'[reporting_date] = MaxDate)
+RETURN DIVIDE(GiaVon, TonKho, 0)
 
-Số ngày Tồn kho (DIO) = DIVIDE(365, [Vòng quay Hàng tồn kho], 0)
+Số ngày Tồn kho (DIO) = 
+VAR DaysInPeriod = MAX(1, DATEDIFF(MIN('silver dim_date'[Date]), MAX('silver dim_date'[Date]), DAY) + 1)
+RETURN DIVIDE(DaysInPeriod, [Vòng quay Hàng tồn kho], 0)
 
 Vòng quay Phải thu = 
-DIVIDE(
-    CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_10"),
-    CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[Indicator_Code] = "B01-DN_130"),
-    0
-)
+VAR MaxDate = MAX('silver fact_balancesheet'[reporting_date])
+VAR DoanhThu = CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_10")
+VAR PhaiThu = CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[Indicator_Code] = "B01-DN_130", 'silver fact_balancesheet'[reporting_date] = MaxDate)
+RETURN DIVIDE(DoanhThu, PhaiThu, 0)
 
-Số ngày Thu tiền (DSO) = DIVIDE(365, [Vòng quay Phải thu], 0)
+Số ngày Thu tiền (DSO) = 
+VAR DaysInPeriod = MAX(1, DATEDIFF(MIN('silver dim_date'[Date]), MAX('silver dim_date'[Date]), DAY) + 1)
+RETURN DIVIDE(DaysInPeriod, [Vòng quay Phải thu], 0)
 
 Vòng quay Phải trả = 
-DIVIDE(
-    CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_11"),
-    CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[Indicator_Code] = "B01-DN_311"),
-    0
-)
+VAR MaxDate = MAX('silver fact_balancesheet'[reporting_date])
+VAR GiaVon = CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_11")
+VAR PhaiTra = CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[Indicator_Code] = "B01-DN_311", 'silver fact_balancesheet'[reporting_date] = MaxDate)
+RETURN DIVIDE(GiaVon, PhaiTra, 0)
 
-Số ngày Trả tiền (DPO) = DIVIDE(365, [Vòng quay Phải trả], 0)
+Số ngày Trả tiền (DPO) = 
+VAR DaysInPeriod = MAX(1, DATEDIFF(MIN('silver dim_date'[Date]), MAX('silver dim_date'[Date]), DAY) + 1)
+RETURN DIVIDE(DaysInPeriod, [Vòng quay Phải trả], 0)
 
 Chu kỳ tiền mặt (CCC) = [Số ngày Tồn kho (DIO)] + [Số ngày Thu tiền (DSO)] - [Số ngày Trả tiền (DPO)]
 ```

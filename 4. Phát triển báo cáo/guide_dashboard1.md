@@ -116,7 +116,7 @@ RETURN DIVIDE(TongNo, TongNguonVon, 0)
 
 ## 4. Công thức DAX & Cấu hình Chi tiết (Phần Biểu đồ - Charts)
 
-> **Cột bổ trợ cần có trong bảng `fact_cashflow` (để thay thế fact_loan):**
+> **Cột bổ trợ cần có trong bảng `fact_cashflow`:**
 > Nhóm các tài khoản vay thành "Ngắn hạn" và "Dài hạn":
 > ```dax
 > term_type = IF('silver fact_cashflow'[account_no] IN {"34111", "34113", "34114"}, "Ngắn hạn", IF('silver fact_cashflow'[account_no] = "34112", "Dài hạn", BLANK()))
@@ -138,9 +138,7 @@ CP Lãi Vay (Kế hoạch) = CALCULATE(SUM('fact_businessplan'[Target_Amount]), 
 ```
 
 ### 2.3 Lãi suất bình quân từng bank
-- **Loại:** Bar Chart
-- **Trục Y:** `dim_bank[Bank_Name]`
-- **Trục X:** Measure `Lãi suất BQ (%) = AVERAGE('fact_loan'[Interest_Rate])`
+- **[ĐÃ LƯỢC BỎ]** Biểu đồ này tạm thời không sử dụng do bảng `fact_loan` (nhập tay) đã bị loại bỏ khỏi Single Source of Truth vì thiếu chính xác.
 
 ### 2.4 Dư nợ tại từng ngân hàng
 - **Loại:** Column Chart
@@ -176,8 +174,4 @@ CP Lãi Vay (Kế hoạch) = CALCULATE(SUM('fact_businessplan'[Target_Amount]), 
 - **Cột:** Kéo từ bảng `fact_collateral`: STT, Loại TS, Giá trị thẩm định, Hệ số TSĐB, Giá trị cho vay, Số tiền được vay.
 
 ### 2.10 Bảng chi tiết lịch trả gốc
-- **Loại:** Matrix
-- **Rows:** `dim_bank[Bank_Name]`
-- **Columns:** `fact_loan[Maturity_Date]`
-- **Values:** `SUM(fact_loan[Principal_Payment_Amount])`
-- **Tính năng mở rộng:** Cho phép Drill-down từ Bank -> Hợp đồng tín dụng.
+- **[ĐÃ LƯỢC BỎ]** Bảng này tạm thời không sử dụng do bảng `fact_loan` (nhập tay) đã bị loại bỏ khỏi Single Source of Truth vì thiếu chính xác.
