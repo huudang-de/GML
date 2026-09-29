@@ -43,7 +43,7 @@
 |:---|:---|:---|:---|:---|
 | 1.1 | **Giá trị phải thu** | LASTDATE(Dư Nợ TK131) — tổng dư nợ cuối kỳ KH đang chiếm dụng | `Chi_tiet_cong_no_phai_thu` | Snapshot |
 | 1.2 | **Vòng quay phải thu hiện tại** | DT thuần trong kỳ / [(PT đầu kỳ + PT cuối kỳ) / 2] | B02_DN + `Chi_tiet_cong_no_phai_thu` | Derived |
-| 1.3 | **Số lượng khách hàng** | COUNT DISTINCT(Mã KH) có dư nợ > 0 | `Chi_tiet_cong_no_phai_thu` | Derived |
+| 1.3 | **Số lượng khách hàng nợ** | COUNTROWS / DISTINCTCOUNT(Mã KH). Bắt buộc phải chèn thêm đoạn filter `[Dư nợ] > 0` | `Chi_tiet_cong_no_phai_thu` | Derived |
 | 1.4 | **Giá trị phải trả** | LASTDATE(Dư Có TK331) — tổng nợ công ty đang chiếm dụng vốn NCC | `Chi_tiet_cong_no_phai_tra` | Snapshot |
 | 1.5 | **Vòng quay phải thu theo năm** | [VQ PT hiện tại] × (365 / Số ngày kỳ BC) | Derived | Derived |
 | 1.6 | **Tổng số hóa đơn** | COUNT DISTINCT(Số hóa đơn) có dư nợ còn lại | `Chi_tiet_cong_no_phai_thu` | Derived |
@@ -78,7 +78,10 @@ dim_partner → 🆕 Tạo mới (thực thể Khách hàng + Nhà cung cấp)
 ```
 
 > [!TIP]
-> **Một bảng `dim_partner` cho cả KH lẫn NCC** — dùng cột `partner_group` để phân loại. Đây là thiết kế tốt vì: (1) một công ty có thể vừa là KH vừa là NCC; (2) giảm số bảng DIM; (3) Power BI slicer tên đối tác hoạt động cho cả phải thu lẫn phải trả.
+> **Một bảng `dim_partner` cho cả KH lẫn NCC** — dùng cột `partner_group` để phân loại. 
+> **Lưu ý DAX / RLS (Bắt buộc):**
+> - Khi tính Phải thu: Gom đủ 2 nhóm `"Khách hàng"` VÀ `"Khách hàng/ nhà cung cấp"`.
+> - Khi tính Phải trả: Gom đủ `"Nhà cung cấp"` VÀ `"Khách hàng/ nhà cung cấp"`.
 
 ---
 

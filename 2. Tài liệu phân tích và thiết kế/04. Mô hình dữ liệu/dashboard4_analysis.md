@@ -45,7 +45,7 @@
 | 1.2 | **Tiền gửi** (còn hiệu lực) | SUM(Trị giá gốc) HĐ tiền gửi thỏa ĐK2 — chưa đến ngày tất toán | `Hop_dong_tien_gui.xlsm` | Snapshot |
 | 1.3 | **Số lượng HĐ tiền gửi** | COUNT DISTINCT(Số sổ/Khế ước) còn hiệu lực | `Hop_dong_tien_gui.xlsm` | Derived |
 | 1.4 | **Lãi suất bình quân** | AVERAGE(Lãi suất) của các sổ còn hiệu lực | `Hop_dong_tien_gui.xlsm`: cột "LS (%)" | Derived |
-| 1.5 | **Thu nhập lãi** | Tổng "Doanh thu hoạt động tài chính" thực nhận trong kỳ → Mã chỉ tiêu 21 trong B02_DN | MISA — B02_DN, Mã 21 | Flow |
+| 1.5 | **Thu nhập lãi** | Đo dòng tiền thực thu từ bảng silver `fact_cashflow` (Lọc tổng `debit_amount` có `counterpart_account` = "515") | `fact_cashflow` | Flow |
 
 ---
 

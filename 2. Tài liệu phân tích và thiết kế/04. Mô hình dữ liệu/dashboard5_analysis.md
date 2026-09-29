@@ -48,10 +48,10 @@
 
 #### 🟦 Phần 1: 4 Chỉ số tổng quan
 
-| Mã | Tên | Cách tính / Nguồn | File gốc | Loại |
+| Mã | Tên | Cách tính (Cập nhật DAX) | File gốc | Loại |
 |:---|:---|:---|:---|:---|
-| 1.1 | **Dòng tiền vào** | SUM(Phát sinh Nợ) TK111 + TK112 trong kỳ, loại trừ ĐK3 | `So_chi_tiet_cac_tai_khoan.xlsx` | Flow |
-| 1.2 | **Dòng tiền ra** | SUM(Phát sinh Có) TK111 + TK112 trong kỳ, loại trừ ĐK3 | `So_chi_tiet_cac_tai_khoan.xlsx` | Flow |
+| 1.1 | **Dòng tiền vào** | SUM(Phát sinh Nợ) TK111 + TK112. Phải chèn điều kiện loại trừ: `LEFT('silver fact_cashflow'[voucher_no], 4) <> "CTNB"` | `So_chi_tiet_cac_tai_khoan.xlsx` | Flow |
+| 1.2 | **Dòng tiền ra** | SUM(Phát sinh Có) TK111 + TK112. Phải chèn điều kiện loại trừ: `LEFT('silver fact_cashflow'[voucher_no], 4) <> "CTNB"` | `So_chi_tiet_cac_tai_khoan.xlsx` | Flow |
 | 1.3 | **Số dư tiền mặt** | LASTDATE(Mã 110 B01_DN) — chốt tồn quỹ cuối kỳ | MISA — B01_DN | Snapshot |
 | 1.4 | **Dự báo thời gian sống** | [Số dư tiền mặt cuối kỳ] ÷ [TB Dòng tiền ra hàng ngày] | Derived từ 1.3 và 1.2 | Derived |
 
@@ -68,7 +68,7 @@
 | 2.5 | **Tỷ lệ đóng góp của hoạt động Thu** | Pie Chart | `So_chi_tiet` (phân loại theo ĐK4) | Tỷ trọng: Thu bán hàng, Thu đi vay, Thu lãi... |
 | 2.6 | **Tỷ lệ đóng góp của hoạt động Chi** | Pie Chart | `So_chi_tiet` (phân loại theo ĐK4) | Tỷ trọng: Chi NCC, Chi lương, Chi trả nợ... |
 | 2.7 | **TSNH / Nợ NH / Vốn lưu động** | Column Chart | B01_DN | Cột: Mã100 + Mã310; Đường: TSNH - Nợ NH |
-| 3.1 | **Bảng Chu kỳ tiền mặt (CCC)** | Table | B01_DN + B02_DN | Số ngày tồn kho + Số ngày PT − Số ngày PTra = CCC (ngày) |
+| 3.1 | **Bảng Chu kỳ tiền mặt (CCC)** | Table | B01_DN + B02_DN | Số ngày tồn kho (DIO) + Số ngày PT (DSO) − Số ngày PTra (DPO) = CCC (ngày). *Các chỉ số thành phần dùng DATEDIFF thay cho 365* |
 
 ---
 

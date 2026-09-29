@@ -56,16 +56,16 @@
 
 #### 🟦 Phần 1: 8 Chỉ số tổng quan (Cards)
 
-| Mã | Tên chỉ tiêu | Cách tính GỐC trong BRD | Nguồn file gốc | Loại |
+| Mã | Tên chỉ tiêu | Cách tính (Cập nhật DAX) | Nguồn file gốc | Loại |
 |:---|:---|:---|:---|:---|
-| 1.1 | **Dư nợ ngắn hạn** | Tổng cột "Dư có" trong Sổ chi tiết TK tại MISA → lọc TK 34111, 34113, 34114 | MISA — Sổ chi tiết TK 341 | Snapshot |
-| 1.2 | **Dư nợ dài hạn** | Tổng cột "Dư có" trong Sổ chi tiết TK → TK vay dài hạn (341) | MISA — Sổ chi tiết TK 341 | Snapshot |
+| 1.1 | **Dư nợ ngắn hạn** | Dùng MAXX(TOPN(1,...)) trên `fact_cashflow` (cột `credit_balance`) để chốt số liệu mới nhất. Lọc `account_no` IN {"34111", "34113", "34114"} | MISA — Sổ chi tiết TK 341 | Snapshot |
+| 1.2 | **Dư nợ dài hạn** | Dùng MAXX(TOPN(1,...)) trên `fact_cashflow` (cột `credit_balance`). Lọc `account_no` = "34112" | MISA — Sổ chi tiết TK 341 | Snapshot |
 | 1.3 | **Hạn mức còn lại** | = Tổng hạn mức tín dụng − Số dư hạn mức đã sử dụng; hoặc lấy trực tiếp cột "Hạn mức đã sử dụng" | File `bc_tin_dung_2026.xlsx` | Snapshot |
-| 1.4 | **Dự báo thời gian sống tiền mặt (Ngày)** | = Tổng tiền hiện có (Mã B01-DN_110 = TK111+TK112) ÷ Chi bình quân mỗi ngày (= Tổng chi / 30 ngày) | MISA — B01_DN (Mã 110) + Sổ chi tiết TK 111/112 | Derived |
+| 1.4 | **Dự báo thời gian sống tiền mặt (Ngày)** | = [Tiền mặt hiện có] ÷ Tổng dòng tiền chi ra trong tháng (SUM(credit_amount) TK 111,112). Loại trừ chứng từ nội bộ: `LEFT(voucher_no,4) <> "CTNB"` | MISA — B01_DN (Mã 110) + Sổ chi tiết TK 111/112 | Derived |
 | 1.5 | **Hạn mức được cấp** | Số tiền DN thực sự làm hồ sơ xin mở hạn mức, dựa trên TSĐB | File `Báo cáo tín dụng` (nội bộ) | Snapshot |
 | 1.6 | **Hạn mức được phê duyệt** | Con số TỐI ĐA ngân hàng đồng ý cho vay trong năm | File `Báo cáo tín dụng` (nội bộ) | Snapshot |
-| 1.7 | **Loan to Value (LTV)** | = Tổng "Dư nợ gốc vay đến hiện tại" ÷ Tổng "Giá trị định giá TSĐB" | File `bc_tin_dung_2026.xlsx` | Derived |
-| 1.8 | **Tỷ lệ Nợ / Vốn (D/E)** | = Tổng Nợ phải trả (Mã 300) ÷ Vốn chủ sở hữu (Mã 400) | MISA — B01_DN (CĐKT) | Derived |
+| 1.7 | **Loan to Value (LTV)** | = Tổng Hạn mức được cấp (`granted_limit`) ÷ Tổng "Giá trị định giá TSĐB" | File `bc_tin_dung_2026.xlsx` | Derived |
+| 1.8 | **Tỷ lệ Nợ / Vốn (D/E)** | = Tổng Nợ phải trả (Mã 300) ÷ Tổng Nguồn vốn (Mã 440) | MISA — B01_DN (CĐKT) | Derived |
 
 ---
 
@@ -87,7 +87,7 @@
 
 | Mã | Tên | Loại | Nguồn file gốc | Các cột hiển thị |
 |:---|:---|:---|:---|:---|
-| 2.8 | **Bảng tổng hợp chỉ số tài chính (Vòng quay nợ vay)** | Table | B02_DN (MISA) + `bc_tin_dung_2026.xlsx` + B01_DN | Kỳ báo cáo · GVHB · Dư nợ BQ · Vòng quay · Số ngày · D/E |
+| 2.8 | **Bảng tổng hợp chỉ số tài chính (Vòng quay nợ vay)** | Table | B02_DN (MISA) + `bc_tin_dung_2026.xlsx` + B01_DN | Kỳ báo cáo · GVHB · Dư nợ BQ (MAX date) · Vòng quay · Số ngày (DATEDIFF thay vì 365) · D/E |
 | 2.9 | **Chi tiết tài sản đảm bảo** | Table (6 cột) | `bc_tin_dung_2026.xlsx` → Sheet `TSBD Bank` | 2.9.1 Loại TS · 2.9.2 Giá trị thẩm định · 2.9.3 Hệ số TSĐB · 2.9.4 Giá trị cho vay · 2.9.5 Số tiền được vay · 2.9.6 Mã NH |
 | 2.10 | **Lịch trả gốc ngân hàng** | Matrix | `bc_tin_dung_2026.xlsx` → Sheet `KE HOACH TRA NO TUAN` | Bank (Rows) · Ngày phát sinh (Cols, tự động giãn) · Số tiền (Values) |
 

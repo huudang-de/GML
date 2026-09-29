@@ -44,8 +44,8 @@
 | Mã | Tên | Cách tính / Nguồn gốc | File gốc / Cột gốc | Loại |
 |:---|:---|:---|:---|:---|
 | 1.1 | **Giá trị hàng tồn kho** | LASTDATE(ending_value) — tổng cuối kỳ. **Không được cộng dồn qua tháng** | `Tong_hop_ton_kho.xlsx`: cột "Giá trị tồn" | Snapshot |
-| 1.2 | **Vòng quay Hàng tồn kho** | = GVHB / [(Tồn đầu kỳ + Tồn cuối kỳ)/2] | B02_DN (GVHB) + `Tong_hop_ton_kho` (ending_value) | Derived |
-| 1.3 | **Tỷ lệ Tồn kho / Doanh thu** (Inventory to Sales) | = Giá trị tồn cuối kỳ / Doanh thu thuần (Mã 10 B02_DN) | `Tong_hop_ton_kho` + B02_DN | Derived |
+| 1.2 | **Vòng quay Hàng tồn kho** | = GVHB / Tồn kho Cuối kỳ (Sử dụng chốt Snapshot ngày cuối tháng) | B02_DN (GVHB) + `Tong_hop_ton_kho` (ending_value) | Derived |
+| 1.3 | **Tỷ lệ Tồn kho / Doanh thu** (Inventory to Sales) | = Giá trị tồn cuối kỳ / CALCULATE(Doanh thu thuần, Mã B02-DN_10) | `Tong_hop_ton_kho` + B02_DN | Derived |
 | 1.4 | **Số lượng hàng tồn kho** | LASTDATE(ending_quantity) — tổng số lượng cuối kỳ theo DVT riêng từng mã hàng | `Tong_hop_ton_kho.xlsx`: cột "Số lượng tồn" | Snapshot |
 | 1.5 | **Tổng mã sản phẩm** | COUNT DISTINCT(product_code) có ending_quantity > 0 | `Tong_hop_ton_kho.xlsx` | Derived |
 | 1.6 | **Giá trị hàng nhập khẩu** | SUM(inward_value) WHERE giao dịch nhập khẩu (có tỷ giá ngoại tệ hoặc loại chứng từ mua hàng nhập khẩu) | Sổ chi tiết mua hàng MISA | Flow |
