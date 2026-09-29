@@ -24,13 +24,23 @@
 ### 1.1 Dòng tiền vào (Total Inflow)
 - **DAX:**
 ```dax
-Dòng tiền vào (Tỷ) = SUM('silver fact_cashflow'[debit_amount]) / 1000000000
+Dòng tiền vào (Tỷ) = 
+CALCULATE(
+    SUM('silver fact_cashflow'[debit_amount]),
+    LEFT('silver fact_cashflow'[account_no], 3) IN {"111", "112"},
+    LEFT('silver fact_cashflow'[voucher_no], 4) <> "CTNB"
+) / 1000000000
 ```
 
 ### 1.2 Dòng tiền ra (Total Outflow)
 - **DAX:**
 ```dax
-Dòng tiền ra (Tỷ) = SUM('silver fact_cashflow'[credit_amount]) / 1000000000
+Dòng tiền ra (Tỷ) = 
+CALCULATE(
+    SUM('silver fact_cashflow'[credit_amount]),
+    LEFT('silver fact_cashflow'[account_no], 3) IN {"111", "112"},
+    LEFT('silver fact_cashflow'[voucher_no], 4) <> "CTNB"
+) / 1000000000
 ```
 
 ### 1.3 Số dư tiền mặt
@@ -49,16 +59,23 @@ CALCULATE(
 - **Mô tả:** Nếu công ty không thu được thêm đồng nào, với số tiền mặt hiện có và tốc độ chi tiêu hiện tại, công ty sẽ "sống" được bao nhiêu ngày.
 - **DAX:**
 ```dax
-Thời gian sống của tiền (Ngày) = 
-DIVIDE(
+Thời gian sống của tiền (Runway) = 
+VAR MaxDate = MAX('silver fact_balancesheet'[reporting_date])
+VAR TienMat = 
     CALCULATE(
-        SUM('silver fact_balancesheet'[ending_balance]),
+        SUM('silver fact_balancesheet'[ending_balance]), 
         'silver fact_balancesheet'[Indicator_Code] = "B01-DN_110",
-        'silver fact_balancesheet'[Reporting_Date] = MAX('silver fact_balancesheet'[Reporting_Date])
-    ),
-    DIVIDE(SUM('silver fact_cashflow'[credit_amount]), 30, 0),
-    0
-)
+        'silver fact_balancesheet'[reporting_date] = MaxDate
+    )
+VAR TongChi = 
+    CALCULATE(
+        SUM('silver fact_cashflow'[credit_amount]),
+        LEFT('silver fact_cashflow'[account_no], 3) IN {"111", "112"},
+        LEFT('silver fact_cashflow'[voucher_no], 4) <> "CTNB",
+        YEAR('silver fact_cashflow'[posting_date]) = YEAR(MaxDate),
+        MONTH('silver fact_cashflow'[posting_date]) = MONTH(MaxDate)
+    )
+RETURN DIVIDE(TienMat, TongChi, 0) * 30
 ```
 - *Mẹo:* Nếu con số này nhỏ hơn 30 ngày (tức là không đủ tiền tiêu trong 1 tháng tới), bạn có thể cài Conditional Formatting cho Card chuyển sang màu Đỏ rực để báo động cho Sếp!
 
@@ -77,7 +94,7 @@ DIVIDE(
 - **Trục X:** `silver dim_date[Month Year]`
 - **Cột/Đường (Y-axis):** Bạn tạo 2 Measure sau để so sánh (Lấy Doanh thu thuần làm mốc kế hoạch thu):
 ```dax
-Thu Thực tế (Tỷ) = SUM('silver fact_cashflow'[debit_amount]) / 1000000000
+Thu Thực tế (Tỷ) = [Dòng tiền vào (Tỷ)]
 
 Thu Kế hoạch (Tỷ) = 
 CALCULATE(
@@ -92,7 +109,7 @@ CALCULATE(
 - **Trục X:** `silver dim_date[Month Year]`
 - **Cột/Đường (Y-axis):** Tạo 2 Measure sau (Lấy Tổng chi phí Giá vốn + Bán hàng + QLDN làm mốc kế hoạch chi):
 ```dax
-Chi Thực tế (Tỷ) = SUM('silver fact_cashflow'[credit_amount]) / 1000000000
+Chi Thực tế (Tỷ) = [Dòng tiền ra (Tỷ)]
 
 Chi Kế hoạch (Tỷ) = 
 CALCULATE(

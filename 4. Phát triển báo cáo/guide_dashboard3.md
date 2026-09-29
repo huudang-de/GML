@@ -22,15 +22,25 @@
 
 ```dax
 Phải thu Cuối Kỳ = 
-CALCULATE(
-    SUM('silver fact_accountsreceivable'[ending_debit_balance]),
-    'silver fact_accountsreceivable'[posting_date] = MAX('silver fact_accountsreceivable'[posting_date])
+SUMX(
+    FILTER('silver dim_partner', 'silver dim_partner'[partner_group] IN {"Khách hàng", "Khách hàng/ nhà cung cấp"}),
+    CALCULATE(
+        MAXX(
+            TOPN(1, 'silver fact_accountsreceivable', 'silver fact_accountsreceivable'[posting_date], DESC, 'silver fact_accountsreceivable'[id], DESC),
+            'silver fact_accountsreceivable'[ending_debit_balance]
+        )
+    )
 )
 
 Phải trả Cuối Kỳ = 
-CALCULATE(
-    SUM('silver fact_accountspayable'[ending_credit_balance]),
-    'silver fact_accountspayable'[posting_date] = MAX('silver fact_accountspayable'[posting_date])
+SUMX(
+    FILTER('silver dim_partner', 'silver dim_partner'[partner_group] IN {"Nhà cung cấp", "Khách hàng/ nhà cung cấp"}),
+    CALCULATE(
+        MAXX(
+            TOPN(1, 'silver fact_accountspayable', 'silver fact_accountspayable'[posting_date], DESC, 'silver fact_accountspayable'[id], DESC),
+            'silver fact_accountspayable'[ending_credit_balance]
+        )
+    )
 )
 ```
 
@@ -44,10 +54,10 @@ Phải trả (Tỷ) = DIVIDE([Phải trả Cuối Kỳ], 1000000000, 0)
 - **Mô tả:** Doanh thu / Trung bình dư nợ Phải thu.
 - **DAX:** (Đảm bảo không dùng VAR)
 ```dax
-Vòng quay PT = 
+Vòng quay PT hiện tại = 
 DIVIDE(
-    CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_01"),
-    ([Phải thu Đầu Kỳ] + [Phải thu Cuối Kỳ]) / 2,
+    CALCULATE(SUM('silver fact_incomestatement'[current_period_amount]), 'silver fact_incomestatement'[indicator_code] = "B02-DN_10"),
+    [Phải thu Cuối Kỳ],
     0
 )
 ```
@@ -55,14 +65,39 @@ DIVIDE(
 ### 1.5 Vòng quay phải thu theo năm
 - **DAX:**
 ```dax
-Số ngày thu tiền BQ (DSO) = DIVIDE(365, [Vòng quay PT], 0)
+Phải thu Năm Ngoái = 
+CALCULATE(
+    [Phải thu Cuối Kỳ],
+    SAMEPERIODLASTYEAR('silver dim_date'[Date])
+)
+
+Vòng quay PT theo năm = 
+DIVIDE(
+    CALCULATE(SUM('silver fact_incomestatement'[current_period_amount]), 'silver fact_incomestatement'[indicator_code] = "B02-DN_10"),
+    ([Phải thu Cuối Kỳ] + [Phải thu Năm Ngoái]) / 2,
+    0
+)
 ```
 
 ### 1.3 & 1.6 Số lượng Khách hàng & Hóa đơn nợ
 - **DAX:**
 ```dax
-Số lượng KH nợ = CALCULATE(DISTINCTCOUNT('silver fact_accountsreceivable'[partner_code]), 'silver fact_accountsreceivable'[ending_debit_balance] > 0)
-Số lượng HĐ nợ = CALCULATE(DISTINCTCOUNT('silver fact_accountsreceivable'[invoice_no]), 'silver fact_accountsreceivable'[ending_debit_balance] > 0)
+Số lượng KH nợ = 
+COUNTROWS(
+    FILTER(
+        ADDCOLUMNS(
+            FILTER('silver dim_partner', 'silver dim_partner'[partner_group] IN {"Khách hàng", "Khách hàng/ nhà cung cấp"}),
+            "DuNo", CALCULATE(MAXX(TOPN(1, 'silver fact_accountsreceivable', 'silver fact_accountsreceivable'[posting_date], DESC, 'silver fact_accountsreceivable'[id], DESC), 'silver fact_accountsreceivable'[ending_debit_balance]))
+        ),
+        [DuNo] > 0
+    )
+)
+
+Tổng hóa đơn = 
+CALCULATE(
+    DISTINCTCOUNT('silver fact_accountsreceivable'[invoice_no]),
+    'silver fact_accountsreceivable'[debit_amount] > 0
+)
 ```
 
 ---
@@ -79,7 +114,7 @@ Số lượng HĐ nợ = CALCULATE(DISTINCTCOUNT('silver fact_accountsreceivable
 ### 2.2 Vòng quay phải thu theo tháng
 - **Loại:** Area Chart
 - **Trục X:** `silver Dim_Date[Month]`
-- **Trục Y:** Measure `Vòng quay PT`
+- **Trục Y:** Measure `Vòng quay PT hiện tại`
 
 ### 2.3 Biểu đồ tuổi nợ (Aging Report)
 - **Loại:** Stacked Column Chart

@@ -33,45 +33,37 @@ CALCULATE(
 ```dax
 Tổng gốc Tiền gửi (Tỷ) = 
 CALCULATE(
-    SUM('silver fact_termdeposit'[original_amount]),
-    FILTER(
-        'silver fact_termdeposit',
-        ISBLANK('silver fact_termdeposit'[settlement_date]) || 'silver fact_termdeposit'[settlement_date] > MAX('silver dim_date'[Date])
-    )
+    SUM('silver fact_termdeposit'[remaining_value])
 ) / 1000000000
 ```
-*(Điều kiện trên lọc ra các sổ tiết kiệm chưa tất toán tính đến thời điểm báo cáo).*
 
 ### 1.3 & 1.4 Số lượng hợp đồng & Lãi suất BQ
 - **DAX:**
 ```dax
 Số sổ tiết kiệm = 
 CALCULATE(
-    DISTINCTCOUNT('silver fact_termdeposit'[passbook_no]),
-    FILTER(
-        'silver fact_termdeposit',
-        ISBLANK('silver fact_termdeposit'[settlement_date]) || 'silver fact_termdeposit'[settlement_date] > MAX('silver dim_date'[Date])
-    )
+    COUNTROWS('silver fact_termdeposit'),
+    'silver fact_termdeposit'[remaining_value] > 0
 )
 
 Lãi suất BQ Tiền gửi (%) = 
 CALCULATE(
-    AVERAGE('silver fact_termdeposit'[interest_rate]),
-    FILTER(
-        'silver fact_termdeposit',
-        ISBLANK('silver fact_termdeposit'[settlement_date]) || 'silver fact_termdeposit'[settlement_date] > MAX('silver dim_date'[Date])
-    )
+    DIVIDE(
+        SUMX('silver fact_termdeposit', 'silver fact_termdeposit'[original_amount] * 'silver fact_termdeposit'[interest_rate]),
+        SUM('silver fact_termdeposit'[original_amount])
+    ),
+    'silver fact_termdeposit'[remaining_value] > 0
 )
 ```
 
 ### 1.5 Thu nhập lãi
-- **Mô tả:** Doanh thu HĐ tài chính (Mã 21 trong B02-DN).
+- **Mô tả:** Lấy từ dòng tiền phát sinh Có của TK Tiền gửi (hoặc ghi Nợ TK 111/112 đối ứng 515).
 - **DAX:**
 ```dax
 Thu nhập lãi (Tỷ) = 
 CALCULATE(
-    SUM('silver fact_incomestatement'[Current_Period_Amount]),
-    'silver fact_incomestatement'[Indicator_Code] = "B02-DN_22"
+    SUM('silver fact_cashflow'[debit_amount]),
+    'silver fact_cashflow'[reciprocal_account] = "515"
 ) / 1000000000
 ```
 

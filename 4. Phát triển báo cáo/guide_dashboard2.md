@@ -41,7 +41,7 @@ HTK Đầu Kỳ = CALCULATE([HTK Cuối Kỳ], PREVIOUSMONTH('Dim_Date'[Date]))
 
 Tồn kho BQ = ([HTK Đầu Kỳ] + [HTK Cuối Kỳ]) / 2
 
-Vòng quay HTK = DIVIDE([Giá vốn hàng bán], [Tồn kho BQ], 0)
+Vòng quay HTK = DIVIDE([Giá vốn hàng bán], [HTK Cuối Kỳ], 0)
 ```
 
 ### 1.3 Tỷ lệ tồn kho / Doanh thu (I/S Ratio)
@@ -49,7 +49,7 @@ Vòng quay HTK = DIVIDE([Giá vốn hàng bán], [Tồn kho BQ], 0)
 Tạo Doanh thu riêng rồi mới chia:
 
 ```dax
-Doanh thu thuần = CALCULATE(SUM('fact_incomestatement'[current_period_amount]), 'fact_incomestatement'[indicator_code] = "B02-DN_01")
+Doanh thu thuần = CALCULATE(SUM('fact_incomestatement'[current_period_amount]), 'fact_incomestatement'[indicator_code] = "B02-DN_10")
 
 Tỷ lệ I/S (%) = DIVIDE([HTK Cuối Kỳ], [Doanh thu thuần], 0)
 ```

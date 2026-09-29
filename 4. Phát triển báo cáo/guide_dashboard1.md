@@ -22,9 +22,17 @@
 - **DAX:**
 ```dax
 Dư nợ ngắn hạn (Tỷ VNĐ) = 
-CALCULATE (
-    SUM('fact_loan'[remaining_principal]),
-    'fact_loan'[term_type] = "Ngắn hạn"
+SUMX(
+    FILTER(
+        VALUES('silver fact_cashflow'[account_no]),
+        'silver fact_cashflow'[account_no] IN {"34111", "34113", "34114"}
+    ),
+    CALCULATE(
+        MAXX(
+            TOPN(1, 'silver fact_cashflow', 'silver fact_cashflow'[posting_date], DESC, 'silver fact_cashflow'[id], DESC),
+            'silver fact_cashflow'[credit_balance]
+        )
+    )
 ) / 1000000000
 ```
 
@@ -32,9 +40,17 @@ CALCULATE (
 - **DAX:**
 ```dax
 Dư nợ dài hạn (Tỷ VNĐ) = 
-CALCULATE (
-    SUM('fact_loan'[remaining_principal]),
-    'fact_loan'[term_type] = "Dài hạn"
+SUMX(
+    FILTER(
+        VALUES('silver fact_cashflow'[account_no]),
+        'silver fact_cashflow'[account_no] = "34112"
+    ),
+    CALCULATE(
+        MAXX(
+            TOPN(1, 'silver fact_cashflow', 'silver fact_cashflow'[posting_date], DESC, 'silver fact_cashflow'[id], DESC),
+            'silver fact_cashflow'[credit_balance]
+        )
+    )
 ) / 1000000000
 ```
 
@@ -42,17 +58,30 @@ CALCULATE (
 - **DAX:**
 ```dax
 Hạn mức còn lại (Tỷ VNĐ) = 
-( SUM('fact_creditlimitsummary'[credit_limit]) - SUM('fact_loan'[remaining_principal]) ) / 1000000000
+SUM('silver fact_creditlimitsummary'[remaining_disbursement]) / 1000000000
 ```
 
 ### 1.4 Dự báo thời gian sống của Tiền mặt (Cash Runway)
-- **Mô tả:** Tổng dư tiền mặt (Mã 110 cuối kỳ) chia cho Tốc độ đốt tiền (Trung bình dòng chi hàng ngày).
+- **Mô tả:** Tổng dư tiền mặt (Mã 110 cuối kỳ) chia cho Tốc độ đốt tiền (Tổng dòng chi ra trong tháng), quy đổi ra số ngày bằng cách nhân 30.
 - **DAX:**
 ```dax
 Cash Runway (Ngày) = 
-VAR TienMat = CALCULATE(SUM('fact_balancesheet'[ending_balance]), 'fact_balancesheet'[Indicator_Code] = "110")
-VAR TrungBinhChi = AVERAGEX('fact_cashflow', 'fact_cashflow'[credit_amount])
-RETURN DIVIDE(TienMat, TrungBinhChi, 0)
+VAR MaxDate = MAX('silver fact_balancesheet'[reporting_date])
+VAR TienMat = 
+    CALCULATE(
+        SUM('silver fact_balancesheet'[ending_balance]), 
+        'silver fact_balancesheet'[indicator_code] = "B01-DN_110",
+        'silver fact_balancesheet'[reporting_date] = MaxDate
+    )
+VAR TongChi = 
+    CALCULATE(
+        SUM('silver fact_cashflow'[credit_amount]),
+        LEFT('silver fact_cashflow'[account_no], 3) IN {"111", "112"},
+        LEFT('silver fact_cashflow'[voucher_no], 4) <> "CTNB",
+        YEAR('silver fact_cashflow'[posting_date]) = YEAR(MaxDate),
+        MONTH('silver fact_cashflow'[posting_date]) = MONTH(MaxDate)
+    )
+RETURN DIVIDE(TienMat, TongChi, 0) * 30
 ```
 
 ### 1.5 & 1.6 Hạn mức được cấp & Hạn mức được phê duyệt
@@ -67,8 +96,8 @@ Hạn mức phê duyệt (Tỷ VNĐ) = SUM('fact_creditlimitsummary'[granted_lim
 ```dax
 Tỷ lệ LTV (%) = 
 DIVIDE(
-    SUM('fact_loan'[remaining_principal]),
-    SUM('fact_collateral'[appraised_value]),
+    SUM('silver fact_creditlimitsummary'[granted_limit]),
+    SUM('silver fact_collateral'[appraised_value]),
     0
 )
 ```
@@ -78,27 +107,26 @@ DIVIDE(
 - **DAX:**
 ```dax
 Tỷ lệ D/E (Lần) = 
-VAR TongNo = CALCULATE(SUM('fact_balancesheet'[ending_balance]), 'fact_balancesheet'[Indicator_Code] = "300")
-VAR VonCSH = CALCULATE(SUM('fact_balancesheet'[ending_balance]), 'fact_balancesheet'[Indicator_Code] = "400")
-RETURN DIVIDE(TongNo, VonCSH, 0)
+VAR TongNo = CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[indicator_code] = "B01-DN_300")
+VAR TongNguonVon = CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[indicator_code] = "B01-DN_440")
+RETURN DIVIDE(TongNo, TongNguonVon, 0)
 ```
 
 ---
 
 ## 4. Công thức DAX & Cấu hình Chi tiết (Phần Biểu đồ - Charts)
 
-> **Cột bổ trợ cần có trong bảng `fact_loan`:**
-> Nếu dữ liệu chưa có `term_type`, hãy tạo Calculated Column này trước:
+> **Cột bổ trợ cần có trong bảng `fact_cashflow` (để thay thế fact_loan):**
+> Nhóm các tài khoản vay thành "Ngắn hạn" và "Dài hạn":
 > ```dax
-> term_type = IF(DATEDIFF('fact_loan'[Disbursement_Date], 'fact_loan'[Maturity_Date], MONTH) <= 12, "Ngắn hạn", "Dài hạn")
+> term_type = IF('silver fact_cashflow'[account_no] IN {"34111", "34113", "34114"}, "Ngắn hạn", IF('silver fact_cashflow'[account_no] = "34112", "Dài hạn", BLANK()))
 > ```
 
 ### 2.1 Nợ ngắn hạn / Dài hạn / Tổng dư nợ
 - **Loại:** Line & Stacked Column Chart
 - **Trục X:** `Dim_Date[Month Year]`
-- **Column Y-axis:** Measure `Tổng Dư Nợ = SUM('fact_loan'[remaining_principal])`
-- **Column Legend:** `fact_loan[term_type]` (Chia màu Cột Ngắn/Dài)
-- **Line Y-axis:** Measure `Tổng Dư Nợ` (Vẽ đường Line tổng bọc trên đỉnh cột)
+- **Column Y-axis:** Kéo 2 Measure `Dư nợ ngắn hạn (Tỷ VNĐ)` và `Dư nợ dài hạn (Tỷ VNĐ)`
+- **Line Y-axis:** Measure `Tổng Dư Nợ = [Dư nợ ngắn hạn (Tỷ VNĐ)] + [Dư nợ dài hạn (Tỷ VNĐ)]`
 
 ### 2.2 Chi phí nợ theo tháng
 - **Loại:** Line Chart
@@ -117,7 +145,7 @@ CP Lãi Vay (Kế hoạch) = CALCULATE(SUM('fact_businessplan'[Target_Amount]), 
 ### 2.4 Dư nợ tại từng ngân hàng
 - **Loại:** Column Chart
 - **Trục X:** `dim_bank[Bank_Name]`
-- **Trục Y:** Measure `Tổng Dư Nợ`
+- **Trục Y:** Measure `Tổng Dư Nợ = [Dư nợ ngắn hạn (Tỷ VNĐ)] + [Dư nợ dài hạn (Tỷ VNĐ)]`
 
 ### 2.5 Chi phí lãi vay thực tế & KH
 - **Loại:** Clustered Column Chart
