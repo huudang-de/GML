@@ -183,3 +183,6 @@ DIVIDE([Tổng Giá Trị Xuất (Thực tế)], [Kế Hoạch Giá Vốn], 0)
    - **Rule 3 (Cờ Đỏ - Vượt lố >5%):** Bấm `+ New rule`. 
      If value `>= 1.05` (Number) and `< 9999` (Number) -> Chọn Icon Cờ Đỏ 🚩.
 5. Bấm **OK**.
+
+
+---

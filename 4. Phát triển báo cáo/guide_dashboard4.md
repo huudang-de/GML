@@ -27,6 +27,14 @@ CALCULATE(
 ) / 1000000000
 ```
 
+**Sub-metrics:**
+```dax
+-- 1.1.1 %MoM
+[Tiền mặt & TĐ Tiền (%MoM)] = 
+VAR ThangTruoc = CALCULATE([Tiền mặt & Tương đương (Tỷ)], PREVIOUSMONTH(\'Dim_Date\'[Date]))
+RETURN DIVIDE([Tiền mặt & Tương đương (Tỷ)] - ThangTruoc, ThangTruoc, 0)
+```
+
 ### 1.2 Tiền gửi (Tổng trị giá gốc)
 - **Mô tả:** Số dư gốc của các khế ước tiền gửi còn hiệu lực.
 - **DAX:**
@@ -102,3 +110,6 @@ CALCULATE(
   10. Giá trị còn lại (`silver fact_termdeposit[remaining_value]`)
 
 - **Bảo mật (RLS) ứng dụng cho Bảng này:** Nhân viên kế toán phụ trách ngân hàng nào (qua bảng Mapping) sẽ chỉ nhìn thấy các sổ tiết kiệm của ngân hàng đó trên bảng này.
+
+
+---

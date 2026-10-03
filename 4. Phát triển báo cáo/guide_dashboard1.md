@@ -133,7 +133,7 @@ RETURN DIVIDE(TongNo, TongNguonVon, 0)
 - **Trục X:** `Dim_Date[Month Year]`
 - **Trục Y:** Kéo 2 Measure sau vào:
 ```dax
-CP Lãi Vay (Thực tế) = CALCULATE(SUM('fact_incomestatement'[Current_Period_Amount]), 'fact_incomestatement'[Indicator_Code] = "B02-DN_24")
+CP Lãi Vay (Thực tế) = CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_24")
 CP Lãi Vay (Kế hoạch) = CALCULATE(SUM('fact_businessplan'[Target_Amount]), 'fact_businessplan'[Indicator_Code] = "B02-DN_24")
 ```
 
@@ -175,3 +175,78 @@ CP Lãi Vay (Kế hoạch) = CALCULATE(SUM('fact_businessplan'[Target_Amount]), 
 
 ### 2.10 Bảng chi tiết lịch trả gốc
 - **[ĐÃ LƯỢC BỎ]** Bảng này tạm thời không sử dụng do bảng `fact_loan` (nhập tay) đã bị loại bỏ khỏi Single Source of Truth vì thiếu chính xác.
+
+---
+
+## 6. Công thức DAX Nhóm Chỉ số Tài chính (Bảng 2.8)
+
+> **LƯU Ý:** Công thức "Vòng quay hàng tồn kho" đã được chuẩn hóa lại. Lấy Giá vốn hàng bán chia cho Giá trị Tồn kho bình quân (Không chia cho số lượng tồn kho vì sai bản chất tài chính).
+
+### Nhóm 1: Measure Lõi (Core Variables)
+Tạo các Measure này ẩn đi, chuyên dùng để làm gốc tính toán:
+```dax
+_TS_NganHan = CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[indicator_code] = "B01-DN_100")
+_No_NganHan = CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[indicator_code] = "B01-DN_310")
+_TonKho = CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[indicator_code] = "B01-DN_140")
+_PhaiThu = CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[indicator_code] = "B01-DN_130")
+_VCSH = CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[indicator_code] = "B01-DN_400")
+_TongTaiSan = CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[indicator_code] = "B01-DN_440")
+
+_DoanhThuThuan = CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[indicator_code] = "B02-DN_10")
+_GiaVonHangBan = CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[indicator_code] = "B02-DN_11")
+_LoiNhuanGop = CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[indicator_code] = "B02-DN_20")
+_LoiNhuanSauThue = CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[indicator_code] = "B02-DN_60")
+_ChiPhiLaiVay = CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[indicator_code] = "B02-DN_23")
+_ChiPhiThue = CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[indicator_code] IN {"B02-DN_51", "B02-DN_52"})
+```
+
+### Nhóm 2: Nhóm Khả năng Thanh toán (Liquidity)
+```dax
+1. Thanh toán hiện hành (Current Ratio) = DIVIDE([_TS_NganHan], [_No_NganHan], 0)
+
+2. Thanh toán nhanh (Quick Ratio) = DIVIDE([_TS_NganHan] - [_TonKho], [_No_NganHan], 0)
+```
+
+### Nhóm 3: Nhóm Vòng quay (Activity / Turnover)
+```dax
+-- Tính Trung bình (Average) cho các Khoản mục Bảng Cân đối
+_TS_NganHan_AVG = DIVIDE([_TS_NganHan] + CALCULATE([_TS_NganHan], PREVIOUSYEAR('Dim_Date'[Date])), 2)
+_No_NganHan_AVG = DIVIDE([_No_NganHan] + CALCULATE([_No_NganHan], PREVIOUSYEAR('Dim_Date'[Date])), 2)
+_TonKho_AVG = DIVIDE([_TonKho] + CALCULATE([_TonKho], PREVIOUSYEAR('Dim_Date'[Date])), 2)
+_PhaiThu_AVG = DIVIDE([_PhaiThu] + CALCULATE([_PhaiThu], PREVIOUSYEAR('Dim_Date'[Date])), 2)
+_VCSH_AVG = DIVIDE([_VCSH] + CALCULATE([_VCSH], PREVIOUSYEAR('Dim_Date'[Date])), 2)
+_TongTaiSan_AVG = DIVIDE([_TongTaiSan] + CALCULATE([_TongTaiSan], PREVIOUSYEAR('Dim_Date'[Date])), 2)
+
+-- Các chỉ số Vòng quay
+3. Vòng quay Vốn lưu động = DIVIDE([_DoanhThuThuan], [_TS_NganHan_AVG] - [_No_NganHan_AVG], 0)
+4. Vòng quay Hàng tồn kho = DIVIDE([_GiaVonHangBan], [_TonKho_AVG], 0)
+5. Vòng quay Khoản phải thu = DIVIDE([_DoanhThuThuan], [_PhaiThu_AVG], 0)
+```
+
+### Nhóm 4: Nhóm Đòn bẩy (Leverage & Coverage)
+```dax
+6. Nợ phải trả / Tổng tài sản = DIVIDE(CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[indicator_code] = "B01-DN_300"), [_TongTaiSan], 0)
+
+7. Nợ dài hạn / Vốn CSH = DIVIDE(CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[indicator_code] = "B01-DN_330"), [_VCSH], 0)
+
+-- Tính EBIT và EBITDA
+EBIT = [_ChiPhiLaiVay] + [_ChiPhiThue] + [_LoiNhuanSauThue]
+
+EBITDA = 
+VAR KhauHao = CALCULATE(SUM('silver fact_balancesheet'[ending_balance]), 'silver fact_balancesheet'[indicator_code] IN {"B01-DN_223", "B01-DN_228"})
+RETURN [EBIT] + ABS(KhauHao)
+
+-- Các chỉ số bảo đảm lãi vay
+8. EBIT / Chi phí lãi vay = DIVIDE([EBIT], [_ChiPhiLaiVay], 0)
+9. EBITDA / Chi phí lãi vay = DIVIDE([EBITDA], [_ChiPhiLaiVay], 0)
+10. Tổng dư nợ / EBITDA = DIVIDE([Tổng Dư Nợ], [EBITDA], 0)
+```
+
+### Nhóm 5: Nhóm Sinh lời (Profitability)
+```dax
+11. Biên Lợi nhuận gộp (%) = DIVIDE([_LoiNhuanGop], [_DoanhThuThuan], 0)
+12. Biên Lợi nhuận HĐKD (%) = DIVIDE(CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[indicator_code] = "B02-DN_30"), [_DoanhThuThuan], 0)
+13. Biên EBITDA (%) = DIVIDE([EBITDA], [_DoanhThuThuan], 0)
+14. ROE (%) = DIVIDE([_LoiNhuanSauThue], [_VCSH_AVG], 0)
+15. ROA (%) = DIVIDE([_LoiNhuanSauThue], [_TongTaiSan_AVG], 0)
+```

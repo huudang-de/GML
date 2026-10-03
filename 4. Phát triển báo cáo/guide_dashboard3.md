@@ -102,6 +102,18 @@ CALCULATE(
 
 ---
 
+**Sub-metrics:**
+```dax
+-- 1.6.1 YTD (Latest Snapshot)
+[Tổng khách hàng nợ (Hiện tại)] = CALCULATE([Tổng khách hàng], REMOVEFILTERS(\'Dim_Date\'))
+
+-- 1.6.2 %MoM
+[Tổng khách hàng nợ (%MoM)] = 
+VAR ThangTruoc = CALCULATE([Tổng khách hàng], PREVIOUSMONTH(\'Dim_Date\'[Date]))
+RETURN DIVIDE([Tổng khách hàng] - ThangTruoc, ThangTruoc, 0)
+```
+
+
 ## 4. Công thức DAX & Cấu hình Chi tiết (Phần Biểu đồ - Charts)
 
 ### 2.1 Khoản phải thu theo tháng
@@ -257,3 +269,6 @@ DIVIDE(
   5. Measure `[Phải thu Cuối Kỳ]` (Số tiền còn nợ)
 - **Lọc phụ (Bắt buộc):** Ở cột Filters bên phải, kéo Measure `[Phải thu Cuối Kỳ]` vào mục *Filters on this visual* và cài đặt điều kiện **is greater than 0** (Lớn hơn 0). Điều này giúp bảng ẩn đi những hóa đơn khách đã trả sạch tiền!
 - *Mẹo UX:* Bấm mũi tên trỏ xuống ở cột Phải thu Cuối Kỳ > Conditional Formatting > Data bars (Thanh dữ liệu). Hóa đơn nào nợ càng nhiều thì thanh màu đỏ càng dài.
+
+
+---

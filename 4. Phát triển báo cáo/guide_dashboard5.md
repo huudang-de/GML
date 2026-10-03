@@ -81,6 +81,18 @@ RETURN DIVIDE(TienMat, TongChi, 0) * 30
 
 ---
 
+**Sub-metrics:**
+```dax
+-- 1.3.1 YTD (Latest Snapshot)
+[Số dư tiền mặt (Hiện tại)] = CALCULATE([Số Dư Tiền Mặt], REMOVEFILTERS(\'Dim_Date\'))
+
+-- 1.3.2 %MoM
+[Số dư tiền mặt (%MoM)] = 
+VAR ThangTruoc = CALCULATE([Số Dư Tiền Mặt], PREVIOUSMONTH(\'Dim_Date\'[Date]))
+RETURN DIVIDE([Số Dư Tiền Mặt] - ThangTruoc, ThangTruoc, 0)
+```
+
+
 ## 4. Công thức DAX & Cấu hình Chi tiết (Phần Biểu đồ - Charts)
 
 ### 2.1 Thu / Chi / Dư quỹ theo thời gian
@@ -207,3 +219,6 @@ RETURN DIVIDE(DaysInPeriod, [Vòng quay Phải trả], 0)
 Chu kỳ tiền mặt (CCC) = [Số ngày Tồn kho (DIO)] + [Số ngày Thu tiền (DSO)] - [Số ngày Trả tiền (DPO)]
 ```
 - **Cấu hình Cột:** Kéo thả lần lượt các trường sau vào Table: `silver dim_date[Month Year]`, `Số ngày Tồn kho (DIO)`, `Số ngày Thu tiền (DSO)`, `Số ngày Trả tiền (DPO)`, `Chu kỳ tiền mặt (CCC)`.
+
+
+---
