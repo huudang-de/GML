@@ -1,48 +1,48 @@
-# ACADEMIC REPORT: LIQUIDITY OPTIMIZATION VIA LINEAR PROGRAMMING
-**Format:** Scopus Academic Paper (Draft)
-**Keywords:** Liquidity Optimization, Linear Programming, Treasury Management, SMEs, PuLP, Cash-backed Loans
+# BÁO CÁO HỌC THUẬT: TỐI ƯU HÓA THANH KHOẢN QUA QUY HOẠCH TUYẾN TÍNH
+**Định dạng:** Bài báo Học thuật chuẩn Scopus (Bản nháp)
+**Từ khóa:** Tối ưu hóa Thanh khoản, Quy hoạch Tuyến tính, Quản trị Ngân quỹ, Doanh nghiệp vừa và nhỏ (SME), PuLP, Vay thế chấp sổ tiết kiệm
 
-## Abstract
-Liquidity management in Small and Medium Enterprises (SMEs) in emerging markets like Vietnam involves unique constraints, such as the use of individual collateral (savings books) for corporate loans and varying loan-to-value (LTV) policies across banks. This study proposes a Treasury Intelligence Engine using Linear Programming (LP) to optimize the allocation of idle cash and borrowing needs. By integrating upstream Machine Learning forecasts (Cashflow, Accounts Receivable Risk, and Inventory EOQ), the PuLP-based optimizer minimizes total interest expense. Empirical results from a real-world manufacturing firm (Gỗ Minh Long) demonstrate a significant reduction in interest costs by prioritizing cash-backed loans (4.29% - 4.66%) over standard unsecured corporate loans (7.0% - 8.5%), yielding an estimated annual saving of over 300 million VND for a 10-billion-VND liquidity deficit.
+## Tóm tắt (Abstract)
+Quản trị thanh khoản tại các Doanh nghiệp Vừa và Nhỏ (SME) ở các thị trường đang phát triển như Việt Nam bao hàm những ràng buộc đặc thù, chẳng hạn như việc sử dụng tài sản đảm bảo của cá nhân (sổ tiết kiệm) cho các khoản vay doanh nghiệp và sự khác biệt về chính sách tỷ lệ cho vay trên tài sản đảm bảo (LTV) giữa các ngân hàng. Nghiên cứu này đề xuất một Hệ thống Trí tuệ Ngân quỹ (Treasury Intelligence Engine) sử dụng Quy hoạch Tuyến tính (Linear Programming - LP) để tối ưu hóa việc phân bổ lượng tiền mặt nhàn rỗi và nhu cầu vay vốn. Bằng cách tích hợp các dự báo Machine Learning từ hệ thống thượng nguồn (Dự báo Dòng tiền, Rủi ro Công nợ, và Nhu cầu nhập hàng EOQ), bộ tối ưu hóa dựa trên thư viện PuLP giúp giảm thiểu tổng chi phí lãi vay. Kết quả thực nghiệm tại một doanh nghiệp sản xuất thực tế (Gỗ Minh Long) cho thấy sự sụt giảm đáng kể trong chi phí lãi vay bằng cách ưu tiên các khoản vay cầm cố sổ tiết kiệm (4.29% - 4.66%) thay vì các khoản vay tín chấp doanh nghiệp thông thường (7.0% - 8.5%), mang lại mức tiết kiệm ước tính hơn 300 triệu VNĐ mỗi năm cho một khoản thâm hụt thanh khoản 10 tỷ VNĐ.
 
 ---
 
-## 1. Introduction
-Effective treasury management requires balancing liquidity to meet operational needs while maximizing financial returns. Traditional approaches rely on heuristic decision-making, which often leads to sub-optimal capital allocation. In this paper, we present an automated Liquidity Optimization Engine that determines the exact amount to borrow or deposit at specific banks, considering real-world constraints such as credit limits and individual vs. corporate interest rate discrepancies.
+## 1. Giới thiệu (Introduction)
+Quản trị ngân quỹ hiệu quả đòi hỏi sự cân bằng giữa tính thanh khoản để đáp ứng nhu cầu vận hành và việc tối đa hóa tỷ suất sinh lời tài chính. Các phương pháp tiếp cận truyền thống thường dựa trên việc ra quyết định theo kinh nghiệm (heuristic), dẫn đến việc phân bổ vốn chưa tối ưu. Trong bài báo này, chúng tôi trình bày một Hệ thống Tối ưu hóa Thanh khoản tự động, giúp xác định chính xác số tiền cần vay hoặc gửi tại các ngân hàng cụ thể, có cân nhắc đến các ràng buộc thực tế như hạn mức tín dụng và sự chênh lệch lãi suất giữa khách hàng cá nhân và doanh nghiệp.
 
-## 2. Literature Review & Comparative Analysis
-The proposed model is evaluated against three existing frameworks:
+## 2. Tổng quan Tài liệu & Phân tích So sánh (Literature Review)
+Mô hình đề xuất được đánh giá và so sánh với ba khung lý thuyết/thực tiễn hiện có:
 
-1. **FPT Corporation's Cash Sweeping Model (2024):** 
-   FPT utilizes a centralized cash pooling strategy to optimize Return on Assets (ROA) across 40+ subsidiaries. While highly effective for conglomerates, it lacks applicability for SMEs where capital often flows between personal (CEO) and corporate entities. Our model introduces the `Owner_Type` constraint to bridge this gap.
-2. **Open Source "Cash Liquidity Optimizer" (GitHub):** 
-   Existing open-source repositories utilize `PuLP` and `SciPy` for capital allocation. However, they assume static interest rates. Our system dynamically crawls market data (`market_interest_rates.csv`) to capture daily fluctuations in lending and deposit rates.
-3. **Vietnamese Manufacturing Study (UEH, 2026):** 
-   Recent research from the University of Economics Ho Chi Minh City proposes a hybrid XGBoost-LSTM model coupled with LP. We adopt this "Shift-Left" architecture by decoupling the forecasting components (Cashflow, AR, Inventory) from the optimization engine, feeding pre-processed "clean" data into the LP solver.
+1. **Mô hình Cash Sweeping của Tập đoàn FPT (2024):** 
+   FPT sử dụng chiến lược gom dòng tiền tập trung để tối ưu hóa Tỷ suất sinh lời trên Tài sản (ROA) trên hơn 40 công ty con. Mặc dù rất hiệu quả đối với các tập đoàn lớn, mô hình này thiếu tính ứng dụng cho các SME, nơi dòng vốn thường xuyên luân chuyển chéo giữa cá nhân (Giám đốc) và pháp nhân doanh nghiệp. Mô hình của chúng tôi giới thiệu ràng buộc `Owner_Type` (Loại sở hữu) để giải quyết lỗ hổng này.
+2. **Dự án Mã nguồn mở "Cash Liquidity Optimizer" (Trên nền tảng GitHub):** 
+   Các kho mã nguồn mở hiện có sử dụng `PuLP` và `SciPy` để phân bổ vốn. Tuy nhiên, chúng giả định lãi suất là tĩnh. Hệ thống của chúng tôi thực hiện crawl (thu thập) dữ liệu thị trường động (`market_interest_rates.csv`) để nắm bắt các biến động hàng ngày của lãi suất cho vay và huy động.
+3. **Nghiên cứu Sản xuất Việt Nam (UEH, 2026):** 
+   Nghiên cứu gần đây từ Đại học Kinh tế TP.HCM đề xuất một mô hình lai ghép giữa XGBoost-LSTM kết hợp với LP. Chúng tôi áp dụng kiến trúc "Shift-Left" (Dịch trái) này bằng cách tách rời các module dự báo (Cashflow, AR, Inventory) khỏi bộ máy tối ưu hóa, và chỉ đưa luồng dữ liệu "sạch" đã qua xử lý vào bộ giải LP.
 
-## 3. Methodology
-The optimization problem is formulated as a Multi-Constraint Linear Programming model solved via the CBC algorithm in the `PuLP` Python library.
+## 3. Phương pháp Nghiên cứu (Methodology)
+Bài toán tối ưu hóa được công thức hóa dưới dạng mô hình Quy hoạch Tuyến tính Đa ràng buộc (Multi-Constraint LP) và được giải quyết thông qua thuật toán CBC trong thư viện Python `PuLP`.
 
-**Objective Function:**
+**Hàm Mục Tiêu (Objective Function):**
 $$ \text{Minimize } Z = \sum_{b} \left( X_{b}^{\text{Normal}} \cdot R_{b}^{\text{Normal}} + X_{b}^{\text{CashBacked}} \cdot R_{b}^{\text{CashBacked}} \right) $$
 
-**Constraints:**
-1. *Capital Requirement:* $ \sum X_{b} = \text{Max Deficit} + \text{Safety Buffer} $
-2. *Credit Line Upper Bound:* $ X_{b}^{\text{Normal}} \le \text{Total\_Limit}_{b} - \text{Current\_Debt}_{b} $
-3. *Cash-backed LTV Bound:* $ X_{b}^{\text{CashBacked}} \le \text{Deposit\_Amount}_{b} \times \text{LTV}_{b} $
+**Các Ràng Buộc (Constraints):**
+1. *Yêu cầu Vốn:* $ \sum X_{b} = \text{Thâm hụt Tối đa (Max Deficit)} + \text{Vùng đệm An toàn (Safety Buffer)} $
+2. *Giới hạn Hạn mức Tín dụng:* $ X_{b}^{\text{Normal}} \le \text{Hạn\_Mức\_Tổng}_{b} - \text{Dư\_Nợ\_Hiện\_Tại}_{b} $
+3. *Giới hạn LTV Cầm cố:* $ X_{b}^{\text{CashBacked}} \le \text{Giá\_Trị\_Sổ\_Tiết\_Kiệm}_{b} \times \text{LTV}_{b} $
 
-Data inputs are fetched from a PostgreSQL Data Warehouse (Silver/Gold layers), ensuring that the optimizer processes deterministic values rather than raw, noisy transactional data.
+Dữ liệu đầu vào được trích xuất từ Kho Dữ liệu PostgreSQL (tầng Silver/Gold), đảm bảo rằng bộ tối ưu hóa xử lý các giá trị mang tính xác định cao thay vì dữ liệu giao dịch thô, nhiều nhiễu.
 
-## 4. Empirical Results
-The system was tested on the financial data of Gỗ Minh Long for July 2026. The firm faced a projected peak liquidity deficit of 8 billion VND, with a required safety buffer of 2 billion VND (Total Target: 10 billion VND).
+## 4. Kết quả Thực nghiệm (Empirical Results)
+Hệ thống được thử nghiệm trên dữ liệu tài chính của Gỗ Minh Long cho tháng 07/2026. Công ty phải đối mặt với mức thâm hụt thanh khoản đỉnh điểm dự báo là 8 tỷ VNĐ, cùng với mức dự phòng an toàn yêu cầu là 2 tỷ VNĐ (Tổng mục tiêu: 10 tỷ VNĐ).
 
-**Results:**
-- The LP solver converged in $< 0.1$ seconds.
-- **Decision:** The algorithm bypassed standard SME loans (7.0% - 8.5%) and fully utilized existing individual savings books at BIDV and Techcombank as collateral.
-- **Allocation:** 
-  - 9.0 Billion VND borrowed against BIDV savings (Interest: 4.29%)
-  - 1.0 Billion VND borrowed against Techcombank savings (Interest: 4.66%)
-- **Financial Impact:** Total annual interest expense was optimized to 432.7 million VND, representing a $>40\%$ reduction compared to baseline heuristic borrowing.
+**Kết quả:**
+- Bộ giải LP hội tụ trong thời gian $< 0.1$ giây.
+- **Quyết định:** Thuật toán đã bỏ qua các khoản vay SME tiêu chuẩn (7.0% - 8.5%) và tận dụng tối đa các sổ tiết kiệm cá nhân hiện có tại BIDV và Techcombank làm tài sản đảm bảo.
+- **Phân bổ chi tiết:** 
+  - Vay 9.0 Tỷ VNĐ thế chấp bằng sổ BIDV (Lãi suất: 4.29%)
+  - Vay 1.0 Tỷ VNĐ thế chấp bằng sổ Techcombank (Lãi suất: 4.66%)
+- **Tác động Tài chính:** Tổng chi phí lãi vay hàng năm được tối ưu hóa xuống còn 432.7 triệu VNĐ, tương đương mức giảm $>40\%$ so với phương pháp vay theo kinh nghiệm truyền thống.
 
-## 5. Conclusion & Recommendations
-The Liquidity Optimization Engine successfully mathematicalizes the tacit rules of Vietnamese banking (LTVs, individual guarantees) into a robust, scalable Python application. Future work could expand the model into a Multi-Period LP formulation, optimizing capital over a rolling 12-week horizon to account for term structures and yield curves.
+## 5. Kết luận & Khuyến nghị (Conclusion & Recommendations)
+Hệ thống Tối ưu hóa Thanh khoản đã thành công trong việc toán học hóa các "luật ngầm" của ngân hàng Việt Nam (tỷ lệ LTV, bảo lãnh cá nhân) thành một ứng dụng Python mạnh mẽ và có khả năng mở rộng. Các nghiên cứu trong tương lai có thể mở rộng mô hình này thành Quy hoạch Tuyến tính Đa thời kỳ (Multi-Period LP), tối ưu hóa vốn trên đường chân trời cuộn 12 tuần để tính toán đến cấu trúc kỳ hạn và đường cong lợi suất.
