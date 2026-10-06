@@ -1,9 +1,9 @@
-﻿# 💰 Dự án 02: Tối ưu hóa Nguồn vốn & Thanh khoản (Liquidity & Treasury Optimization)
+# 💰 Dự án 02: Tối ưu hóa Nguồn vốn & Thanh khoản (Liquidity & Treasury Optimization)
 
 > **Mã dự án:** GML-ML-02
 > **Phạm vi:** Vốn vay ngân hàng, Hợp đồng tiền gửi, Dòng tiền thuần ngắn hạn
 > **Nguồn dữ liệu:** `bc_tin_dung_2026.xlsx` | `Hop_dong_tien_gui.xlsm` | `silver.fact_cashflow` | `silver.fact_accountsreceivable` | `silver.fact_accountspayable`
-> **Trạng thái:** 📋 Lập kế hoạch
+> **Trạng thái:** 🚀 Đang triển khai (Các dự án Upstream: Dòng tiền, Công nợ, Tồn kho đã hoàn tất)
 
 ---
 
@@ -143,7 +143,9 @@ Dự án Liquidity Optimization KHÔNG hoạt động độc lập. Nó là **t�
 | DỰ ÁN 01: Cashflow Forecast |  | DỰ ÁN AR: AR Risk Classification|  | DỰ ÁN INV: Inventory Forecast|
 | - Dự báo dòng tiền Thu/Chi  |  | - Phân loại rủi ro nợ KH    |  | - Dự báo nhu cầu NVL         |
 |   theo tuần T+1 đến T+4     |  | - Dự báo ngày KH thanh toán |  | - Thời điểm cần vốn mua hàng |
-| OUTPUT: cashflow_forecast   |  | OUTPUT: ar_risk_forecast    |  | OUTPUT: inventory_plan       |
+| OUTPUT:                     |  | OUTPUT:                     |  | OUTPUT:                      |
+| 1. fact_cashflow_forecast   |  | 1. fact_ar_risk_score       |  | 1. fact_inventory_forecast   |
+| 2. fact_cashflow_scenarios  |  |                             |  | 2. fact_reorder_recommend... |
 +-------------+---------------+  +-------------+---------------+  +-------------+----------------+
               |                                |                                |
               +--------------------------------+--------------------------------+
@@ -153,9 +155,9 @@ Dự án Liquidity Optimization KHÔNG hoạt động độc lập. Nó là **t�
                   |        LIQUIDITY OPTIMIZER (Linear Program)    |
                   |                                                |
                   |  INPUT TỔNG HỢP TỪ 3 DỰ ÁN + FILE NỘI BỘ:   |
-                  |  [1] Net Cashflow du bao (Output DuAn01)       |
-                  |  [2] Ngay thu hoi cong no KH (Output DuAnAR)  |
-                  |  [3] Ke hoach mua NVL (Output DuAnINV)        |
+                  |  [1] Forecast & Scenarios (Từ DB gold)         |
+                  |  [2] Rủi ro nợ xấu AR (Từ DB silver)           |
+                  |  [3] Lượng đặt hàng EOQ (Từ DB silver)         |
                   |  [4] Hop dong tien gui (.xlsm)                |
                   |  [5] Han muc tin dung (.xlsx)                 |
                   |                                                |
@@ -168,15 +170,18 @@ Dự án Liquidity Optimization KHÔNG hoạt động độc lập. Nó là **t�
 
 ### Bảng Input chi tiết
 
-| # | Nguồn Input | Đến từ | Thông tin Cung cấp |
+| # | Nguồn Input (Silver/Gold DB) | Đến từ | Thông tin Cung cấp |
 |:---|:---|:---|:---|
-| 1 | `cashflow_forecast.csv` | **Dự án 01 Cashflow Forecasting** | Net Cashflow dự báo mỗi tuần (T+4 tuần tới) |
-| 2 | `ar_risk_forecast.csv` | **Dự án AR Risk Classification** | Ngày & số tiền KH dự báo trả; KH có nguy cơ chậm trả |
-| 3 | `inventory_plan.csv` | **Dự án Inventory Forecasting** | Nhu cầu mua nguyên vật liệu và thời điểm cần vốn |
+| 1 | `gold.fact_cashflow_forecast`<br>`gold.fact_cashflow_scenarios` | **Dự án 01 Cashflow Forecasting** | Net Cashflow dự báo mỗi tuần và các kịch bản Stress-test rủi ro hụt tiền. |
+| 2 | `silver.fact_ar_risk_score` | **Dự án AR Risk Classification** | Cảnh báo dòng tiền thu muộn (chậm trả) để chuẩn bị phương án dự phòng. |
+| 3 | `silver.fact_reorder_recommendations` | **Dự án Inventory Forecasting** | Nhu cầu vốn (VND) phải chuẩn bị để mua vật tư EOQ khẩn cấp trong ngày. |
 | 4 | `Hop_dong_tien_gui.xlsm` | **File nội bộ GML** | Số tiền, kỳ hạn, lãi suất, ngày đáo hạn từng sổ TK |
 | 5 | `bc_tin_dung_2026.xlsx` | **File nội bộ GML** | Hạn mức tín dụng, dư nợ hiện tại, lãi suất từng khế ước |
+| 6 | `market_interest_rates.csv`<br>*(Hoặc Data API)* | **Market Data (Thị trường)** | Bảng tổng hợp lãi suất huy động/cho vay hiện hành của các Ngân hàng (Kỳ hạn 1T, 3T, 6T...) để AI quyết định mở sổ mới ở Bank nào thì có lợi nhất. |
 
-> **Lưu ý thiết kế (Standalone Mode):** Khi 3 dự án ML kia chưa hoàn thành, Optimizer vẫn chạy được bằng cách dùng trực tiếp dữ liệu thô từ `silver.fact_cashflow`, `silver.fact_accountsreceivable`, `silver.fact_accountspayable` trong PostgreSQL — không cần chờ các dự án upstream.
+> **Tầm nhìn Tối ưu hóa (Market Intelligence):** Ban đầu hệ thống chỉ tối ưu trên các khế ước/sổ tiết kiệm *đã có*. Nhờ việc bổ sung Dữ liệu Lãi suất Thị trường (Input 6), AI giờ đây có khả năng so sánh chéo để ra quyết định chiến lược: *"Nên mở sổ tiết kiệm mới ở Ngân hàng B kỳ hạn 3 tháng vì lãi đang cao hơn Ngân hàng A"*, thay vì chỉ phân bổ tiền một cách thụ động.
+
+> **Cập nhật Kiến trúc (Tháng 10/2026):** Cả 3 dự án ML Upstream (Dòng tiền, Công nợ, Tồn kho) **đã hoàn thành 100%**. Liquidity Optimizer giờ đây sẽ sử dụng trực tiếp các bảng dữ liệu "đã được AI tiêu hóa" từ Silver Layer (như `silver.fact_inventory_forecast`, `silver.fact_reorder_recommendations`, bảng rủi ro AR...) thay vì phải tự tính toán từ dữ liệu thô. Điều này giúp Engine tối ưu (LP) chạy cực kỳ nhẹ và chính xác.
 
 ---
 
@@ -208,7 +213,7 @@ Dự án Liquidity Optimization KHÔNG hoạt động độc lập. Nó là **t�
 |                  |   . Khong vuot han muc tin dung                  |
 |                  |   . Ky han so tiet kiem phai phu hop             |
 +------------------+--------------------------------------------------+
-| LAYER 4:         | Action Recommendations (Streamlit Dashboard)     |
+| LAYER 4:         | Action Recommendations (Power BI Dashboard)      |
 | DECISIONS        | - "Nen gui [X ty] ky han [N thang] vao [ngay]"  |
 | (OUTPUT)         | - "Nen giai ngan [Z ty] khe uoc [so X] vao..."  |
 |                  | - "Du bao du tien, khong can giai ngan"          |
@@ -237,7 +242,7 @@ Dự án Liquidity Optimization KHÔNG hoạt động độc lập. Nó là **t�
 |:---|:---|
 | **pandas / SQLAlchemy** | Kết nối PostgreSQL, xử lý dữ liệu |
 | **openpyxl** | Đọc file .xlsx/.xlsm tín dụng & tiền gửi |
-| **Streamlit** | Dashboard hiển thị khuyến nghị cho CFO |
+| **Power BI** | Dashboard hiển thị khuyến nghị cho CFO |
 | **MLflow** | Tracking thí nghiệm, quản lý phiên bản model |
 | **APScheduler** | Tự động chạy dự báo định kỳ (thứ Hai 8:00 AM) |
 
@@ -263,7 +268,7 @@ Dự án Liquidity Optimization KHÔNG hoạt động độc lập. Nó là **t�
 - [ ] Task 3.3: Backtest kết quả LP với scenario lịch sử.
 
 ### Phase 4 — Dashboard & Triển khai `[1 tuần]`
-- [ ] Task 4.1: Streamlit Dashboard: Dòng tiền dự báo + Khuyến nghị hành động.
+- [ ] Task 4.1: Power BI Dashboard: Dòng tiền dự báo + Khuyến nghị hành động.
 - [ ] Task 4.2: Lịch chạy tự động hàng tuần.
 - [ ] Task 4.3: Hướng dẫn sử dụng cho kế toán trưởng.
 
