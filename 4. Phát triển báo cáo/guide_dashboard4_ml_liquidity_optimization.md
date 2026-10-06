@@ -36,19 +36,23 @@ Tạo các Measure tính toán phục vụ thẻ KPI:
 AI_Total_Capital_Raised = SUM('fact_liquidity_actions'[Amount_VND])
 ```
 
-**2. Tổng Chi phí Lãi vay ước tính (Theo AI):**
+**2. Tổng Chi phí Lãi vay ước tính (Tính cho 30 ngày vay ngắn hạn):**
 ```dax
-AI_Est_Annual_Interest = 
+AI_Est_Monthly_Interest = 
 SUMX(
     'fact_liquidity_actions', 
-    'fact_liquidity_actions'[Amount_VND] * ('fact_liquidity_actions'[Interest_Rate_%] / 100)
+    'fact_liquidity_actions'[Amount_VND] * ('fact_liquidity_actions'[Interest_Rate_%] / 100) * (30 / 365)
 )
 ```
 
 **3. Lãi suất vay bình quân (Weighted Average Rate):**
 ```dax
 AI_Weighted_Avg_Rate = 
-DIVIDE([AI_Est_Annual_Interest], [AI_Total_Capital_Raised], 0)
+DIVIDE(
+    SUMX('fact_liquidity_actions', 'fact_liquidity_actions'[Amount_VND] * 'fact_liquidity_actions'[Interest_Rate_%]),
+    [AI_Total_Capital_Raised], 
+    0
+)
 ```
 
 ---
@@ -58,9 +62,9 @@ DIVIDE([AI_Est_Annual_Interest], [AI_Total_Capital_Raised], 0)
 Trang báo cáo này nên được thiết kế theo phong cách **Action-Oriented (Định hướng hành động)**.
 
 ### 4.1. Cụm Thẻ KPI (Top Banner)
-- **Card 1 (Màu đỏ nhạt):** Thâm hụt tiền dự kiến (Max Deficit) + Safety Buffer (Ví dụ: 10 Tỷ VNĐ).
-- **Card 2 (Màu xanh lá):** Tổng chi phí lãi vay (AI_Est_Annual_Interest) (Ví dụ: 432 Triệu VNĐ).
-- **Card 3 (Màu vàng):** Lãi suất đi vay bình quân (Ví dụ: 4.33%). (Highlight: Rẻ hơn rất nhiều so với lãi suất tín chấp thông thường 7-8%).
+- **Card 1 (Màu Xanh dương):** `[AI_Total_Capital_Raised]` (Tổng Nhu cầu Vốn) - Số tiền AI đề xuất giải ngân/rút sổ ngay hôm nay để bù đắp thâm hụt.
+- **Card 2 (Màu Cam cảnh báo):** `[AI_Est_Monthly_Interest]` (Chi phí Lãi vay 30 ngày) - Số tiền lãi thực tế phải trả nếu giữ khoản vay này trong 1 tháng.
+- **Card 3 (Màu Xanh lá):** `[AI_Weighted_Avg_Rate]` (Lãi suất Bình quân) - Điểm chuẩn (Cost of Funds). CFO nhìn vào đây sẽ thấy sướng vì AI luôn tìm ra rate ~4-5%, rẻ hơn hẳn vay tín chấp truyền thống (7-8%).
 
 ### 4.2. Biểu đồ Phân bổ Nguồn vốn (Capital Structure)
 - **Visual Type:** Donut Chart (Biểu đồ vành khăn)

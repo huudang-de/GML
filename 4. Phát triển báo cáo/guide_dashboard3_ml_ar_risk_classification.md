@@ -78,9 +78,13 @@ CALCULATE(
     'silver fact_ar_risk_score'[risk_badge] = "High Risk"
 )
 
-// 5. Xác suất Nợ xấu Trung bình Toàn tệp (Average Default Probability)
-[Xác suất Bùng nợ BQ (%)] = 
-AVERAGE('silver fact_ar_risk_score'[default_probability])
+// 5. Dự phòng Tổn thất kỳ vọng (Expected Credit Loss - ECL) theo chuẩn IFRS 9
+// Công thức: ECL = EAD (Tổng dư nợ) x PD (Xác suất vỡ nợ) x LGD (Giả định mất 100% do nợ tín chấp)
+[Dự phòng Rủi ro ECL (Tỷ)] = 
+SUMX(
+    'silver dim_partner',
+    [Tổng Dư nợ Phải thu (Tỷ)] * RELATED('silver fact_ar_risk_score'[default_probability])
+)
 
 // 6. Màu nền Cảnh báo UI (Được AI sinh sẵn)
 [Color_AI_Risk_Badge] = 
@@ -108,17 +112,18 @@ MAX('silver fact_ar_risk_score'[ui_color])
 * **Card 3 (High Risk Clients):**
   * Fields: `[Số KH High Risk]`.
   * Label: *Số Khách Hàng Nằm Trong Danh Sách Đen AI*.
-* **Card 4 (Average PoD):**
-  * Fields: `[Xác suất Bùng nợ BQ (%)]`.
-  * Label: *Tỷ lệ Xù Nợ BQ Toàn Hệ Thống*.
+* **Card 4 (Expected Credit Loss - ECL):**
+  * Fields: `[Dự phòng Rủi ro ECL (Tỷ)]`.
+  * Label: *Dự phòng Tổn thất Kỳ vọng (ECL)*.
+  * Cấu hình: Cực kỳ quan trọng với CFO để trích lập dự phòng lợi nhuận (P&L).
 
 ---
 
 ### Vùng 3: Biểu đồ Chủ đạo (Top 15 KH Nguy hiểm Nhất)
 * **Loại Visual:** **Clustered Bar Chart** (Biểu đồ thanh ngang).
 * **Trục Y (Y-axis):** `silver dim_partner[partner_name]`.
-* **Trục X (X-axis):** `[Dư nợ Phải thu (Tỷ)]`.
-* **Lọc (Filters):** Kéo `[Dư nợ Phải thu (Tỷ)]` vào *Top N = 15*.
+* **Trục X (X-axis):** `[Dự phòng Rủi ro ECL (Tỷ)]` (Nên dùng ECL thay vì Dư nợ gốc để thấy rõ số tiền thực sự có nguy cơ bốc hơi).
+* **Lọc (Filters):** Kéo `[Dự phòng Rủi ro ECL (Tỷ)]` vào *Top N = 15*.
 * **Màu tự động AI (Quan trọng):** 
   * Chọn Visual $\rightarrow$ Format $\rightarrow$ Bars $\rightarrow$ Color $\rightarrow$ Chọn ký hiệu `fx` (Conditional Formatting).
   * Format style: **Field value**.
@@ -148,7 +153,8 @@ MAX('silver fact_ar_risk_score'[ui_color])
   1. `silver dim_partner[partner_name]` (Tên Khách hàng).
   2. `silver fact_ar_risk_score[risk_badge]` (Thẻ Cảnh Báo AI).
   3. `silver fact_ar_risk_score[default_probability]` (Xác suất Bùng nợ - Định dạng %).
-  4. `[Dư nợ Phải thu (Tỷ)]`.
+  4. `[Tổng Dư nợ Phải thu (Tỷ)]`.
+  5. `[Dự phòng Rủi ro ECL (Tỷ)]`.
 * **Cài đặt Conditional Formatting:**
   * Chọn cột `risk_badge` $\rightarrow$ *Cell elements* $\rightarrow$ *Background color* $\rightarrow$ *Field value* $\rightarrow$ `[Color_AI_Risk_Badge]`. Bảng sẽ nổi bật toàn bộ các dòng Đỏ/Vàng/Xanh đúng chuẩn UI/UX tài chính.
 
