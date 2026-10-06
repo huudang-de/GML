@@ -1,4 +1,4 @@
-# TÀI LIỆU HƯỚNG DẪN THIẾT KẾ: DASHBOARD 5 - ML INVENTORY DEMAND FORECASTING & REORDER OPTIMIZATION
+# TÀI LIỆU HƯỚNG DẪN THIẾT KẾ: DASHBOARD 2 - ML INVENTORY DEMAND FORECASTING & REORDER OPTIMIZATION
 
 **Dự án:** Trí tuệ Nhân tạo trong Quản trị Chuỗi Cung Ứng (Gỗ Minh Long)
 **Người sử dụng mục tiêu:** Giám đốc Chuỗi cung ứng (Supply Chain Manager), Trưởng phòng Mua hàng (Purchasing Manager), Nhân viên Kế hoạch.
@@ -7,7 +7,7 @@
 ---
 
 ## 1. Mục đích của Dashboard (Business Purpose)
-Dashboard số 5 là điểm chạm cuối cùng của toàn bộ hệ thống Học máy (Machine Learning). Nó biến các thuật toán phức tạp thành giao diện trực quan nhằm:
+Dashboard số 2 là điểm chạm cuối cùng của toàn bộ hệ thống Học máy (Machine Learning). Nó biến các thuật toán phức tạp thành giao diện trực quan nhằm:
 - Cho phép bộ phận Mua hàng biết **chính xác cần đặt mua mã vật tư nào, với số lượng bao nhiêu** ngay trong ngày hôm nay.
 - Cảnh báo các mã vật tư sắp chạm ngưỡng cạn kiệt (Chạm điểm ROP - Reorder Point).
 - Minh bạch hóa dự báo của AI bằng cách vẽ biểu đồ đường xu hướng (Trend) kết hợp dải tin cậy 95% (Confidence Interval), giúp ban Giám đốc đánh giá được rủi ro dự báo.
