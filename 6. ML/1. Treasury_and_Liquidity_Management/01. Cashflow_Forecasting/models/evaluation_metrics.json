@@ -1,0 +1,26 @@
+{
+  "test_period": "2026-07-01 to 2026-07-31 (31 days)",
+  "inflow": {
+    "wape_pct": 67.68,
+    "mae_ty": 6.299,
+    "rmse_ty": 9.021,
+    "total_actual_ty": 288.54,
+    "total_predicted_ty": 305.93,
+    "error_total_pct": 6.03
+  },
+  "outflow": {
+    "wape_pct": 66.42,
+    "mae_ty": 9.791,
+    "rmse_ty": 15.43,
+    "total_actual_ty": 457.01,
+    "total_predicted_ty": 318.84,
+    "error_total_pct": 30.23
+  },
+  "net_cashflow": {
+    "wape_pct": 104.34,
+    "mae_ty": 6.544,
+    "directional_accuracy_pct": 70.0,
+    "total_net_actual_ty": -168.47,
+    "total_net_predicted_ty": -12.92
+  }
+}

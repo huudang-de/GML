@@ -1,0 +1,136 @@
+{
+  "test_period": "2026-07-01 to 2026-07-31 (31 days)",
+  "benchmark_comparison": [
+    {
+      "model_name": "LightGBM (ML Model)",
+      "inflow_wape_pct": 67.68,
+      "inflow_gain_vs_baseline_pct": 0.0,
+      "outflow_wape_pct": 66.42,
+      "outflow_gain_vs_baseline_pct": 0.0,
+      "net_mae_ty": 6.544,
+      "net_directional_accuracy_pct": 70.0
+    },
+    {
+      "model_name": "Naive (t-1)",
+      "inflow_wape_pct": 109.26,
+      "inflow_gain_vs_baseline_pct": 38.05,
+      "outflow_wape_pct": 79.32,
+      "outflow_gain_vs_baseline_pct": 16.26,
+      "net_mae_ty": 6.786,
+      "net_directional_accuracy_pct": 16.67
+    },
+    {
+      "model_name": "Seasonal Naive (t-7)",
+      "inflow_wape_pct": 111.1,
+      "inflow_gain_vs_baseline_pct": 39.08,
+      "outflow_wape_pct": 96.39,
+      "outflow_gain_vs_baseline_pct": 31.1,
+      "net_mae_ty": 7.477,
+      "net_directional_accuracy_pct": 63.33
+    },
+    {
+      "model_name": "Moving Average 7d (MA-7)",
+      "inflow_wape_pct": 96.25,
+      "inflow_gain_vs_baseline_pct": 29.68,
+      "outflow_wape_pct": 82.11,
+      "outflow_gain_vs_baseline_pct": 19.11,
+      "net_mae_ty": 5.756,
+      "net_directional_accuracy_pct": 33.33
+    },
+    {
+      "model_name": "Moving Average 30d (MA-30)",
+      "inflow_wape_pct": 106.56,
+      "inflow_gain_vs_baseline_pct": 36.49,
+      "outflow_wape_pct": 85.87,
+      "outflow_gain_vs_baseline_pct": 22.65,
+      "net_mae_ty": 7.858,
+      "net_directional_accuracy_pct": 23.33
+    }
+  ],
+  "multi_horizon_backtest": {
+    "7_days": {
+      "horizon_days": 7,
+      "inflow_wape_pct": 62.93,
+      "inflow_actual_ty": 117.74,
+      "inflow_pred_ty": 74.96,
+      "inflow_error_pct": 36.33,
+      "outflow_wape_pct": 61.44,
+      "outflow_actual_ty": 140.29,
+      "outflow_pred_ty": 79.78,
+      "outflow_error_pct": 43.13,
+      "net_directional_accuracy_pct": 83.33
+    },
+    "14_days": {
+      "horizon_days": 14,
+      "inflow_wape_pct": 64.44,
+      "inflow_actual_ty": 146.84,
+      "inflow_pred_ty": 121.89,
+      "inflow_error_pct": 16.99,
+      "outflow_wape_pct": 65.42,
+      "outflow_actual_ty": 176.82,
+      "outflow_pred_ty": 135.82,
+      "outflow_error_pct": 23.18,
+      "net_directional_accuracy_pct": 69.23
+    },
+    "30_days": {
+      "horizon_days": 30,
+      "inflow_wape_pct": 69.84,
+      "inflow_actual_ty": 274.96,
+      "inflow_pred_ty": 289.1,
+      "inflow_error_pct": 5.14,
+      "outflow_wape_pct": 65.88,
+      "outflow_actual_ty": 414.58,
+      "outflow_pred_ty": 306.82,
+      "outflow_error_pct": 25.99,
+      "net_directional_accuracy_pct": 68.97
+    }
+  },
+  "stress_testing_summary": {
+    "S0_Baseline": {
+      "deficit_days": 15,
+      "total_net_ty": -12.92,
+      "max_cumulative_deficit_ty": -24.43,
+      "recommended_cash_buffer_ty": 24.43
+    },
+    "S1_AR_Delay_Shock": {
+      "deficit_days": 26,
+      "total_net_ty": -89.4,
+      "max_cumulative_deficit_ty": -89.99,
+      "recommended_cash_buffer_ty": 89.99
+    },
+    "S2_AP_Surge_Shock": {
+      "deficit_days": 25,
+      "total_net_ty": -92.63,
+      "max_cumulative_deficit_ty": -94.64,
+      "recommended_cash_buffer_ty": 94.64
+    },
+    "S3_Combined_Shock": {
+      "deficit_days": 28,
+      "total_net_ty": -137.87,
+      "max_cumulative_deficit_ty": -137.87,
+      "recommended_cash_buffer_ty": 137.87
+    }
+  },
+  "residual_outliers": {
+    "total_outliers": 2,
+    "threshold_ty": 21.81,
+    "outliers": [
+      {
+        "date": "2026-07-30",
+        "day_name": "Thursday",
+        "actual_inflow_ty": 7.62,
+        "actual_outflow_ty": 58.0,
+        "net_error_ty": 52.8,
+        "cause": "Bien dong dot bien thu/chi tai khoan"
+      },
+      {
+        "date": "2026-07-31",
+        "day_name": "Friday",
+        "actual_inflow_ty": 13.57,
+        "actual_outflow_ty": 42.43,
+        "net_error_ty": 33.66,
+        "cause": "Bien dong dot bien thu/chi tai khoan"
+      }
+    ]
+  }
+}

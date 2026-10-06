@@ -1,6 +1,10 @@
 # Hướng dẫn Phát triển Dashboard 5: Quản trị Dòng tiền (Cashflow)
 
-## 1. Yêu cầu Bố cục (Layout)
+> 💡 **Phân tách Trang Dashboard 5:**
+> - **Trang 1 (File này):** Quản trị Dòng tiền Lịch sử (Historical Cashflow Analysis) từ Silver Data.
+> - **Trang 2 (Nâng cao):** [Dự báo Dòng tiền Thông minh & Kiểm thử Căng thẳng (ML Cashflow Forecasting & Stress Testing)](guide_dashboard5_ml_cashflow_forecasting.md) từ Gold ML Data.
+
+## 1. Yêu cầu Bố cục (Layout - Trang 1: Dòng tiền Lịch sử)
 * **Canvas Size:** `Width: 1920px` x `Height: 2500px`
 * **Vùng 1 (H: 80px):** Logo, Tiêu đề, Slicers (Thời gian, Ngân hàng, TK Ngân hàng).
 * **Vùng 2 (H: 120px):** 4 thẻ KPI Cards.

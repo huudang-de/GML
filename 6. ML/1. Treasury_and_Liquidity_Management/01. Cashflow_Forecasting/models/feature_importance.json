@@ -1,0 +1,26 @@
+{
+  "top_10_inflow": {
+    "inflow_lag_14": 28,
+    "inflow_lag_1": 25,
+    "outflow_lag_1": 23,
+    "outflow_lag_14": 21,
+    "ar_expected_due_today": 21,
+    "inflow_rolling_std_14d": 19,
+    "net_lag_7": 17,
+    "day_of_week": 16,
+    "net_rolling_std_14d": 15,
+    "inflow_rolling_std_30d": 14
+  },
+  "top_10_outflow": {
+    "inflow_lag_1": 38,
+    "outflow_lag_14": 36,
+    "ar_expected_due_today": 31,
+    "net_lag_21": 27,
+    "outflow_lag_1": 26,
+    "ap_expected_due_today": 23,
+    "day_of_week": 23,
+    "inflow_lag_14": 22,
+    "inflow_rolling_mean_7d": 22,
+    "net_rolling_std_7d": 21
+  }
+}
