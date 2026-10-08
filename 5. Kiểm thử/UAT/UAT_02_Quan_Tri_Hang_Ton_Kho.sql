@@ -210,8 +210,8 @@ ORDER BY 1;
 +---------------------------+----------------+---------------+-----------------+
 */
 
--- VISUAL: Top 10 dư tồn kho
--- MEASURE: _TonKho[Top_10_Ton]
+-- VISUAL: Top 10 dư tồn kho (Theo Giá trị)
+-- MEASURE: _TonKho[Top_10_Ton_Gia_Tri]
 SELECT product_code,
        SUM(ending_value) AS gia_tri
 FROM silver.fact_inventory_balance
@@ -223,20 +223,49 @@ LIMIT 10;
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance)
-+------------------------------+-----------------+
-|         product_code         |     gia_tri     |
-+------------------------------+-----------------+
-|          Thành phẩm          | 193186257228.00 |
-|       Nguyên vật liệu        |  19500264169.00 |
-|     Đèn áp trần Trim NK      |  11257055684.00 |
-|          M017DAA2T           |  8371610947.00  |
-|          M017VCM2T           |  6593836290.00  |
-|           Hàng hóa           |  4150666040.00  |
-|          M017DOH2T           |  3605848700.00  |
-|          D017PBA0T           |  3116851719.00  |
-| Đèn chùm NK 16 bóng mã: L036 |  2901897986.00  |
-|          M475MLA4T           |  2843479000.00  |
-+------------------------------+-----------------+
++--------------------------------+-------------------+
+|         product_code           |      gia_tri      |
++--------------------------------+-------------------+
+| Thành phẩm                     |   193186257228.00 |
+| Nguyên vật liệu                |    19500264169.00 |
+| Đèn áp trần Trim NK            |    11257055684.00 |
+| M017DAA2T                      |     8371610947.00 |
+| M017VCM2T                      |     6593836290.00 |
+| Hàng hóa                       |     4150666040.00 |
+| M017DOH2T                      |     3605848700.00 |
+| D017PBA0T                      |     3116851719.00 |
+| Đèn chùm NK 16 bóng mã: L036   |     2901897986.00 |
+| M475MLA4T                      |     2843479000.00 |
++--------------------------------+-------------------+
+*/
+
+-- VISUAL: Top 10 dư tồn kho (Theo Số lượng)
+-- MEASURE: _TonKho[Top_10_Ton_So_Luong]
+SELECT product_code,
+       SUM(ending_quantity) AS so_luong
+FROM silver.fact_inventory_balance
+WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance)
+GROUP BY 1
+ORDER BY so_luong DESC
+LIMIT 10;
+
+/* RESULT LOG:
+-- GHI CHÚ FILTER:
+-- WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance)
++--------------------------------+-------------------+
+|         product_code           |     so_luong      |
++--------------------------------+-------------------+
+| GP4123T                        |         119495.72 |
+| N1610CLNO01T                   |         109500.00 |
+| M475MLA4T                      |          40049.00 |
+| M017DAA2T                      |          27904.00 |
+| D017PBA0T                      |          18200.00 |
+| M017VCM2T                      |          15451.00 |
+| M550DAH2T                      |          15101.00 |
+| GM107XT                        |          12674.00 |
+| N1021VG2                       |          10642.00 |
+| GX096-1951                     |          10621.00 |
++--------------------------------+-------------------+
 */
 
 -- VISUAL: Xuất kho Kế hoạch vs Thực tế
