@@ -12,9 +12,23 @@
 - **Thời gian (Month/Year):** Kéo từ bảng `Dim_Date`
 - **Ngân hàng (Bank):** Kéo từ bảng `dim_bank`
 
+## 3. Tiền xử lý dữ liệu (Power Query)
+**Lưu ý quan trọng về Mapping mã Ngân hàng:**
+Do file Excel nghiệp vụ đầu vào thường xuyên gõ tắt mã ngân hàng (VD: `VP`, `HD`, `WOORI`, `TP`), trong khi bảng danh mục chuẩn `dim_bank` lưu tên đầy đủ (`VPBank`, `HDBank`, `Woori Bank`, `TPBank`), nếu không mapping lại thì khi kéo thả Relationships (1-n) trên Power BI sẽ bị mất kết nối và sai số liệu.
+**Cách xử lý trong Power Query:**
+1. Mở **Power Query Editor**.
+2. Chọn bảng `fact_creditlimitsummary` (và các bảng có chứa mã bank gõ tắt như `fact_collateral`).
+3. Chuột phải vào cột `bank_code` -> Chọn **Replace Values** (Thay thế giá trị) và thực hiện các bước sau:
+   - Value To Find: `VP` -> Replace With: `VPBank`
+   - Value To Find: `HD` -> Replace With: `HDBank`
+   - Value To Find: `WOORI` -> Replace With: `Woori Bank`
+   - Value To Find: `TP` -> Replace With: `TPBank`
+   - Value To Find: `AGR` -> Replace With: `Agribank`
+*(Hoặc dùng lệnh Table.ReplaceValue trong Advanced Editor).*
+
 ---
 
-## 3. Công thức DAX & Cấu hình Chi tiết (Phần Thẻ KPI - Cards)
+## 4. Công thức DAX & Cấu hình Chi tiết (Phần Thẻ KPI - Cards)
 
 **Lưu ý chung:** Khuyến nghị chuẩn hóa hiển thị thành đơn vị **Tỷ VNĐ** cho tất cả các thẻ Card để Sếp dễ đọc.
 
@@ -114,7 +128,7 @@ RETURN DIVIDE(TongNo, TongNguonVon, 0)
 
 ---
 
-## 4. Công thức DAX & Cấu hình Chi tiết (Phần Biểu đồ - Charts)
+## 5. Công thức DAX & Cấu hình Chi tiết (Phần Biểu đồ - Charts)
 
 > **Cột bổ trợ cần có trong bảng `fact_cashflow`:**
 > Nhóm các tài khoản vay thành "Ngắn hạn" và "Dài hạn":
