@@ -264,19 +264,33 @@ RETURN DIVIDE([Tổng khách hàng] - ThangTruoc, ThangTruoc, 0)
 - **Trục Y:** Measure `Vòng quay PT hiện tại`
 
 ### 2.3 Biểu đồ tuổi nợ (Aging Report)
-- **Loại:** Stacked Column Chart
-- **Trục X:** Kéo cột `Tuổi Nợ Biểu Đồ` vào.
-- **Lọc phụ (Rất quan trọng):** Trọng tâm của biểu đồ này là Nợ quá hạn. Bạn kéo `Tuổi Nợ Biểu Đồ` vào cột Filters, **bỏ tích ô "Current"** đi nhé (Chỉ giữ lại 4 nhóm: 1-30, 31-60, 61-90, 90+).
 - **Trục Y:** `Nợ FIFO Aging (Tỷ)` (Tạo Measure ở bên dưới)
 - **Cách tạo Measure Phân bổ FIFO Tuổi Nợ (BẮT BUỘC):**
-Trục Y của biểu đồ này KHÔNG THỂ dùng measure `Phải thu (Tỷ)`. Lý do: `Phải thu` lấy cột `ending_debit_balance` (là lũy kế tổng nợ). Nếu sếp dùng cột Tuổi Nợ (chỉ tính cho hóa đơn) để cắt (slice) tổng nợ thì Power BI sẽ tính sai bét (đó là lý do kéo 1-30 vào bị biến mất).
-Sếp phải tạo một Measure tính chuẩn FIFO bóc tách từng hóa đơn rồi chia dải như sau:
+Tuyệt đối KHÔNG dùng cột Calculated Column với hàm `TODAY()` để tính tuổi nợ! Vì `TODAY()` luôn lấy ngày hôm nay (hiện tại là tháng 10) để trừ đi ngày xuất hóa đơn (tháng 7), làm cho toàn bộ hóa đơn bị đẩy lùi về dải `61-90` hoặc `90+`. Và nếu sếp chọn xem dữ liệu tháng 1, nó vẫn lấy tháng 10 để trừ!
 
+Để tuổi nợ nhảy chính xác theo bộ lọc Tháng, sếp BẮT BUỘC phải làm theo 2 bước sau:
+
+**Bước 1: Tạo bảng phụ `Dim_AgingBucket` (Bảng rời, không nối cáp)**
+1. Chọn **Enter Data** trên thanh công cụ.
+2. Tạo 2 cột: `Bucket` và `Sort`. Nhập y hệt thế này:
+   - Current | 1
+   - 1-30    | 2
+   - 31-60   | 3
+   - 61-90   | 4
+   - 91-120  | 5
+   - 121-150 | 6
+   - 151-180 | 7
+   - 180+    | 8
+3. Đặt tên bảng là `Dim_AgingBucket` rồi Load.
+4. Chọn cột `Bucket` > **Sort by Column** > `Sort`.
+5. Kéo cột `Bucket` này thả vào **Trục X** của biểu đồ.
+
+**Bước 2: Tạo Measure `Nợ FIFO Aging (Tỷ)` cực mạnh sau đây:**
 ```dax
 Nợ FIFO Aging (Tỷ) = 
 VAR _MaxDate = MAX('silver Dim_Date'[Date])
--- Lấy dải Tuổi Nợ đang được chọn trên Trục X
-VAR _SelectedBuckets = VALUES('silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ])
+-- Lấy dải Tuổi Nợ đang được chọn trên Trục X (của bảng phụ Dim_AgingBucket)
+VAR _SelectedBuckets = VALUES('Dim_AgingBucket'[Bucket])
 
 RETURN
 DIVIDE(
@@ -284,7 +298,7 @@ DIVIDE(
         VALUES('silver dim_partner'[partner_code]),
         VAR _Customer = 'silver dim_partner'[partner_code]
         
-        -- 1. Chốt Số dư nợ tại mốc MaxDate (Xóa filter trục X để không bị tính sai)
+        -- 1. Chốt Số dư nợ tại mốc MaxDate
         VAR _TotalDebt = 
             CALCULATE(
                 MAXX(
@@ -292,8 +306,7 @@ DIVIDE(
                     'silver fact_accountsreceivable'[ending_debit_balance]
                 ),
                 'silver fact_accountsreceivable'[posting_date] <= _MaxDate,
-                ALL('silver Dim_Date'),
-                REMOVEFILTERS('silver fact_accountsreceivable')
+                ALL('silver Dim_Date')
             )
         
         RETURN
@@ -306,16 +319,14 @@ DIVIDE(
                         'silver fact_accountsreceivable',
                         "InvNo", 'silver fact_accountsreceivable'[invoice_no],
                         "InvDate", 'silver fact_accountsreceivable'[invoice_date],
-                        "InvAmt", 'silver fact_accountsreceivable'[debit_amount],
-                        "Bucket", 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ]
+                        "InvAmt", 'silver fact_accountsreceivable'[debit_amount]
                     ),
                     'silver fact_accountsreceivable'[debit_amount] > 0,
                     'silver fact_accountsreceivable'[posting_date] <= _MaxDate,
-                    ALL('silver Dim_Date'),
-                    REMOVEFILTERS('silver fact_accountsreceivable')
+                    ALL('silver Dim_Date')
                 )
                 
-            -- 3. Chạy vòng lặp FIFO
+            -- 3. Chạy vòng lặp FIFO & Tính Tuổi nợ ĐỘNG theo _MaxDate
             VAR _UnpaidInvoices = 
                 GENERATE(
                     _Invoices,
@@ -327,10 +338,24 @@ DIVIDE(
                             [InvAmt]
                         )
                     VAR _UnpaidAmt = MIN([InvAmt], MAX(0, _TotalDebt - (_RunningTotal - [InvAmt])))
-                    RETURN ROW("UnpaidAmt", _UnpaidAmt)
+                    
+                    -- Tính tuổi nợ động (KHÔNG DÙNG TODAY)
+                    VAR _DaysSinceInvoice = DATEDIFF(_CurrentInvDate, _MaxDate, DAY)
+                    VAR _DynamicBucket = 
+                        SWITCH(TRUE(),
+                            _DaysSinceInvoice <= 0, "Current",
+                            _DaysSinceInvoice <= 30, "1-30",
+                            _DaysSinceInvoice <= 60, "31-60",
+                            _DaysSinceInvoice <= 90, "61-90",
+                            _DaysSinceInvoice <= 120, "91-120",
+                            _DaysSinceInvoice <= 150, "121-150",
+                            _DaysSinceInvoice <= 180, "151-180",
+                            "180+"
+                        )
+                    RETURN ROW("UnpaidAmt", _UnpaidAmt, "Bucket", _DynamicBucket)
                 )
                 
-            -- 4. Lọc lại chỉ lấy phần tiền của hóa đơn nằm trong dải Tuổi Nợ trục X
+            -- 4. Lọc lại chỉ lấy tiền của hóa đơn nằm trong dải Tuổi Nợ được chọn
             RETURN
             SUMX(
                 FILTER(_UnpaidInvoices, [UnpaidAmt] > 0 && [Bucket] IN _SelectedBuckets),
@@ -341,41 +366,7 @@ DIVIDE(
     1000000000, 0
 )
 ```
-
-- **Cách tạo Cột Tuổi nợ dành riêng cho Biểu Đồ (Calculated Column):**
-Bạn click **New Column** (Cột mới) 2 lần để tạo 2 cột tính toán tách biệt nhé:
-
-**Cột 1 (Dùng để hiển thị phân nhóm):**
-```dax
-Tuổi Nợ Biểu Đồ = 
-SWITCH(TRUE(),
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 0, "Current",
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 30, "1-30",
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 60, "31-60",
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 90, "61-90",
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 120, "91-120",
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 150, "121-150",
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 180, "151-180",
-    "180+"
-)
-```
-
-**Cột 2 (Cột ẩn dùng để sắp xếp cho chuẩn):**
-```dax
-Tuổi Nợ Biểu Đồ Sort = 
-SWITCH(TRUE(),
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 0, 1,
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 30, 2,
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 60, 3,
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 90, 4,
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 120, 5,
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 150, 6,
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 180, 7,
-    8
-)
-```
-- *Mẹo UX:* Để biểu đồ không bị xếp lộn xộn, bạn chọn cột `Tuổi Nợ Biểu Đồ`, lên thanh công cụ chọn **Sort by Column** > `Tuổi Nợ Biểu Đồ Sort`.
-- *Mẹo UX:* Tô màu Đỏ thẫm cho nhóm `90+` để thu hút sự chú ý.
+- *Mẹo UX:* Sếp nhớ kéo cột `Dim_AgingBucket[Bucket]` vào cột Filters của biểu đồ, bỏ tích ô "Current" đi để biểu đồ chỉ hiện nợ quá hạn. Tô màu Đỏ thẫm cho nhóm `180+` để thu hút sự chú ý.
 
 ### 2.4 Top 10 khách hàng (Tổng số dư)
 - **Loại:** Horizontal Bar Chart
@@ -386,8 +377,8 @@ SWITCH(TRUE(),
 ### 2.5 Top 10 khách hàng (Nợ quá hạn)
 - **Loại:** Horizontal Bar Chart
 - **Trục Y:** `silver dim_partner[Partner_Name]`
-- **Trục X:** Kéo Measure `Nợ FIFO Aging (Tỷ)` vào (Tuyệt đối không dùng Phải Thu Tỷ).
-- **Lọc phụ (Rất quan trọng):** Mở cột **Filters** (Bộ lọc). Kéo cột `Tuổi Nợ Biểu Đồ` thả vào ô *Filters on this visual*. Bỏ tích ô "Current" (Chỉ giữ lại các nhóm quá hạn). Biểu đồ sẽ tự động rút gọn thành nợ quá hạn.
+- **Trục X:** Kéo Measure `Nợ FIFO Aging (Tỷ)` vào.
+- **Lọc phụ (Rất quan trọng):** Mở cột **Filters** (Bộ lọc). Kéo cột `Dim_AgingBucket[Bucket]` thả vào ô *Filters on this visual*. Bỏ tích ô "Current" (Chỉ giữ lại các nhóm quá hạn). Biểu đồ sẽ tự động rút gọn thành nợ quá hạn.
 
 ---
 
@@ -410,68 +401,34 @@ SWITCH(TRUE(),
 |  11 | **% quá hạn** | Tỷ lệ số tiền nợ quá hạn trên tổng số tiền nợ |
 
 **Cách thao tác (Sử dụng Table phẳng để không bị lặp % Quá hạn):**
-Để cột `% Quá hạn` chỉ xuất hiện đúng 1 lần ở cuối bảng, chúng ta BẮT BUỘC phải dùng biểu đồ **Table** (Bảng phẳng), không được dùng Matrix. Việc dùng Table đòi hỏi bạn phải tạo các Measure rời cho từng khung tuổi nợ.
+Để cột `% Quá hạn` chỉ xuất hiện đúng 1 lần ở cuối bảng, chúng ta BẮT BUỘC phải dùng biểu đồ **Table** (Bảng phẳng), không được dùng Matrix.
 
-**Bước 1: Tạo Cột tính toán `Tuổi Nợ Bảng`**
-*(Tạo 2 cột này trong bảng `silver fact_accountsreceivable`)*.
-Bạn click **New Column** 2 lần để tạo 2 cột rời nhau:
-
-**Cột 1:**
+**Tạo các Measure rời cho từng độ tuổi nợ (Sử dụng bảng Dim_AgingBucket)**
+Bạn click **New Measure** để tạo lần lượt các cột nợ:
 ```dax
-Tuổi Nợ Bảng = 
-SWITCH(TRUE(),
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 0, "Current",
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 30, "1-30",
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 60, "31-60",
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 90, "61-90",
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 120, "91-120",
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 150, "121-150",
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 180, "151-180",
-    "180+"
-)
-```
-
-**Cột 2 (Dùng để Sort Cột 1):**
-```dax
-Tuổi Nợ Bảng Sort = 
-SWITCH(TRUE(),
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 0, 1,
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 30, 2,
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 60, 3,
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 90, 4,
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 120, 5,
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 150, 6,
-    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 180, 7,
-    8
-)
-```
-
-**Bước 2: Tạo các Measure rời cho từng độ tuổi nợ**
-Bạn click **New Measure** để tạo lần lượt các cột nợ (Lưu ý: Phải dùng measure `Nợ FIFO Aging (Tỷ)` bên trên để chia cột chuẩn xác):
-```dax
-Nợ Current = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "Current")
-Nợ 1-30 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "1-30")
-Nợ 31-60 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "31-60")
-Nợ 61-90 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "61-90")
-Nợ 91-120 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "91-120")
-Nợ 121-150 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "121-150")
-Nợ 151-180 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "151-180")
-Nợ 180+ = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "180+")
+Nợ Current = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "Current")
+Nợ 1-30 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "1-30")
+Nợ 31-60 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "31-60")
+Nợ 61-90 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "61-90")
+Nợ 91-120 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "91-120")
+Nợ 121-150 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "121-150")
+Nợ 151-180 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "151-180")
+Nợ 180+ = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "180+")
 
 % Quá hạn = 
 DIVIDE(
-    CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] <> "Current"),
+    CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] <> "Current"),
     [Phải thu (Tỷ)],
     0
 )
 ```
 
-**Bước 3: Kéo thả vào Table**
+**Kéo thả vào Table**
 - **Loại biểu đồ:** Chọn biểu tượng **Table** (Bảng phẳng).
 - **Columns (Kéo thả tuần tự các mục sau vào ô Columns):** 
   1. Kéo `Partner_Name` từ bảng `silver dim_partner` vào (Click đúp sửa tên thành **Customer**).
   2. Kéo 8 Measure nợ từ `Nợ Current` đến `Nợ 180+` thả vào.
-  3. Kéo Measure `[Phải thu Cuối Kỳ]` vào (Click đúp sửa tên thành **Số tiền**).
+  3. Kéo Measure `[Phải thu (Tỷ)]` vào (Click đúp sửa tên thành **Số tiền**).
   4. Kéo Measure `[% Quá hạn]` vào cuối cùng.
 
 ### 2.7 Bảng chi tiết các hóa đơn đang nợ
@@ -480,10 +437,40 @@ DIVIDE(
   1. `silver dim_partner[Partner_Name]` (Tên Khách hàng)
   2. `silver fact_accountsreceivable[invoice_no]` (Số hóa đơn)
   3. `silver fact_accountsreceivable[invoice_date]` (Ngày xuất Hóa đơn)
-  4. Cột tính toán `Tuổi Nợ Bảng` (Hiển thị chi tiết đến 180+)
-  5. Measure `[Phải thu Cuối Kỳ]` (Số tiền còn nợ)
-- **Lọc phụ (Bắt buộc):** Ở cột Filters bên phải, kéo Measure `[Phải thu Cuối Kỳ]` vào mục *Filters on this visual* và cài đặt điều kiện **is greater than 0** (Lớn hơn 0). Điều này giúp bảng ẩn đi những hóa đơn khách đã trả sạch tiền!
-- *Mẹo UX:* Bấm mũi tên trỏ xuống ở cột Phải thu Cuối Kỳ > Conditional Formatting > Data bars (Thanh dữ liệu). Hóa đơn nào nợ càng nhiều thì thanh màu đỏ càng dài.
+  4. Tạo 1 Measure `Tuổi Nợ Động` để thả vào bảng này (Vì bảng không cho phép dùng Cột Calculated tĩnh):
+```dax
+Tuổi Nợ Động = 
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+VAR _InvDate = MAX('silver fact_accountsreceivable'[invoice_date])
+VAR _Days = DATEDIFF(_InvDate, _MaxDate, DAY)
+RETURN 
+SWITCH(TRUE(),
+    ISBLANK(_InvDate), BLANK(),
+    _Days <= 0, "Current",
+    _Days <= 30, "1-30",
+    _Days <= 60, "31-60",
+    _Days <= 90, "61-90",
+    _Days <= 120, "91-120",
+    _Days <= 150, "121-150",
+    _Days <= 180, "151-180",
+    "180+"
+)
+```
+  5. Kéo Measure `Tuổi Nợ Động` vào.
+  6. Thêm 1 cột hiển thị Số nợ còn lại của Hóa đơn (Phải viết measure tính riêng phần chưa thanh toán cho từng bill):
+```dax
+Hóa đơn (Chưa thanh toán) = 
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+VAR _TotalDebt = CALCULATE(MAXX(TOPN(1, 'silver fact_accountsreceivable', 'silver fact_accountsreceivable'[posting_date], DESC, 'silver fact_accountsreceivable'[id], DESC), 'silver fact_accountsreceivable'[ending_debit_balance]), 'silver fact_accountsreceivable'[posting_date] <= _MaxDate, ALL('silver Dim_Date'))
+VAR _Invoices = CALCULATETABLE(SELECTCOLUMNS('silver fact_accountsreceivable', "InvNo", 'silver fact_accountsreceivable'[invoice_no], "InvDate", 'silver fact_accountsreceivable'[invoice_date], "InvAmt", 'silver fact_accountsreceivable'[debit_amount]), 'silver fact_accountsreceivable'[debit_amount] > 0, 'silver fact_accountsreceivable'[posting_date] <= _MaxDate, ALL('silver Dim_Date'))
+VAR _CurrentInvDate = MAX('silver fact_accountsreceivable'[invoice_date])
+VAR _CurrentInvNo = MAX('silver fact_accountsreceivable'[invoice_no])
+VAR _InvAmt = CALCULATE(SUM('silver fact_accountsreceivable'[debit_amount]), 'silver fact_accountsreceivable'[invoice_no] = _CurrentInvNo)
+VAR _RunningTotal = SUMX(FILTER(_Invoices, [InvDate] > _CurrentInvDate || ([InvDate] = _CurrentInvDate && [InvNo] >= _CurrentInvNo)), [InvAmt])
+RETURN IF(ISBLANK(_TotalDebt) || ISBLANK(_CurrentInvNo), BLANK(), MIN(_InvAmt, MAX(0, _TotalDebt - (_RunningTotal - _InvAmt))))
+```
+  7. Kéo Measure `Hóa đơn (Chưa thanh toán)` vào cột cuối. Lọc bảng này `is greater than 0`.
+- *Mẹo UX:* Bấm mũi tên trỏ xuống ở cột `Hóa đơn (Chưa thanh toán)` > Conditional Formatting > Data bars (Thanh dữ liệu). Hóa đơn nào nợ càng nhiều thì thanh màu đỏ càng dài.
 
 
 ---
