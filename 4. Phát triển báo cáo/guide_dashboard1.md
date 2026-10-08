@@ -222,6 +222,30 @@ Tổng Dòng Chi =
 - **Cột:** Kỳ báo cáo, Giá vốn hàng bán (Mã 11 trong B02), Dư nợ vay BQ, Vòng quay nợ vay, Số ngày luân chuyển, Tỷ lệ D/E.
 - **DAX Vòng quay Nợ Vay:** `DIVIDE( Giá Vốn Hàng Bán, Trung bình cộng Dư Nợ đầu và cuối kỳ )`
 
+---
+
+## 6. Công thức DAX Nhóm Chỉ số Tài chính (Bảng 2.8)
+> **Nguồn:** Lấy từ `B01-DN` (Báo cáo tình hình tài chính), `B02-DN` (Báo cáo kết quả hoạt động kinh doanh) và các Sổ chi tiết. Công thức gốc bám sát file excel "Tổng hợp chỉ số".
+
+- **Khả năng thanh toán hiện hành:** `Tài sản ngắn hạn (lấy mục A. Tài sản ngắn hạn B01) / Nợ ngắn hạn (lấy mục C.I Nợ ngắn hạn B01)`
+- **Khả năng thanh toán nhanh:** `(Tài sản ngắn hạn (B01) - Giá trị hàng tồn kho (Báo cáo tồn kho - Cuối kì cột giá trị)) / Nợ ngắn hạn (B01)`
+- **Vòng quay vốn lưu động:** `Doanh thu thuần (mục 3 B02) / AVERAGE(Tài sản ngắn hạn - Nợ ngắn hạn năm trước và năm hiện tại)`
+- **Vòng quay hàng tồn kho:** `Giá vốn hàng bán (Sổ chi tiết mua hàng _ tổng cột Giá trị mua) / AVERAGE(Hàng tồn kho năm trước và năm hiện tại _ Lấy cột số lượng của cuối kì)`
+- **Vòng quay các khoản phải thu:** `Doanh thu thuần (mục 3 B02) / AVERAGE(Khoản phải thu năm trước và hiện tại)` (Tổng công nợ phải thu khách hàng)
+- **Nợ phải trả trên Tổng tài sản:** `Nợ phải trả (mục C B01) / Tổng tài sản (mục Tổng nguồn vốn B01)`
+- **Nợ dài hạn / Vốn CSH:** `Nợ dài hạn (mục C.II B01) / Vốn CSH (mục D B01)`
+- **EBIT:** `Chi phí lãi vay (mục 8 B02) + Chi phí thuế (tổng mục 16+17 B02) + Lợi nhuận sau thuế (mục 18 B02)`
+- **EBITDA:** `EBIT + Khấu hao tài sản cố định (mục B.II B01)`
+- **EBIT / Chi phí lãi vay:** `EBIT / Chi phí lãi vay (B02)`
+- **EBITDA / Chi phí lãi vay:** `EBITDA / Chi phí lãi vay (B02)`
+- **Lợi nhuận gộp / Doanh thu thuần:** `Lợi nhuận gộp / Doanh thu thuần (B02)`
+- **Lợi nhuận HĐKD / Doanh thu thuần:** `Lợi nhuận HĐKD / Doanh thu thuần (B02)`
+- **EBITDA / Doanh thu thuần:** `EBITDA / Doanh thu thuần (B02)`
+- **Vốn chủ sở hữu bình quân:** `(VCSH năm trước + VCSH năm hiện tại) / 2` (mục D B01)
+- **ROE (Lợi nhuận ST / VCSH bq):** `Lợi nhuận sau thuế (mục 18 B02) / Vốn chủ sở hữu bình quân`
+- **ROA (Lợi nhuận ST / Tổng Tài sản bq):** `Lợi nhuận sau thuế (mục 18 B02) / Tổng Tài sản bình quân`
+- **Tổng dư nợ / EBITDA:** `Tổng dư nợ (Tính ở mục 2.1) / EBITDA`
+
 ### 2.9 Chi tiết tài sản đảm bảo
 - **Loại:** Table
 - **Cột:** Kéo từ bảng `fact_collateral`: STT, Loại TS, Giá trị thẩm định, Hệ số TSĐB, Giá trị cho vay, Số tiền được vay.
