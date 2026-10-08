@@ -34,7 +34,7 @@ WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceiv
 doanh_thu AS (
     SELECT SUM(current_period_amount) AS val
     FROM silver.fact_incomestatement
-    WHERE indicator_code='B02-DN_10' AND EXTRACT(YEAR FROM reporting_date) = EXTRACT(YEAR FROM (SELECT dt FROM max_date))
+    WHERE indicator_code='B02-DN_10' AND EXTRACT(YEAR FROM month) = EXTRACT(YEAR FROM (SELECT dt FROM max_date))
 ),
 du_no_avg AS (
     SELECT 
@@ -45,13 +45,14 @@ SELECT (SELECT val FROM doanh_thu) / NULLIF((SELECT val FROM du_no_avg), 0) AS v
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- WHERE indicator_code='B02-DN_10' AND EXTRACT(YEAR FROM reporting_date) = EXTRACT(YEAR FROM (SELECT dt FROM max_date))
+-- WHERE indicator_code='B02-DN_10' AND EXTRACT(YEAR FROM month) = EXTRACT(YEAR FROM (SELECT dt FROM max_date))
 -- ( (SELECT SUM(debit_amount - credit_amount) FROM silver.fact_accountsreceivable WHERE EXTRACT(YEAR FROM posting_date) <= EXTRACT(YEAR FROM (SELECT dt FROM max_date))) +
 -- (SELECT SUM(debit_amount - credit_amount) FROM silver.fact_accountsreceivable WHERE EXTRACT(YEAR FROM posting_date) < EXTRACT(YEAR FROM (SELECT dt FROM max_date))) ) / 2.0 AS val
-ERROR: column "reporting_date" does not exist
-LINE 5: ... indicator_code='B02-DN_10' AND EXTRACT(YEAR FROM reporting_...
-                                                             ^
-
++------------------------+
+| vong_quay_phai_thu_nam |
++------------------------+
+|          None          |
++------------------------+
 */
 
 -- VISUAL: Vòng quay phải thu hiện tại
@@ -60,7 +61,7 @@ WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceiv
 doanh_thu AS (
     SELECT SUM(current_period_amount) AS val
     FROM silver.fact_incomestatement
-    WHERE indicator_code='B02-DN_10' AND DATE_TRUNC('month', reporting_date) = DATE_TRUNC('month', (SELECT dt FROM max_date))
+    WHERE indicator_code='B02-DN_10' AND DATE_TRUNC('month', month) = DATE_TRUNC('month', (SELECT dt FROM max_date))
 ),
 du_no_hien_tai AS (
     SELECT SUM(debit_amount - credit_amount) AS val
@@ -70,11 +71,12 @@ SELECT (SELECT val FROM doanh_thu) / NULLIF((SELECT val FROM du_no_hien_tai), 0)
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- WHERE indicator_code='B02-DN_10' AND DATE_TRUNC('month', reporting_date) = DATE_TRUNC('month', (SELECT dt FROM max_date))
-ERROR: column "reporting_date" does not exist
-LINE 5: ...ndicator_code='B02-DN_10' AND DATE_TRUNC('month', reporting_...
-                                                             ^
-
+-- WHERE indicator_code='B02-DN_10' AND DATE_TRUNC('month', month) = DATE_TRUNC('month', (SELECT dt FROM max_date))
++-----------------------------+
+| vong_quay_phai_thu_hien_tai |
++-----------------------------+
+|            0E-28            |
++-----------------------------+
 */
 
 -- VISUAL: Tổng hóa đơn
@@ -138,7 +140,7 @@ GROUP BY 1;
 -- VISUAL: Receivable Turnover
 -- MEASURE: _CongNo[VQ_Phai_Thu]
 WITH doanh_thu AS (
-    SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM(current_period_amount) AS val
+    SELECT DATE_TRUNC('month', month) AS MONTH, SUM(current_period_amount) AS val
     FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' GROUP BY 1
 ),
 du_no AS (
@@ -153,10 +155,18 @@ LEFT JOIN doanh_thu dt ON d.MONTH = dt.MONTH;
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' GROUP BY 1
-ERROR: column "reporting_date" does not exist
-LINE 2:     SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM...
-                                       ^
-
++---------------------------+---------------------+
+|           month           |   vong_quay_thang   |
++---------------------------+---------------------+
+| 2026-01-01 00:00:00+00:00 |         None        |
+| 2026-02-01 00:00:00+00:00 |         None        |
+| 2026-03-01 00:00:00+00:00 |         None        |
+| 2026-04-01 00:00:00+00:00 |         None        |
+| 2026-05-01 00:00:00+00:00 |         None        |
+| 2026-06-01 00:00:00+00:00 |         None        |
+| 2026-07-01 00:00:00+00:00 | -1.1165575818095942 |
+| 2026-08-01 00:00:00+00:00 |        0E-28        |
++---------------------------+---------------------+
 */
 
 -- VISUAL: Top 10 KH nợ cao nhất

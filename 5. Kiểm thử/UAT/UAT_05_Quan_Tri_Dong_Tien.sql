@@ -248,17 +248,17 @@ WITH max_date AS (SELECT MAX(reporting_date) AS dt FROM silver.fact_balancesheet
 dso_calc AS (
     SELECT 
         (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_130' AND reporting_date=(SELECT dt FROM max_date)) /
-        NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' AND reporting_date=(SELECT dt FROM max_date)), 0) * 365 AS dso
+        NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dso
 ),
 dio_calc AS (
     SELECT 
         (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_140' AND reporting_date=(SELECT dt FROM max_date)) /
-        NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND reporting_date=(SELECT dt FROM max_date)), 0) * 365 AS dio
+        NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dio
 ),
 dpo_calc AS (
     SELECT 
         (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_311' AND reporting_date=(SELECT dt FROM max_date)) /
-        NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND reporting_date=(SELECT dt FROM max_date)), 0) * 365 AS dpo
+        NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dpo
 )
 SELECT 
     (SELECT dso FROM dso_calc) AS dso,
@@ -269,14 +269,15 @@ SELECT
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_130' AND reporting_date=(SELECT dt FROM max_date)) /
--- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' AND reporting_date=(SELECT dt FROM max_date)), 0) * 365 AS dso
+-- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dso
 -- (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_140' AND reporting_date=(SELECT dt FROM max_date)) /
--- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND reporting_date=(SELECT dt FROM max_date)), 0) * 365 AS dio
+-- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dio
 -- (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_311' AND reporting_date=(SELECT dt FROM max_date)) /
--- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND reporting_date=(SELECT dt FROM max_date)), 0) * 365 AS dpo
-ERROR: column "reporting_date" does not exist
-LINE 5: ...omestatement WHERE indicator_code='B02-DN_10' AND reporting_...
-                                                             ^
-
+-- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dpo
++------+------+------+------+
+| dso  | dio  | dpo  | ccc  |
++------+------+------+------+
+| None | None | None | None |
++------+------+------+------+
 */
 

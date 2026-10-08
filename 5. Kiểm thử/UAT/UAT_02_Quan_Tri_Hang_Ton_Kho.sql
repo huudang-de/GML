@@ -127,7 +127,7 @@ WITH ton_kho AS (
     FROM silver.fact_inventory_balance GROUP BY 1
 ),
 gia_von AS (
-    SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM(current_period_amount) AS cogs
+    SELECT DATE_TRUNC('month', month) AS MONTH, SUM(current_period_amount) AS cogs
     FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' GROUP BY 1
 )
 SELECT t.MONTH,
@@ -138,10 +138,12 @@ LEFT JOIN gia_von g ON t.MONTH = g.MONTH;
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' GROUP BY 1
-ERROR: column "reporting_date" does not exist
-LINE 6:     SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM...
-                                       ^
-
++---------------------------+-----------------+
+|           month           | he_so_vong_quay |
++---------------------------+-----------------+
+| 2026-07-01 00:00:00+00:00 |      0E-28      |
+| 2026-08-01 00:00:00+00:00 |      0E-28      |
++---------------------------+-----------------+
 */
 
 -- VISUAL: Inventory to Sales
@@ -151,7 +153,7 @@ WITH ton_kho AS (
     FROM silver.fact_inventory_balance GROUP BY 1
 ),
 doanh_thu AS (
-    SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM(current_period_amount) AS dthu
+    SELECT DATE_TRUNC('month', month) AS MONTH, SUM(current_period_amount) AS dthu
     FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' GROUP BY 1
 )
 SELECT t.MONTH,
@@ -162,10 +164,12 @@ LEFT JOIN doanh_thu d ON t.MONTH = d.MONTH;
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' GROUP BY 1
-ERROR: column "reporting_date" does not exist
-LINE 6:     SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM...
-                                       ^
-
++---------------------------+--------------------+
+|           month           |      ty_le_is      |
++---------------------------+--------------------+
+| 2026-07-01 00:00:00+00:00 | 4.5564288294601285 |
+| 2026-08-01 00:00:00+00:00 |        None        |
++---------------------------+--------------------+
 */
 
 -- VISUAL: Trạng thái Inventory
@@ -242,7 +246,7 @@ WITH thuc_te AS (
     FROM silver.fact_inventoryoutward GROUP BY 1
 ),
 ke_hoach AS (
-    SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM(target_amount) AS ke_hoach
+    SELECT DATE_TRUNC('month', month) AS MONTH, SUM(target_amount) AS ke_hoach
     FROM silver.fact_businessplan WHERE indicator_code = 'B02-DN_01' GROUP BY 1
 )
 SELECT COALESCE(t.MONTH, k.MONTH) AS MONTH,
@@ -255,9 +259,16 @@ FULL OUTER JOIN ke_hoach k ON t.MONTH = k.MONTH;
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- FROM silver.fact_businessplan WHERE indicator_code = 'B02-DN_01' GROUP BY 1
-ERROR: column "reporting_date" does not exist
-LINE 6:     SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM...
-                                       ^
-
++---------------------------+---------------+----------+----------------------+
+|           month           |    thuc_te    | ke_hoach | phan_tram_chenh_lech |
++---------------------------+---------------+----------+----------------------+
+| 2026-04-01 00:00:00+00:00 | 76769615088.0 |    0     |         None         |
+| 2026-06-01 00:00:00+00:00 | 81312507829.0 |    0     |         None         |
+| 2026-03-01 00:00:00+00:00 | 53646924511.0 |    0     |         None         |
+| 2026-02-01 00:00:00+00:00 | 20922802826.0 |    0     |         None         |
+| 2026-07-01 00:00:00+00:00 | 76844566080.0 |    0     |         None         |
+| 2026-05-01 00:00:00+00:00 | 74599184818.0 |    0     |         None         |
+| 2026-01-01 00:00:00+00:00 | 52585271668.0 |    0     |         None         |
++---------------------------+---------------+----------+----------------------+
 */
 
