@@ -343,86 +343,88 @@ GROUP BY bank_code;
 
 -- VISUAL: Cơ cấu dòng thu theo Bank
 -- MEASURE: _TaiChinh[Dong_Thu_Theo_Bank]
-SELECT partner_code AS bank_code,
-       SUM(debit_amount) AS tong_thu
-FROM silver.fact_cashflow
-WHERE account_no LIKE '112%'
-  AND voucher_no NOT LIKE 'CTNB%'
-  AND voucher_no NOT LIKE 'NTTK%'
-  AND reciprocal_account NOT LIKE '111%' 
-  AND reciprocal_account NOT LIKE '112%'
-GROUP BY partner_code;
+SELECT a.account_name AS bank_name,
+       SUM(c.debit_amount) AS tong_thu
+FROM silver.fact_cashflow c
+LEFT JOIN silver.dim_account a ON c.account_no = a.account_no
+WHERE c.account_no LIKE '112%'
+  AND c.voucher_no NOT LIKE 'CTNB%'
+  AND c.voucher_no NOT LIKE 'NTTK%'
+  AND c.reciprocal_account NOT LIKE '111%' 
+  AND c.reciprocal_account NOT LIKE '112%'
+GROUP BY a.account_name;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- WHERE account_no LIKE '112%'
--- AND voucher_no NOT LIKE 'CTNB%'
--- AND voucher_no NOT LIKE 'NTTK%'
--- AND reciprocal_account NOT LIKE '111%'
--- AND reciprocal_account NOT LIKE '112%'
-+----------------------------------+-----------------+
-|            bank_code             |     tong_thu    |
-+----------------------------------+-----------------+
-|                0110887352        |       0.00      |
-|              NCC0056             |  1285566090.00  |
-|           001077006090           |       0.00      |
-|           001090023561           |    6888000.00   |
-|           001096017517           |   271053000.00  |
-|           001165002084           |   34224000.00   |
-|           001192010358           |       0.00      |
-|          0100100417-025          |       0.00      |
-|            0100105662            |       0.00      |
-|            0100108984            |       0.00      |
-|            0100109106            |       0.00      |
-|          0100109106-023          |       0.00      |
-|          0100110768-060          |   19995219.00   |
-|          0100111200-001          |       0.00      |
-|            0100111472            |   117766800.00  |
-|            0100233583            |  14670000000.00 |
-|            0100385089            |  32015004504.00 |
-...(TRUNCATED FOR READABILITY)...
+-- WHERE c.account_no LIKE '112%'
+-- AND c.voucher_no NOT LIKE 'CTNB%'
+-- AND c.voucher_no NOT LIKE 'NTTK%'
+-- AND c.reciprocal_account NOT LIKE '111%'
+-- AND c.reciprocal_account NOT LIKE '112%'
++-----------------------------------------------------+-----------------+
+|                      bank_name                      |     tong_thu    |
++-----------------------------------------------------+-----------------+
+|                       Ngoại tệ                      |  10597708736.00 |
+|           TK 0141100123005 - MB Thanh Xuân          | 259354391337.00 |
+| TK 0141100810002 Thanh toán Thấu Chi - Ngân hàng MB |   36760669.00   |
+|            TK 0145600027008 - MB Linh Đàm           |   519371580.00  |
+|  TK 030061999899 NH Sacombank (Sài gòn thương tín)  |  67379782604.00 |
+|   TK 097704070005119 HDBANK (TMCP phát triển HCM)   |  33401144194.00 |
+|            TK 097840070000031/006 HD Bank           |  10597708736.00 |
+|        TK 100300485745 - Ngân hàng Woori Bank       |  98890633612.00 |
+|      TK 2035186001 -  Indovina IVB - CN Hà Nội      |  82427030358.00 |
+|    TK 2407201007052 - NH AGRIBANK  - Hưng Yên II    |  2316477200.00  |
+|                TK 474255166 - VP Bank               |  67330751047.00 |
+|           TK 5859222288 NH LPB (Lộc Phát)           |   26820456.00   |
+|             TK 89156688 - VPBANK Hội sở             |  3652300000.00  |
+|         TK 90900283720 NH TPBank Tiên Phong         |  15720566231.00 |
+|              TK 996186186  MB TT lương              |  4700002995.00  |
+|                    Tiền Việt Nam                    | 635756032283.00 |
+|                Tiền gửi không kỳ hạn                | 646353741019.00 |
++-----------------------------------------------------+-----------------+
 */
 
 -- VISUAL: Cơ cấu dòng chi theo Bank
 -- MEASURE: _TaiChinh[Dong_Chi_Theo_Bank]
-SELECT partner_code AS bank_code,
-       SUM(credit_amount) AS tong_chi
-FROM silver.fact_cashflow
-WHERE account_no LIKE '112%'
-  AND voucher_no NOT LIKE 'CTNB%'
-  AND voucher_no NOT LIKE 'NTTK%'
-  AND reciprocal_account NOT LIKE '111%' 
-  AND reciprocal_account NOT LIKE '112%'
-GROUP BY partner_code;
+SELECT a.account_name AS bank_name,
+       SUM(c.credit_amount) AS tong_chi
+FROM silver.fact_cashflow c
+LEFT JOIN silver.dim_account a ON c.account_no = a.account_no
+WHERE c.account_no LIKE '112%'
+  AND c.voucher_no NOT LIKE 'CTNB%'
+  AND c.voucher_no NOT LIKE 'NTTK%'
+  AND c.reciprocal_account NOT LIKE '111%' 
+  AND c.reciprocal_account NOT LIKE '112%'
+GROUP BY a.account_name;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- WHERE account_no LIKE '112%'
--- AND voucher_no NOT LIKE 'CTNB%'
--- AND voucher_no NOT LIKE 'NTTK%'
--- AND reciprocal_account NOT LIKE '111%'
--- AND reciprocal_account NOT LIKE '112%'
-+----------------------------------+-----------------+
-|            bank_code             |     tong_chi    |
-+----------------------------------+-----------------+
-|                0110887352        |   92340000.00   |
-|              NCC0056             |  8049262914.00  |
-|           001077006090           |   670024521.00  |
-|           001090023561           |       0.00      |
-|           001096017517           |       0.00      |
-|           001165002084           |       0.00      |
-|           001192010358           |    4095000.00   |
-|          0100100417-025          |  4171938465.00  |
-|            0100105662            |   60795000.00   |
-|            0100108984            |  3056343204.00  |
-|            0100109106            |   551872407.00  |
-|          0100109106-023          |    477000.00    |
-|          0100110768-060          |   22446759.00   |
-|          0100111200-001          |   18000000.00   |
-|            0100111472            |   120520800.00  |
-|            0100233583            |  46260775197.00 |
-|            0100385089            |       0.00      |
-...(TRUNCATED FOR READABILITY)...
+-- WHERE c.account_no LIKE '112%'
+-- AND c.voucher_no NOT LIKE 'CTNB%'
+-- AND c.voucher_no NOT LIKE 'NTTK%'
+-- AND c.reciprocal_account NOT LIKE '111%'
+-- AND c.reciprocal_account NOT LIKE '112%'
++-----------------------------------------------------+-----------------+
+|                      bank_name                      |     tong_chi    |
++-----------------------------------------------------+-----------------+
+|                       Ngoại tệ                      |  12506548412.00 |
+|           TK 0141100123005 - MB Thanh Xuân          | 310516142916.00 |
+| TK 0141100810002 Thanh toán Thấu Chi - Ngân hàng MB |   313760669.00  |
+|            TK 0145600027008 - MB Linh Đàm           |       0.00      |
+|  TK 030061999899 NH Sacombank (Sài gòn thương tín)  |  74516837258.00 |
+|   TK 097704070005119 HDBANK (TMCP phát triển HCM)   |  31615623381.00 |
+|            TK 097840070000031/006 HD Bank           |  12506548412.00 |
+|        TK 100300485745 - Ngân hàng Woori Bank       |  70475216547.00 |
+|      TK 2035186001 -  Indovina IVB - CN Hà Nội      | 135015928766.00 |
+|    TK 2407201007052 - NH AGRIBANK  - Hưng Yên II    |  5457605384.00  |
+|                TK 474255166 - VP Bank               |  51134663382.00 |
+|           TK 5859222288 NH LPB (Lộc Phát)           |    846142.00    |
+|             TK 89156688 - VPBANK Hội sở             |       0.00      |
+|         TK 90900283720 NH TPBank Tiên Phong         |  32706078649.00 |
+|              TK 996186186  MB TT lương              |  15102356152.00 |
+|                    Tiền Việt Nam                    | 726855059246.00 |
+|                Tiền gửi không kỳ hạn                | 739361607658.00 |
++-----------------------------------------------------+-----------------+
 */
 
 -- VISUAL: Bảng tổng hợp 18 Chỉ số

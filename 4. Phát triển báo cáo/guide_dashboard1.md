@@ -183,12 +183,12 @@ CP Lãi Vay (Kế hoạch) = CALCULATE(SUM('silver fact_businessplan'[Target_Amo
 
 ### 2.6 Phân tích dòng thu theo bank
 - **Loại:** Horizontal Bar Chart
-- **Trục Y:** `dim_bank[Bank_Name]`
+- **Trục Y:** `dim_account[account_name]` (Lưu ý: Không dùng `dim_bank[Bank_Name]` vì trong dòng tiền `partner_code` trỏ đến Khách hàng/Nhà cung cấp. Cần dùng tài khoản ngân hàng `112x` từ `dim_account` để biết tiền vào/ra bank nào).
 - **Trục X:** Measure `Tổng Dòng Thu = SUM('fact_cashflow'[debit_amount])`
 
 ### 2.7 Phân tích dòng chi theo bank
 - **Loại:** Horizontal Bar Chart
-- **Trục Y:** `dim_bank[Bank_Name]`
+- **Trục Y:** `dim_account[account_name]`
 - **Trục X:** Measure `Tổng Dòng Chi = SUM('fact_cashflow'[credit_amount])`
 
 ---
