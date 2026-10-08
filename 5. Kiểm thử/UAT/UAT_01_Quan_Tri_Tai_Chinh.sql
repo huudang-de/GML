@@ -142,46 +142,43 @@ SELECT
 
 -- VISUAL: Nợ ngắn/dài hạn theo thời gian
 -- MEASURE: _TaiChinh[Du_No_Theo_Thang]
-WITH monthly_delta AS
-  (SELECT DATE_TRUNC('month', posting_date) AS MONTH,
-          SUM(CASE
-                  WHEN account_no LIKE '34111%'
-                       OR account_no LIKE '34113%'
-                       OR account_no LIKE '34114%' THEN credit_amount - debit_amount
-                  ELSE 0
-              END) AS delta_ngan_han,
-          SUM(CASE
-                  WHEN account_no LIKE '34112%' THEN credit_amount - debit_amount
-                  ELSE 0
-              END) AS delta_dai_han,
-          SUM(credit_amount - debit_amount) AS delta_tong
-   FROM silver.fact_cashflow
-   WHERE account_no LIKE '341%'
-   GROUP BY 1)
-SELECT MONTH,
-       SUM(delta_ngan_han) OVER (
-                                 ORDER BY MONTH) AS no_ngan_han,
-       SUM(delta_dai_han) OVER (
-                                ORDER BY MONTH) AS no_dai_han,
-       SUM(delta_tong) OVER (
-                             ORDER BY MONTH) AS tong_du_no
-FROM monthly_delta;
+WITH months AS (
+    SELECT DISTINCT DATE_TRUNC('month', posting_date) AS month
+    FROM silver.fact_cashflow
+),
+monthly_balances AS (
+    SELECT m.month,
+           c.account_no,
+           c.credit_balance,
+           ROW_NUMBER() OVER(PARTITION BY m.month, c.account_no ORDER BY c.posting_date DESC, c.id DESC) as rn
+    FROM months m
+    JOIN silver.fact_cashflow c ON c.posting_date < m.month + INTERVAL '1 month'
+    WHERE c.account_no IN ('34111', '34112', '34113', '34114', '341')
+)
+SELECT month,
+       SUM(CASE WHEN account_no IN ('34111', '34113', '34114') THEN credit_balance ELSE 0 END) AS no_ngan_han,
+       SUM(CASE WHEN account_no = '34112' THEN credit_balance ELSE 0 END) AS no_dai_han,
+       SUM(CASE WHEN account_no = '341' THEN credit_balance ELSE 0 END) AS tong_du_no
+FROM monthly_balances
+WHERE rn = 1
+GROUP BY month
+ORDER BY month;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- OR account_no LIKE '34113%'
--- OR account_no LIKE '34114%' THEN credit_amount - debit_amount
--- WHERE account_no LIKE '341%'
+-- WHERE c.account_no IN ('34111', '34112', '34113', '34114', '341')
+-- WHERE rn = 1
 +---------------------------+-----------------+----------------+-----------------+
 |           month           |   no_ngan_han   |   no_dai_han   |    tong_du_no   |
 +---------------------------+-----------------+----------------+-----------------+
-| 2026-01-01 00:00:00+00:00 |  -5931423850.00 | -503964877.00  | -19625237083.00 |
-| 2026-02-01 00:00:00+00:00 |  -5853486494.00 | 11943788174.00 |  17680422624.00 |
-| 2026-03-01 00:00:00+00:00 |  -9958298082.00 | 30200593725.00 |  59864992999.00 |
-| 2026-04-01 00:00:00+00:00 |  -6011334519.00 | 30200593725.00 |  71434472174.00 |
-| 2026-05-01 00:00:00+00:00 |  -3483348183.00 | 30200593725.00 |  78963249834.00 |
-| 2026-06-01 00:00:00+00:00 |  -600096357.00  | 30189906225.00 |  87268627634.00 |
-| 2026-07-01 00:00:00+00:00 | -58676538840.00 | 29111738593.00 | -90195202711.00 |
+| 2026-01-01 00:00:00+00:00 | 288810348805.00 | 21559222373.00 | 314703079449.00 |
+| 2026-02-01 00:00:00+00:00 | 288888286161.00 | 34006975424.00 | 327093064099.00 |
+| 2026-03-01 00:00:00+00:00 | 284783474573.00 | 52263780975.00 | 341109352305.00 |
+| 2026-04-01 00:00:00+00:00 | 288730438136.00 | 52263780975.00 | 344920610111.00 |
+| 2026-05-01 00:00:00+00:00 | 291258424472.00 | 52263780975.00 | 347421005773.00 |
+| 2026-06-01 00:00:00+00:00 | 294141676298.00 | 52253093475.00 | 350137412510.00 |
+| 2026-07-01 00:00:00+00:00 | 236065233815.00 | 51174925843.00 | 290982802395.00 |
+| 2026-08-01 00:00:00+00:00 | 236065233815.00 | 51174925843.00 | 290982802395.00 |
 +---------------------------+-----------------+----------------+-----------------+
 */
 
@@ -280,46 +277,42 @@ WITH actual_interest AS (
     WHERE indicator_code = 'B02-DN_23' 
     GROUP BY 1
 ),
-monthly_debt AS (
-    SELECT DATE_TRUNC('month', posting_date) AS month, 
-           SUM(credit_amount - debit_amount) AS net_borrowing 
-    FROM silver.fact_cashflow 
-    WHERE account_no LIKE '341%' 
-    GROUP BY 1
+months AS (
+    SELECT DISTINCT DATE_TRUNC('month', posting_date) AS month
+    FROM silver.fact_cashflow
+),
+monthly_balances AS (
+    SELECT m.month,
+           c.account_no,
+           c.credit_balance,
+           ROW_NUMBER() OVER(PARTITION BY m.month, c.account_no ORDER BY c.posting_date DESC, c.id DESC) as rn
+    FROM months m
+    JOIN silver.fact_cashflow c ON c.posting_date < m.month + INTERVAL '1 month'
+    WHERE c.account_no = '341'
 ),
 cumulative_debt AS (
-    SELECT month, 
-           SUM(net_borrowing) OVER (ORDER BY month) AS tong_du_no 
-    FROM monthly_debt
+    SELECT month, SUM(credit_balance) AS tong_du_no
+    FROM monthly_balances
+    WHERE rn = 1
+    GROUP BY month
 )
-SELECT month, 
+SELECT i.thang AS month, 
        i.tong_chi_phi_lai_vay, 
        d.tong_du_no,
        i.tong_chi_phi_lai_vay / NULLIF(d.tong_du_no, 0) AS cost_of_debt
 FROM actual_interest i
-LEFT JOIN cumulative_debt d ON month = d.month;
+LEFT JOIN cumulative_debt d ON i.thang = d.month;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE indicator_code = 'B02-DN_23'
--- WHERE account_no LIKE '341%'
+-- WHERE c.account_no = '341'
+-- WHERE rn = 1
 +---------------------------+----------------------+-----------------+--------------+
 |           month           | tong_chi_phi_lai_vay |    tong_du_no   | cost_of_debt |
 +---------------------------+----------------------+-----------------+--------------+
-| 2026-01-01 00:00:00+00:00 |         0.00         | -19625237083.00 |    0E-28     |
-| 2026-02-01 00:00:00+00:00 |         0.00         |  17680422624.00 |    0E-28     |
-| 2026-03-01 00:00:00+00:00 |         0.00         |  59864992999.00 |    0E-28     |
-| 2026-04-01 00:00:00+00:00 |         0.00         |  71434472174.00 |    0E-28     |
-| 2026-05-01 00:00:00+00:00 |         0.00         |  78963249834.00 |    0E-28     |
-| 2026-06-01 00:00:00+00:00 |         0.00         |  87268627634.00 |    0E-28     |
-| 2026-07-01 00:00:00+00:00 |         0.00         | -90195202711.00 |    0E-28     |
-| 2026-01-01 00:00:00+00:00 |         0.00         | -19625237083.00 |    0E-28     |
-| 2026-02-01 00:00:00+00:00 |         0.00         |  17680422624.00 |    0E-28     |
-| 2026-03-01 00:00:00+00:00 |         0.00         |  59864992999.00 |    0E-28     |
-| 2026-04-01 00:00:00+00:00 |         0.00         |  71434472174.00 |    0E-28     |
-| 2026-05-01 00:00:00+00:00 |         0.00         |  78963249834.00 |    0E-28     |
-| 2026-06-01 00:00:00+00:00 |         0.00         |  87268627634.00 |    0E-28     |
-| 2026-07-01 00:00:00+00:00 |         0.00         | -90195202711.00 |    0E-28     |
+| 2026-07-01 00:00:00+00:00 |         0.00         | 290982802395.00 |    0E-28     |
+| 2026-08-01 00:00:00+00:00 |         0.00         | 290982802395.00 |    0E-28     |
 +---------------------------+----------------------+-----------------+--------------+
 */
 
