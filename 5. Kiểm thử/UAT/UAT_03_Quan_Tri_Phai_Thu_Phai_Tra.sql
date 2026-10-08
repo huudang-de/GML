@@ -116,16 +116,26 @@ SELECT COALESCE((SELECT val FROM doanh_thu_hien_tai), 0) / NULLIF((SELECT val FR
 +-----------------------------+
 */
 
--- VISUAL: Tổng hóa đơn
+-- VISUAL: Tổng hóa đơn (Số chứng từ đang treo nợ)
 -- MEASURE: _CongNo[Tong_Hoa_Don]
-SELECT COUNT(DISTINCT invoice_no) AS tong_hoa_don
-FROM silver.fact_accountsreceivable;
+SELECT COUNT(*) AS tong_hoa_don
+FROM (
+    SELECT invoice_no
+    FROM silver.fact_accountsreceivable f
+    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+      AND f.invoice_no IS NOT NULL AND f.invoice_no != ''
+    GROUP BY invoice_no
+    HAVING SUM(debit_amount - credit_amount) > 0
+) t;
 
 /* RESULT LOG:
+-- GHI CHÚ FILTER:
+-- Nhóm theo hóa đơn, hóa đơn nào có Tổng phát sinh Nợ > Tổng phát sinh Có thì là chưa thu hết tiền
 +--------------+
 | tong_hoa_don |
 +--------------+
-|     4924     |
+|     2803     |
 +--------------+
 */
 
