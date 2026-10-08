@@ -143,7 +143,8 @@ Cost_Of_Debt = DIVIDE([CP Lãi Vay (Thực tế)], [Tổng Dư Nợ], BLANK())
 ```
 
 ### 2.3 Lãi suất bình quân từng bank
-- **Nguồn dữ liệu:** Lấy từ cột `interest_rate` trong bảng `silver fact_creditlimitsummary`. Chỉ lấy lãi suất vay Ngắn hạn theo yêu cầu của BRD.
+- **Nguồn dữ liệu (BRD Data Dictionary):** Lấy từ cột "Lãi suất vay" ở sheet 'Theo dõi vay NH' của file excel '20260531_Minh Long BC tín dụng 2026' (Chỉ lấy lãi suất bình quân ngắn hạn, không lấy dài hạn).
+  - *Ánh xạ sang Data Warehouse:* Lấy từ cột `interest_rate` trong bảng `silver fact_creditlimitsummary` (với điều kiện `limit_type = "Ngắn hạn"`).
 - **Loại:** Column Chart (hoặc Bar Chart)
 - **Trục X:** `dim_bank[Bank_Name]`
 - **Trục Y:** Kéo Measure `Lãi suất bình quân` vào.
