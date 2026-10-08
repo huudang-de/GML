@@ -118,9 +118,16 @@ COUNTROWS(
 )
 
 Tổng hóa đơn = 
-CALCULATE(
-    DISTINCTCOUNT('silver fact_accountsreceivable'[invoice_no]),
-    'silver fact_accountsreceivable'[debit_amount] > 0
+COUNTROWS(
+    FILTER(
+        SUMMARIZE(
+            'silver fact_accountsreceivable',
+            'silver fact_accountsreceivable'[invoice_no],
+            "DaThu", SUM('silver fact_accountsreceivable'[credit_amount]),
+            "PhaiThu", SUM('silver fact_accountsreceivable'[debit_amount])
+        ),
+        [PhaiThu] - [DaThu] > 0 && NOT(ISBLANK('silver fact_accountsreceivable'[invoice_no]))
+    )
 )
 ```
 
