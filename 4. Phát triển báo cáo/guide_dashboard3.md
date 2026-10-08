@@ -22,24 +22,32 @@
 
 ```dax
 Phải thu Cuối Kỳ = 
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+RETURN
 SUMX(
     FILTER('silver dim_partner', 'silver dim_partner'[partner_group] IN {"Khách hàng", "Khách hàng/ nhà cung cấp"}),
     CALCULATE(
         MAXX(
             TOPN(1, 'silver fact_accountsreceivable', 'silver fact_accountsreceivable'[posting_date], DESC, 'silver fact_accountsreceivable'[id], DESC),
             'silver fact_accountsreceivable'[ending_debit_balance]
-        )
+        ),
+        'silver fact_accountsreceivable'[posting_date] <= _MaxDate,
+        ALL('silver Dim_Date')
     )
 )
 
 Phải trả Cuối Kỳ = 
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+RETURN
 SUMX(
     FILTER('silver dim_partner', 'silver dim_partner'[partner_group] IN {"Nhà cung cấp", "Khách hàng/ nhà cung cấp"}),
     CALCULATE(
         MAXX(
             TOPN(1, 'silver fact_accountspayable', 'silver fact_accountspayable'[posting_date], DESC, 'silver fact_accountspayable'[id], DESC),
             'silver fact_accountspayable'[ending_credit_balance]
-        )
+        ),
+        'silver fact_accountspayable'[posting_date] <= _MaxDate,
+        ALL('silver Dim_Date')
     )
 )
 ```
