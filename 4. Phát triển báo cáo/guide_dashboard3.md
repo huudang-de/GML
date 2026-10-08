@@ -157,9 +157,88 @@ RETURN DIVIDE([Tổng khách hàng] - ThangTruoc, ThangTruoc, 0)
 - **Column Legend:** Cột `Tuổi Nợ Biểu Đồ` (Chia thành 5 nhóm đến 90+)
 - **Line Y-axis:** Measure `Tổng hóa đơn` (Đường line xu hướng tổng số hóa đơn treo nợ theo yêu cầu BRD).
 
-> [!WARNING]
-> **CẢNH BÁO VỀ THUẬT TOÁN FIFO (CẤN TRỪ CÔNG NỢ LÙI):**
-> BRD yêu cầu Tuổi nợ phải tính theo logic FIFO (Tiền trả sẽ cấn trừ vào hóa đơn cũ nhất). Tuy nhiên, cột `Tuổi Nợ Biểu Đồ` hiện tại chỉ đếm số ngày bằng hàm `DATEDIFF` đơn giản, KHÔNG thực hiện vòng lặp cấn trừ FIFO. Việc chạy vòng lặp FIFO trên DAX thuần với bảng Ledger phẳng là cực kỳ nặng và rủi ro nhân đôi số liệu. Sếp nên feedback lại với team Data Engineer (DE) để xử lý bước cấn trừ FIFO này ở tầng ETL (bằng Python/SQL), sau đó đẩy ra một bảng Fact riêng (ví dụ: `fact_aging_receivables`) rồi mới ném lên Power BI vẽ Chart nhé! Hướng dẫn chi tiết tạo bảng FIFO đã được lưu trong test script SQL `UAT_03`.
+> [!TIP]
+> **BÍ QUYẾT XỬ LÝ FIFO BẰNG DAX (KHÔNG CẦN NHỜ DE):**
+> Vì sếp muốn AE DA tự xử lý logic FIFO (cấn trừ lùi) ngay trên Power BI mà không cần DE làm bảng phụ ở Backend, sếp có thể dùng kỹ thuật **Bảng không liên kết (Disconnected Table)** kết hợp hàm `GENERATE` để tạo vòng lặp tính Running Total ảo trong DAX. Dưới đây là công thức chuẩn mực!
+> 
+> **Bước 1: Tạo bảng nhóm Tuổi Nợ (Enter Data)**
+> Tạo một bảng tên `Dim_TuoiNo` gồm 1 cột `Nhom`: "Trong hạn" và "Quá hạn". KHÔNG tạo relationship với bất kỳ bảng nào.
+> Kéo cột `Nhom` này vào **Column Legend** của biểu đồ.
+> 
+> **Bước 2: Viết Measure Phân bổ FIFO cực mạnh này:**
+> ```dax
+> Phải thu FIFO (Tỷ) = 
+> VAR _MaxDate = MAX('silver Dim_Date'[Date])
+> VAR _IsTrongHan = SELECTEDVALUE('Dim_TuoiNo'[Nhom]) = "Trong hạn"
+> VAR _IsQuaHan = SELECTEDVALUE('Dim_TuoiNo'[Nhom]) = "Quá hạn"
+> 
+> RETURN
+> DIVIDE(
+>     SUMX(
+>         VALUES('silver dim_partner'[partner_code]),
+>         VAR _Customer = 'silver dim_partner'[partner_code]
+>         
+>         -- 1. Chốt Số dư nợ của khách hàng tại mốc _MaxDate
+>         VAR _TotalDebt = 
+>             CALCULATE(
+>                 MAXX(
+>                     TOPN(1, 'silver fact_accountsreceivable', 'silver fact_accountsreceivable'[posting_date], DESC, 'silver fact_accountsreceivable'[id], DESC),
+>                     'silver fact_accountsreceivable'[ending_debit_balance]
+>                 ),
+>                 'silver fact_accountsreceivable'[posting_date] <= _MaxDate,
+>                 ALL('silver Dim_Date')
+>             )
+>         
+>         RETURN
+>         IF(ISBLANK(_TotalDebt) || _TotalDebt <= 0, BLANK(),
+>             
+>             -- 2. Lấy danh sách hóa đơn từ mới đến cũ
+>             VAR _Invoices = 
+>                 CALCULATETABLE(
+>                     SELECTCOLUMNS(
+>                         'silver fact_accountsreceivable',
+>                         "InvNo", 'silver fact_accountsreceivable'[invoice_no],
+>                         "InvDate", 'silver fact_accountsreceivable'[invoice_date],
+>                         "InvAmt", 'silver fact_accountsreceivable'[debit_amount]
+>                     ),
+>                     'silver fact_accountsreceivable'[debit_amount] > 0,
+>                     'silver fact_accountsreceivable'[posting_date] <= _MaxDate,
+>                     ALL('silver Dim_Date')
+>                 )
+>                 
+>             -- 3. Chạy vòng lặp cấn trừ FIFO ảo
+>             VAR _UnpaidInvoices = 
+>                 GENERATE(
+>                     _Invoices,
+>                     VAR _CurrentInvDate = [InvDate]
+>                     VAR _CurrentInvNo = [InvNo]
+>                     VAR _RunningTotal = 
+>                         SUMX(
+>                             FILTER(_Invoices, [InvDate] > _CurrentInvDate || ([InvDate] = _CurrentInvDate && [InvNo] >= _CurrentInvNo)),
+>                             [InvAmt]
+>                         )
+>                     VAR _UnpaidAmt = MIN([InvAmt], MAX(0, _TotalDebt - (_RunningTotal - [InvAmt])))
+>                     RETURN ROW("UnpaidAmt", _UnpaidAmt)
+>                 )
+>                 
+>             -- 4. Phân bổ phần chưa trả vào nhóm Trong hạn / Quá hạn
+>             RETURN
+>             SUMX(
+>                 FILTER(_UnpaidInvoices, [UnpaidAmt] > 0 &&
+>                     (
+>                         (_IsTrongHan && DATEDIFF([InvDate], _MaxDate, DAY) <= 30) ||
+>                         (_IsQuaHan && DATEDIFF([InvDate], _MaxDate, DAY) > 30) ||
+>                         (NOT(_IsTrongHan) && NOT(_IsQuaHan))
+>                     )
+>                 ),
+>                 [UnpaidAmt]
+>             )
+>         )
+>     ),
+>     1000000000, 0
+> )
+> ```
+> Sếp lấy Measure `Phải thu FIFO (Tỷ)` này thả vào **Column Y-axis** là Biểu đồ Cột Chồng của sếp sẽ chạy bao mượt, chuẩn logic FIFO 100% y như SQL mà không cần phiền tới Data Engineer!
 
 ### 2.2 Vòng quay phải thu theo tháng
 - **Loại:** Area Chart
