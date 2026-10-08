@@ -85,10 +85,11 @@ SELECT (SELECT val FROM doanh_thu_nam) / NULLIF((SELECT val FROM phai_thu_cuoi_n
 -- VISUAL: Vòng quay phải thu hiện tại
 -- MEASURE: _CongNo[VQ_Phai_Thu_Thang]
 WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable),
-doanh_thu_thang AS (
+doanh_thu_hien_tai AS (
+    -- Trong DAX, người dùng không chọn tháng cụ thể nên nó lấy toàn bộ Doanh thu (YTD)
     SELECT SUM(current_period_amount) AS val
     FROM silver.fact_incomestatement
-    WHERE indicator_code='B02-DN_10' AND DATE_TRUNC('month', month) = DATE_TRUNC('month', (SELECT dt FROM max_date))
+    WHERE indicator_code='B02-DN_10'
 ),
 latest_transactions AS (
     SELECT f.partner_code, f.ending_debit_balance,
@@ -102,15 +103,16 @@ phai_thu_hien_tai AS (
     FROM latest_transactions
     WHERE rn = 1
 )
-SELECT COALESCE((SELECT val FROM doanh_thu_thang), 0) / NULLIF((SELECT val FROM phai_thu_hien_tai), 0) AS vong_quay_phai_thu_hien_tai;
+-- Vì Đầu kỳ = 0 nên Average = Cuối kỳ (theo logic DAX phòng hờ ISBLANK của user)
+SELECT COALESCE((SELECT val FROM doanh_thu_hien_tai), 0) / NULLIF((SELECT val FROM phai_thu_hien_tai), 0) AS vong_quay_phai_thu_hien_tai;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- WHERE indicator_code='B02-DN_10' AND DATE_TRUNC('month', month) = DATE_TRUNC('month', (SELECT dt FROM max_date))
+-- Lấy toàn bộ Doanh thu chia cho Phải thu hiện tại
 +-----------------------------+
 | vong_quay_phai_thu_hien_tai |
 +-----------------------------+
-|              0              |
+|      2.0643905335967923     |
 +-----------------------------+
 */
 
