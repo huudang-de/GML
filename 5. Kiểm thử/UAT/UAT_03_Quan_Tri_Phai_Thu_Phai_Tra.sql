@@ -131,47 +131,62 @@ FROM silver.fact_accountsreceivable;
 
 -- VISUAL: Tổng số khách hàng
 -- MEASURE: _CongNo[Tong_KH]
+WITH latest_transactions AS (
+    SELECT f.partner_code, f.ending_debit_balance,
+           ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    FROM silver.fact_accountsreceivable f
+    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+)
 SELECT COUNT(*) AS tong_khach_hang
-FROM (
-    SELECT partner_code
-    FROM silver.fact_accountsreceivable
-    GROUP BY partner_code
-    HAVING SUM(debit_amount - credit_amount) > 0
-) t;
+FROM latest_transactions
+WHERE rn = 1 AND ending_debit_balance > 0;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- HAVING SUM(debit_amount - credit_amount) > 0
+-- Lấy khách hàng có số dư nợ cuối cùng > 0
 +-----------------+
 | tong_khach_hang |
 +-----------------+
-|       415       |
+|       694       |
 +-----------------+
 */
 
 -- VISUAL: Phải thu theo tháng
 -- MEASURE: _CongNo[Phai_Thu_Thang]
-WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable)
-SELECT DATE_TRUNC('month', posting_date) AS MONTH,
-       SUM(CASE WHEN (SELECT dt FROM max_date) <= invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) AS no_trong_han,
-       SUM(CASE WHEN (SELECT dt FROM max_date) > invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) AS no_qua_han,
-       SUM(debit_amount - credit_amount) AS tong_no
-FROM silver.fact_accountsreceivable
-GROUP BY 1;
+WITH months AS (
+    SELECT generate_series('2026-01-01'::date, '2026-08-01'::date, '1 month'::interval) as end_of_month
+),
+latest_transactions AS (
+    SELECT 
+        m.end_of_month,
+        f.partner_code,
+        f.ending_debit_balance,
+        ROW_NUMBER() OVER (PARTITION BY m.end_of_month, f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    FROM months m
+    JOIN silver.fact_accountsreceivable f ON f.posting_date <= (m.end_of_month + interval '1 month - 1 day')
+    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+)
+SELECT end_of_month AS MONTH, SUM(ending_debit_balance) as tong_no
+FROM latest_transactions
+WHERE rn = 1
+GROUP BY end_of_month
+ORDER BY end_of_month;
 
 /* RESULT LOG:
-+---------------------------+----------------+----------------+-----------------+
-|           month           |  no_trong_han  |   no_qua_han   |     tong_no     |
-+---------------------------+----------------+----------------+-----------------+
-| 2026-04-01 00:00:00+00:00 |       0        | 82815409522.00 | -13047710599.00 |
-| 2026-06-01 00:00:00+00:00 |       0        | 87377050927.00 |  17280663724.00 |
-| 2026-03-01 00:00:00+00:00 |       0        | 57845395198.00 | -39161076360.00 |
-| 2026-02-01 00:00:00+00:00 |       0        | 22461846187.00 |  -7639515467.00 |
-| 2026-07-01 00:00:00+00:00 | 75809509710.00 | 5135023170.00  |  3965180286.00  |
-| 2026-08-01 00:00:00+00:00 |       0        |       0        |   -1374000.00   |
-| 2026-05-01 00:00:00+00:00 |       0        | 80333683232.00 | -24151392302.00 |
-| 2026-01-01 00:00:00+00:00 |       0        | 56450096083.00 |  -4409052059.00 |
-+---------------------------+----------------+----------------+-----------------+
++---------------------------+-----------------+
+|           month           |     tong_no     |
++---------------------------+-----------------+
+| 2026-01-01 00:00:00+00:00 |  75694248268.00 |
+| 2026-02-01 00:00:00+00:00 |  68400006109.00 |
+| 2026-03-01 00:00:00+00:00 |  75429291620.00 |
+| 2026-04-01 00:00:00+00:00 |  73931778049.00 |
+| 2026-05-01 00:00:00+00:00 |  64966749083.00 |
+| 2026-06-01 00:00:00+00:00 |  74479143783.00 |
+| 2026-07-01 00:00:00+00:00 |  91541796991.00 |
+| 2026-08-01 00:00:00+00:00 |  91540422991.00 |
++---------------------------+-----------------+
 */
 
 -- VISUAL: Receivable Turnover
