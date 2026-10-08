@@ -230,18 +230,39 @@ WITH doanh_thu AS (
     SELECT DATE_TRUNC('month', month) AS MONTH, SUM(current_period_amount) AS val
     FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' GROUP BY 1
 ),
-du_no AS (
-    SELECT DATE_TRUNC('month', posting_date) AS MONTH, SUM(debit_amount - credit_amount) AS val
-    FROM silver.fact_accountsreceivable GROUP BY 1
+months AS (
+    SELECT generate_series('2026-01-01'::date, '2026-08-01'::date, '1 month'::interval) as start_month
+),
+cust_balances AS (
+    SELECT m.start_month,
+           f.partner_code, 
+           f.ending_debit_balance,
+           ROW_NUMBER() OVER (PARTITION BY m.start_month, f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    FROM months m
+    JOIN silver.fact_accountsreceivable f ON f.posting_date <= (m.start_month + interval '1 month - 1 day')
+    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+),
+monthly_debt AS (
+    SELECT start_month, SUM(ending_debit_balance) as total_debt
+    FROM cust_balances
+    WHERE rn = 1
+    GROUP BY start_month
+),
+monthly_avg_debt AS (
+    SELECT start_month, total_debt,
+           LAG(total_debt) OVER (ORDER BY start_month) as prev_debt,
+           (total_debt + COALESCE(LAG(total_debt) OVER (ORDER BY start_month), total_debt)) / 2.0 as avg_debt
+    FROM monthly_debt
 )
-SELECT d.MONTH, 
-       dt.val / NULLIF(SUM(d.val) OVER (ORDER BY d.MONTH), 0) AS vong_quay_thang
-FROM du_no d
-LEFT JOIN doanh_thu dt ON d.MONTH = dt.MONTH;
+SELECT d.start_month as MONTH, 
+       dt.val / NULLIF(d.avg_debt, 0) AS vong_quay_thang
+FROM monthly_avg_debt d
+LEFT JOIN doanh_thu dt ON d.start_month = dt.MONTH
+ORDER BY d.start_month;
 
 /* RESULT LOG:
--- GHI CHÚ FILTER:
--- FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' GROUP BY 1
+-- GHI CHÚ FILTER: Tính bằng Doanh thu / Trung bình Cộng dư nợ Phải Thu 2 tháng liên tiếp
 +---------------------------+---------------------+
 |           month           |   vong_quay_thang   |
 +---------------------------+---------------------+
@@ -251,7 +272,7 @@ LEFT JOIN doanh_thu dt ON d.MONTH = dt.MONTH;
 | 2026-04-01 00:00:00+00:00 |         None        |
 | 2026-05-01 00:00:00+00:00 |         None        |
 | 2026-06-01 00:00:00+00:00 |         None        |
-| 2026-07-01 00:00:00+00:00 | -1.1165575818095942 |
+| 2026-07-01 00:00:00+00:00 | 2.5765233603817983  |
 | 2026-08-01 00:00:00+00:00 |        0E-28        |
 +---------------------------+---------------------+
 */

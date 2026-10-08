@@ -60,12 +60,30 @@ Phải trả (Tỷ) = DIVIDE([Phải trả Cuối Kỳ], 1000000000, 0)
 
 ### 1.2 Vòng quay phải thu hiện tại
 - **Mô tả:** Doanh thu / Trung bình dư nợ Phải thu.
-- **DAX:** (Đảm bảo không dùng VAR)
+- **DAX:**
 ```dax
 Vòng quay PT hiện tại = 
+VAR ThangNay = MAX('silver Dim_Date'[Date])
+VAR ThangTruoc = EOMONTH(ThangNay, -1)
+
+VAR PhaiThu_CuoiKy = [Phải thu Cuối Kỳ]
+VAR PhaiThu_DauKy = 
+    CALCULATE(
+        [Phải thu Cuối Kỳ],
+        'silver Dim_Date'[Date] <= ThangTruoc
+    )
+
+VAR DuNoBQN = 
+    IF(
+        ISBLANK(PhaiThu_DauKy) || PhaiThu_DauKy = 0,
+        PhaiThu_CuoiKy,
+        (PhaiThu_CuoiKy + PhaiThu_DauKy) / 2
+    )
+
+RETURN
 DIVIDE(
     CALCULATE(SUM('silver fact_incomestatement'[current_period_amount]), 'silver fact_incomestatement'[indicator_code] = "B02-DN_10"),
-    [Phải thu Cuối Kỳ],
+    DuNoBQN,
     0
 )
 ```
