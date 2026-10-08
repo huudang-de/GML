@@ -128,17 +128,29 @@ RETURN DIVIDE(TongNo, TongNguonVon, 0)
 - **Column Y-axis:** Kéo 2 Measure `Dư nợ ngắn hạn (Tỷ VNĐ)` và `Dư nợ dài hạn (Tỷ VNĐ)`
 - **Line Y-axis:** Measure `Tổng Dư Nợ = [Dư nợ ngắn hạn (Tỷ VNĐ)] + [Dư nợ dài hạn (Tỷ VNĐ)]`
 
-### 2.2 Chi phí nợ theo tháng
+### 2.2 Cost of Debt (Chi phí nợ theo tháng)
+- **Nguồn dữ liệu (BRD Data Dictionary):** 
+  - Tử số (Tổng chi phí lãi vay): Lấy từ Báo cáo kết quả kinh doanh MISA (Bảng `fact_incomestatement`, mã chỉ tiêu `B02-DN_23`).
+  - Mẫu số (Tổng dư nợ): Lấy từ Sổ chi tiết các tài khoản MISA (Bảng `fact_cashflow`, mã tài khoản `341`).
 - **Loại:** Line Chart
 - **Trục X:** `Dim_Date[Month Year]`
-- **Trục Y:** Kéo 2 Measure sau vào:
+- **Trục Y:** Kéo Measure `Cost_Of_Debt` vào biểu đồ.
+- **Công thức DAX:**
 ```dax
-CP Lãi Vay (Thực tế) = CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_24")
-CP Lãi Vay (Kế hoạch) = CALCULATE(SUM('fact_businessplan'[Target_Amount]), 'fact_businessplan'[Indicator_Code] = "B02-DN_24")
+CP Lãi Vay (Thực tế) = CALCULATE(SUM('silver fact_incomestatement'[Current_Period_Amount]), 'silver fact_incomestatement'[Indicator_Code] = "B02-DN_23")
+
+Cost_Of_Debt = DIVIDE([CP Lãi Vay (Thực tế)], [Tổng Dư Nợ], BLANK())
 ```
 
 ### 2.3 Lãi suất bình quân từng bank
-- **[ĐÃ LƯỢC BỎ]** Biểu đồ này tạm thời không sử dụng do bảng `fact_loan` (nhập tay) đã bị loại bỏ khỏi Single Source of Truth vì thiếu chính xác.
+- **Nguồn dữ liệu:** Lấy từ cột `interest_rate` trong bảng `silver fact_creditlimitsummary`.
+- **Loại:** Column Chart (hoặc Bar Chart)
+- **Trục X:** `dim_bank[Bank_Name]`
+- **Trục Y:** Kéo Measure `Lãi suất bình quân (Card)` (hoặc kéo cột `interest_rate` và chọn Average).
+- **Công thức DAX tham khảo:**
+```dax
+Lãi suất bình quân (Card) = AVERAGE('silver fact_creditlimitsummary'[interest_rate])
+```
 
 ### 2.4 Dư nợ tại từng ngân hàng
 - **Loại:** Column Chart
@@ -149,6 +161,10 @@ CP Lãi Vay (Kế hoạch) = CALCULATE(SUM('fact_businessplan'[Target_Amount]), 
 - **Loại:** Clustered Column Chart
 - **Trục X:** `Dim_Date[Month]`
 - **Trục Y:** Kéo 2 Measure `CP Lãi Vay (Thực tế)` và `CP Lãi Vay (Kế hoạch)` vào để cột đứng song song so sánh.
+- **Công thức DAX:**
+```dax
+CP Lãi Vay (Kế hoạch) = CALCULATE(SUM('silver fact_businessplan'[Target_Amount]), 'silver fact_businessplan'[Indicator_Code] = "B02-DN_23")
+```
 
 ### 2.6 Phân tích dòng thu theo bank
 - **Loại:** Horizontal Bar Chart

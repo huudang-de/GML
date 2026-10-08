@@ -227,22 +227,35 @@ FULL OUTER JOIN PLAN p ON a.month = p.month;
 -- VISUAL: Lãi suất bình quân (Card)
 -- MEASURE: _TaiChinh[Lai_Suat_Binh_Quan_Card]
 SELECT AVG(interest_rate) AS lai_suat_binh_quan_tong
-FROM silver.fact_loan;
+FROM silver.fact_creditlimitsummary;
 
 /* RESULT LOG:
 +-------------------------+
 | lai_suat_binh_quan_tong |
 +-------------------------+
-|   0.08355930232558144   |
+|    0.0820142857142857   |
 +-------------------------+
 */
 
 -- VISUAL: Lãi suất bình quân bank
+-- MEASURE: _TaiChinh[Lai_Suat_Binh_Quan_Bank]
 SELECT bank_code,
-       AVG(interest_rate) AS lai_suat_binh_quan
-FROM silver.fact_loan
-WHERE (maturity_date - disbursement_date) <= 366
-GROUP BY 1;
+       interest_rate AS lai_suat_binh_quan
+FROM silver.fact_creditlimitsummary;
+
+/* RESULT LOG:
++-----------+--------------------+
+| bank_code | lai_suat_binh_quan |
++-----------+--------------------+
+|     MB    |       0.0861       |
+|     VP    |       0.0805       |
+|     TP    |       0.084        |
+|    IVB    |       0.083        |
+|   WOORI   |        0.07        |
+|     HD    |       0.0875       |
+|    SCB    |       0.083        |
++-----------+--------------------+
+*/
 
 -- VISUAL: Interest YTD
 -- MEASURE: _TaiChinh[Interest_YTD]
