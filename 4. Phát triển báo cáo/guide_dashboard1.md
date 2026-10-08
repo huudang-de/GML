@@ -240,9 +240,11 @@ Tổng Dòng Chi =
 Số tiền gốc cần trả = 
     CALCULATE(
         SUM('silver fact_loan'[remaining_principal]),
-        'silver fact_loan'[remaining_principal] > 0
+        'silver fact_loan'[remaining_principal] > 0,
+        USERELATIONSHIP('Dim_Date'[Date], 'silver fact_loan'[maturity_date])
     )
 ```
+*(Lý do phải có `USERELATIONSHIP`: Vì Relationship mặc định (Active) giữa bảng `Dim_Date` và `fact_loan` đang nối bằng `disbursement_date` (Ngày giải ngân). Nếu không dùng hàm này, khi sếp kéo `Dim_Date[Date]` vào Matrix nó sẽ chỉ hiện ngày giải ngân cuối cùng, ví dụ 28/4. Dùng `USERELATIONSHIP` sẽ kích hoạt đường nối phụ bằng `maturity_date` (Ngày đáo hạn) để lên đúng lịch trả nợ trong tương lai).*
 
 ---
 
