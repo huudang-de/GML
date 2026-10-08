@@ -141,3 +141,16 @@ SELECT voucher_no AS so_chung_tu,
        ((SELECT dt FROM max_date) - invoice_date - 30) AS so_ngay_qua_han
 FROM silver.fact_accountsreceivable
 WHERE (debit_amount - credit_amount) > 0;
+
+-- VISUAL: Bảng chi tiết nợ theo Khách hàng
+-- MEASURE: _CongNo[Chi_Tiet_No_KH]
+WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable)
+SELECT partner_code AS ma_khach_hang,
+       SUM(CASE WHEN (SELECT dt FROM max_date) <= invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) AS no_trong_han,
+       SUM(CASE WHEN (SELECT dt FROM max_date) <= invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) / NULLIF(SUM(debit_amount - credit_amount), 0) AS phan_tram_trong_han,
+       SUM(CASE WHEN (SELECT dt FROM max_date) > invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) AS no_qua_han,
+       SUM(CASE WHEN (SELECT dt FROM max_date) > invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) / NULLIF(SUM(debit_amount - credit_amount), 0) AS phan_tram_qua_han,
+       SUM(debit_amount - credit_amount) AS du_no_phai_thu
+FROM silver.fact_accountsreceivable
+GROUP BY 1
+HAVING SUM(debit_amount - credit_amount) > 0;
