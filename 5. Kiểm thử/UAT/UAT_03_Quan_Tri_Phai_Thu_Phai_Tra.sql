@@ -51,43 +51,58 @@ WHERE rn = 1;
 -- VISUAL: Vòng quay phải thu theo năm
 -- MEASURE: _CongNo[VQ_Phai_Thu_Nam]
 WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable),
-doanh_thu AS (
+doanh_thu_nam AS (
     SELECT SUM(current_period_amount) AS val
     FROM silver.fact_incomestatement
     WHERE indicator_code='B02-DN_10' AND EXTRACT(YEAR FROM month) = EXTRACT(YEAR FROM (SELECT dt FROM max_date))
 ),
-du_no_avg AS (
-    SELECT 
-        ( (SELECT SUM(debit_amount - credit_amount) FROM silver.fact_accountsreceivable WHERE EXTRACT(YEAR FROM posting_date) <= EXTRACT(YEAR FROM (SELECT dt FROM max_date))) + 
-          (SELECT SUM(debit_amount - credit_amount) FROM silver.fact_accountsreceivable WHERE EXTRACT(YEAR FROM posting_date) < EXTRACT(YEAR FROM (SELECT dt FROM max_date))) ) / 2.0 AS val
+latest_transactions AS (
+    SELECT f.partner_code, f.ending_debit_balance,
+           ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    FROM silver.fact_accountsreceivable f
+    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+),
+phai_thu_cuoi_nam AS (
+    SELECT SUM(ending_debit_balance) AS val
+    FROM latest_transactions
+    WHERE rn = 1
 )
-SELECT (SELECT val FROM doanh_thu) / NULLIF((SELECT val FROM du_no_avg), 0) AS vong_quay_phai_thu_nam;
+-- Vì data lịch sử năm trước (2025) không có trong fact_accountsreceivable, 
+-- DAX trả về BLANK cho Phải thu năm ngoái, nên Trung bình = Phải thu cuối năm / 2
+SELECT (SELECT val FROM doanh_thu_nam) / NULLIF((SELECT val FROM phai_thu_cuoi_nam) / 2.0, 0) AS vong_quay_phai_thu_nam;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE indicator_code='B02-DN_10' AND EXTRACT(YEAR FROM month) = EXTRACT(YEAR FROM (SELECT dt FROM max_date))
--- ( (SELECT SUM(debit_amount - credit_amount) FROM silver.fact_accountsreceivable WHERE EXTRACT(YEAR FROM posting_date) <= EXTRACT(YEAR FROM (SELECT dt FROM max_date))) +
--- (SELECT SUM(debit_amount - credit_amount) FROM silver.fact_accountsreceivable WHERE EXTRACT(YEAR FROM posting_date) < EXTRACT(YEAR FROM (SELECT dt FROM max_date))) ) / 2.0 AS val
 +------------------------+
 | vong_quay_phai_thu_nam |
 +------------------------+
-|          None          |
+|   4.1287955502621155   |
 +------------------------+
 */
 
 -- VISUAL: Vòng quay phải thu hiện tại
 -- MEASURE: _CongNo[VQ_Phai_Thu_Thang]
 WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable),
-doanh_thu AS (
+doanh_thu_thang AS (
     SELECT SUM(current_period_amount) AS val
     FROM silver.fact_incomestatement
     WHERE indicator_code='B02-DN_10' AND DATE_TRUNC('month', month) = DATE_TRUNC('month', (SELECT dt FROM max_date))
 ),
-du_no_hien_tai AS (
-    SELECT SUM(debit_amount - credit_amount) AS val
-    FROM silver.fact_accountsreceivable
+latest_transactions AS (
+    SELECT f.partner_code, f.ending_debit_balance,
+           ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    FROM silver.fact_accountsreceivable f
+    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+),
+phai_thu_hien_tai AS (
+    SELECT SUM(ending_debit_balance) AS val
+    FROM latest_transactions
+    WHERE rn = 1
 )
-SELECT (SELECT val FROM doanh_thu) / NULLIF((SELECT val FROM du_no_hien_tai), 0) AS vong_quay_phai_thu_hien_tai;
+SELECT COALESCE((SELECT val FROM doanh_thu_thang), 0) / NULLIF((SELECT val FROM phai_thu_hien_tai), 0) AS vong_quay_phai_thu_hien_tai;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
@@ -95,7 +110,7 @@ SELECT (SELECT val FROM doanh_thu) / NULLIF((SELECT val FROM du_no_hien_tai), 0)
 +-----------------------------+
 | vong_quay_phai_thu_hien_tai |
 +-----------------------------+
-|            0E-28            |
+|              0              |
 +-----------------------------+
 */
 
