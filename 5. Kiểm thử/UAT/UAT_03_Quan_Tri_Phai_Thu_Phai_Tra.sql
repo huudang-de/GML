@@ -162,41 +162,66 @@ WHERE rn = 1 AND ending_debit_balance > 0;
 +-----------------+
 */
 
--- VISUAL: Phải thu theo tháng
+-- VISUAL: Phải thu theo tháng (Phân bổ Trong hạn / Quá hạn bằng logic FIFO)
 -- MEASURE: _CongNo[Phai_Thu_Thang]
 WITH months AS (
     SELECT generate_series('2026-01-01'::date, '2026-08-01'::date, '1 month'::interval) as end_of_month
 ),
-latest_transactions AS (
-    SELECT 
-        m.end_of_month,
-        f.partner_code,
-        f.ending_debit_balance,
-        ROW_NUMBER() OVER (PARTITION BY m.end_of_month, f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+cust_balances AS (
+    SELECT m.end_of_month, f.partner_code, f.ending_debit_balance as total_debt,
+           ROW_NUMBER() OVER (PARTITION BY m.end_of_month, f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
     FROM months m
     JOIN silver.fact_accountsreceivable f ON f.posting_date <= (m.end_of_month + interval '1 month - 1 day')
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
     WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+),
+positive_balances AS (
+    SELECT end_of_month, partner_code, total_debt
+    FROM cust_balances
+    WHERE rn = 1 AND total_debt > 0
+),
+invoices AS (
+    SELECT m.end_of_month, f.partner_code, f.invoice_no, f.invoice_date, f.debit_amount
+    FROM months m
+    JOIN silver.fact_accountsreceivable f ON f.posting_date <= (m.end_of_month + interval '1 month - 1 day')
+    WHERE f.debit_amount > 0 AND f.invoice_no IS NOT NULL AND f.invoice_no != ''
+),
+invoices_running AS (
+    SELECT i.end_of_month, i.partner_code, i.invoice_no, i.invoice_date, i.debit_amount,
+           SUM(i.debit_amount) OVER (PARTITION BY i.end_of_month, i.partner_code ORDER BY i.invoice_date DESC, i.invoice_no DESC) as running_total
+    FROM invoices i
+    JOIN positive_balances pb ON i.partner_code = pb.partner_code AND i.end_of_month = pb.end_of_month
+),
+unpaid_invoices AS (
+    SELECT i.end_of_month, i.partner_code, i.invoice_no, i.invoice_date,
+           LEAST(i.debit_amount, GREATEST(0, pb.total_debt - (i.running_total - i.debit_amount))) as unpaid_amount
+    FROM invoices_running i
+    JOIN positive_balances pb ON i.partner_code = pb.partner_code AND i.end_of_month = pb.end_of_month
 )
-SELECT end_of_month AS MONTH, SUM(ending_debit_balance) as tong_no
-FROM latest_transactions
-WHERE rn = 1
+SELECT 
+    end_of_month AS MONTH,
+    SUM(CASE WHEN (end_of_month + interval '1 month - 1 day')::date - invoice_date <= 30 THEN unpaid_amount ELSE 0 END) as no_trong_han,
+    SUM(CASE WHEN (end_of_month + interval '1 month - 1 day')::date - invoice_date > 30 THEN unpaid_amount ELSE 0 END) as no_qua_han,
+    SUM(unpaid_amount) as tong_no
+FROM unpaid_invoices
+WHERE unpaid_amount > 0
 GROUP BY end_of_month
 ORDER BY end_of_month;
 
 /* RESULT LOG:
-+---------------------------+-----------------+
-|           month           |     tong_no     |
-+---------------------------+-----------------+
-| 2026-01-01 00:00:00+00:00 |  75694248268.00 |
-| 2026-02-01 00:00:00+00:00 |  68400006109.00 |
-| 2026-03-01 00:00:00+00:00 |  75429291620.00 |
-| 2026-04-01 00:00:00+00:00 |  73931778049.00 |
-| 2026-05-01 00:00:00+00:00 |  64966749083.00 |
-| 2026-06-01 00:00:00+00:00 |  74479143783.00 |
-| 2026-07-01 00:00:00+00:00 |  91541796991.00 |
-| 2026-08-01 00:00:00+00:00 |  91540422991.00 |
-+---------------------------+-----------------+
+-- GHI CHÚ FILTER: Phân bổ FIFO số dư cuối tháng vào các hóa đơn từ mới nhất lùi về cũ nhất
++---------------------------+----------------+----------------+----------------+
+|           month           |  no_trong_han  |   no_qua_han   |    tong_no     |
++---------------------------+----------------+----------------+----------------+
+| 2026-01-01 00:00:00+00:00 |      0.00      | 75654946328.00 | 75654946328.00 |
+| 2026-02-01 00:00:00+00:00 | 8328639599.00  | 60064547464.00 | 68393187063.00 |
+| 2026-03-01 00:00:00+00:00 | 18501170919.00 | 56910609325.00 | 75411780244.00 |
+| 2026-04-01 00:00:00+00:00 | 10226462445.00 | 63688179294.00 | 73914641739.00 |
+| 2026-05-01 00:00:00+00:00 | 9716075971.00  | 55234250262.00 | 64950326233.00 |
+| 2026-06-01 00:00:00+00:00 | 16104702167.00 | 58357283765.00 | 74461985932.00 |
+| 2026-07-01 00:00:00+00:00 | 9831961655.00  | 81692694116.00 | 91524655771.00 |
+| 2026-08-01 00:00:00+00:00 | 1858564036.00  | 89664718535.00 | 91523282571.00 |
++---------------------------+----------------+----------------+----------------+
 */
 
 -- VISUAL: Receivable Turnover
