@@ -7,37 +7,47 @@
 -- ==========================================
 -- VISUAL: Dư nợ ngắn hạn
 -- MEASURE: _TaiChinh[Du_No_Ngan_Han]
-SELECT SUM(credit_amount) - SUM(debit_amount)
-FROM silver.fact_cashflow
-WHERE account_no LIKE '34111%'
-  OR account_no LIKE '34113%'
-  OR account_no LIKE '34114%';
+WITH latest_balances AS (
+    SELECT account_no, credit_balance,
+           ROW_NUMBER() OVER(PARTITION BY account_no ORDER BY posting_date DESC, id DESC) as rn
+    FROM silver.fact_cashflow
+    WHERE account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%'
+)
+SELECT SUM(credit_balance) AS du_no_ngan_han
+FROM latest_balances
+WHERE rn = 1;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- WHERE account_no LIKE '34111%'
--- OR account_no LIKE '34113%'
--- OR account_no LIKE '34114%';
+-- WHERE account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%'
+-- WHERE rn = 1;
 +-----------------+
-|     ?column?    |
+|  du_no_ngan_han |
 +-----------------+
-| -58676538840.00 |
+| 236065233815.00 |
 +-----------------+
 */
 
 -- VISUAL: Dư nợ dài hạn
 -- MEASURE: _TaiChinh[Du_No_Dai_Han]
-SELECT SUM(credit_amount) - SUM(debit_amount)
-FROM silver.fact_cashflow
-WHERE account_no LIKE '34112%';
+WITH latest_balances AS (
+    SELECT account_no, credit_balance,
+           ROW_NUMBER() OVER(PARTITION BY account_no ORDER BY posting_date DESC, id DESC) as rn
+    FROM silver.fact_cashflow
+    WHERE account_no LIKE '34112%'
+)
+SELECT SUM(credit_balance) AS du_no_dai_han
+FROM latest_balances
+WHERE rn = 1;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- WHERE account_no LIKE '34112%';
+-- WHERE account_no LIKE '34112%'
+-- WHERE rn = 1;
 +----------------+
-|    ?column?    |
+| du_no_dai_han  |
 +----------------+
-| 29111738593.00 |
+| 51174925843.00 |
 +----------------+
 */
 
