@@ -178,13 +178,13 @@ FROM monthly_delta;
 -- VISUAL: Chi phí lãi vay thực tế vs KH
 -- MEASURE: _TaiChinh[Chi_Phi_Lai_Vay]
 WITH actual AS
-  (SELECT DATE_TRUNC('month', reporting_date) AS MONTH,
+  (SELECT DATE_TRUNC('month', month) AS MONTH,
           SUM(current_period_amount) AS chi_phi_thuc_te
    FROM silver.fact_incomestatement
    WHERE indicator_code = 'B02-DN_23'
    GROUP BY 1),
      PLAN AS
-  (SELECT DATE_TRUNC('month', reporting_date) AS MONTH,
+  (SELECT DATE_TRUNC('month', month) AS MONTH,
           SUM(target_amount) AS ke_hoach
    FROM silver.fact_businessplan
    WHERE indicator_code = 'B02-DN_23'
@@ -199,10 +199,22 @@ FULL OUTER JOIN PLAN p ON a.month = p.month;
 -- GHI CHÚ FILTER:
 -- WHERE indicator_code = 'B02-DN_23'
 -- WHERE indicator_code = 'B02-DN_23'
-ERROR: column "reporting_date" does not exist
-LINE 2:   (SELECT DATE_TRUNC('month', reporting_date) AS MONTH,
-                                      ^
-
++---------------------------+-----------------+---------------+
+|           month           | chi_phi_thuc_te |    ke_hoach   |
++---------------------------+-----------------+---------------+
+| 2026-01-01 00:00:00+00:00 |        0        | 3162980024.00 |
+| 2026-02-01 00:00:00+00:00 |        0        | 1581490013.00 |
+| 2026-03-01 00:00:00+00:00 |        0        | 1581490013.00 |
+| 2026-04-01 00:00:00+00:00 |        0        | 3162980026.00 |
+| 2026-05-01 00:00:00+00:00 |        0        | 1581490013.00 |
+| 2026-06-01 00:00:00+00:00 |        0        | 1581490013.00 |
+| 2026-07-01 00:00:00+00:00 |       0.00      | 1581490013.00 |
+| 2026-08-01 00:00:00+00:00 |       0.00      | 1581490013.00 |
+| 2026-09-01 00:00:00+00:00 |        0        | 3162980026.00 |
+| 2026-10-01 00:00:00+00:00 |        0        | 3162980026.00 |
+| 2026-11-01 00:00:00+00:00 |        0        | 4744470039.00 |
+| 2026-12-01 00:00:00+00:00 |        0        | 4744470039.00 |
++---------------------------+-----------------+---------------+
 */
 
 -- VISUAL: Lãi suất bình quân (Card)
@@ -425,7 +437,7 @@ b01_prev AS (
 b02_curr AS (
     SELECT indicator_code, SUM(current_period_amount) as val 
     FROM silver.fact_incomestatement 
-    WHERE reporting_date = (SELECT dt FROM md) 
+    WHERE month = (SELECT dt FROM md) 
     GROUP BY indicator_code
 ),
 du_no AS (
@@ -483,7 +495,7 @@ FROM vars;
 -- GHI CHÚ FILTER:
 -- WHERE reporting_date = (SELECT dt FROM md)
 -- WHERE reporting_date = (SELECT dt_prev FROM prev_md)
--- WHERE reporting_date = (SELECT dt FROM md)
+-- WHERE month = (SELECT dt FROM md)
 -- WHERE account_no LIKE '341%' AND DATE_TRUNC('month', posting_date) <= DATE_TRUNC('month', (SELECT dt FROM md))
 -- COALESCE((SELECT SUM(val) FROM b01_curr WHERE indicator_code='B01-DN_100'), 0) AS ts_ngan_han,
 -- COALESCE((SELECT SUM(val) FROM b01_curr WHERE indicator_code='B01-DN_310'), 0) AS no_ngan_han,
@@ -507,10 +519,11 @@ FROM vars;
 -- COALESCE((SELECT SUM(val) FROM b02_curr WHERE indicator_code='B02-DN_30'), 0) AS ln_hdkd,
 -- COALESCE((SELECT SUM(val) FROM b02_curr WHERE indicator_code='B02-DN_51'), 0) + COALESCE((SELECT SUM(val) FROM b02_curr WHERE indicator_code='B02-DN_52'), 0) AS cp_thue,
 -- COALESCE((SELECT SUM(val) FROM b02_curr WHERE indicator_code='B02-DN_60'), 0) AS ln_st,
-ERROR: column "reporting_date" does not exist
-LINE 18:     WHERE reporting_date = (SELECT dt FROM md) 
-                   ^
-
++--------------------+------------------------+---------------+-------------------+--------------------+--------------------------+----------------------+------+-----------------+-------------------+---------------------+-------------+--------------+-------------+-------+-------+-------------------------+
+|   current_ratio    |      quick_ratio       | vong_quay_vld | vong_quay_ton_kho | vong_quay_phai_thu | no_phai_tra_tren_tong_ts | no_dai_han_tren_vcsh | ebit |      ebitda     | ebit_tren_lai_vay | ebitda_tren_lai_vay | bien_ln_gop | bien_ln_hdkd | bien_ebitda |  roe  |  roa  |  tong_du_no_tren_ebitda |
++--------------------+------------------------+---------------+-------------------+--------------------+--------------------------+----------------------+------+-----------------+-------------------+---------------------+-------------+--------------+-------------+-------+-------+-------------------------+
+| 1.3861467792621685 | 0.86334807868217378402 |     0E-28     |       0E-28       |       0E-28        |  0.63580376382791085809  |        0E-28         | 0.00 | 113908673222.00 |        None       |         None        |     None    |     None     |     None    | 0E-28 | 0E-28 | -0.79182032552706401674 |
++--------------------+------------------------+---------------+-------------------+--------------------+--------------------------+----------------------+------+-----------------+-------------------+---------------------+-------------+--------------+-------------+-------+-------+-------------------------+
 */
 
 -- VISUAL: Chi tiết tài sản đảm bảo
