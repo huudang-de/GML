@@ -143,13 +143,13 @@ Cost_Of_Debt = DIVIDE([CP Lãi Vay (Thực tế)], [Tổng Dư Nợ], BLANK())
 ```
 
 ### 2.3 Lãi suất bình quân từng bank
-- **Nguồn dữ liệu:** Lấy từ cột `interest_rate` trong bảng `silver fact_creditlimitsummary`.
+- **Nguồn dữ liệu:** Lấy từ cột `interest_rate` trong bảng `silver fact_creditlimitsummary`. Chỉ lấy lãi suất vay Ngắn hạn theo yêu cầu của BRD.
 - **Loại:** Column Chart (hoặc Bar Chart)
 - **Trục X:** `dim_bank[Bank_Name]`
-- **Trục Y:** Kéo Measure `Lãi suất bình quân (Card)` (hoặc kéo cột `interest_rate` và chọn Average).
+- **Trục Y:** Kéo Measure `Lãi suất bình quân` vào.
 - **Công thức DAX tham khảo:**
 ```dax
-Lãi suất bình quân (Card) = AVERAGE('silver fact_creditlimitsummary'[interest_rate])
+Lãi suất bình quân = CALCULATE(AVERAGE('silver fact_creditlimitsummary'[interest_rate]), 'silver fact_creditlimitsummary'[limit_type] = "Ngắn hạn")
 ```
 
 ### 2.4 Dư nợ tại từng ngân hàng
