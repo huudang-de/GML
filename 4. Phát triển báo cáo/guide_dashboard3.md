@@ -279,7 +279,10 @@ SWITCH(TRUE(),
     DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 30, "1-30",
     DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 60, "31-60",
     DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 90, "61-90",
-    "90+"
+    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 120, "91-120",
+    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 150, "121-150",
+    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 180, "151-180",
+    "180+"
 )
 ```
 
@@ -291,7 +294,10 @@ SWITCH(TRUE(),
     DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 30, 2,
     DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 60, 3,
     DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 90, 4,
-    5
+    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 120, 5,
+    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 150, 6,
+    DATEDIFF('silver fact_accountsreceivable'[invoice_date], TODAY(), DAY) <= 180, 7,
+    8
 )
 ```
 - *Mẹo UX:* Để biểu đồ không bị xếp lộn xộn, bạn chọn cột `Tuổi Nợ Biểu Đồ`, lên thanh công cụ chọn **Sort by Column** > `Tuổi Nợ Biểu Đồ Sort`.

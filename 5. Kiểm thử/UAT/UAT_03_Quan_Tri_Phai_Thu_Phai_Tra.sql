@@ -340,46 +340,70 @@ LIMIT 10;
 
 -- VISUAL: Tuổi nợ Aging
 -- MEASURE: _CongNo[Aging]
-WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable),
+WITH cust_balances AS (
+    SELECT f.partner_code, f.ending_debit_balance as total_debt,
+           ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    FROM silver.fact_accountsreceivable f
+    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+),
+positive_balances AS (
+    SELECT partner_code, total_debt FROM cust_balances WHERE rn = 1 AND total_debt > 0
+),
+invoices AS (
+    SELECT f.partner_code, f.invoice_no, f.invoice_date, f.debit_amount, f.id
+    FROM silver.fact_accountsreceivable f
+    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    WHERE f.debit_amount > 0 AND f.invoice_no IS NOT NULL AND f.invoice_no != ''
+      AND p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+),
+invoices_running AS (
+    SELECT i.partner_code, i.invoice_no, i.invoice_date, i.debit_amount,
+           SUM(i.debit_amount) OVER (PARTITION BY i.partner_code ORDER BY i.invoice_date DESC, i.invoice_no DESC) as running_total
+    FROM invoices i
+    JOIN positive_balances pb ON i.partner_code = pb.partner_code
+),
+unpaid_invoices AS (
+    SELECT i.partner_code, i.invoice_no, i.invoice_date,
+           LEAST(i.debit_amount, GREATEST(0, pb.total_debt - (i.running_total - i.debit_amount))) as unpaid_amount
+    FROM invoices_running i
+    JOIN positive_balances pb ON i.partner_code = pb.partner_code
+),
 aging_calc AS (
     SELECT 
-        (SELECT dt FROM max_date) - invoice_date AS days_overdue,
-        debit_amount - credit_amount AS net_amount
-    FROM silver.fact_accountsreceivable
+        (SELECT MAX(posting_date) FROM silver.fact_accountsreceivable) - invoice_date AS days_since_invoice,
+        unpaid_amount
+    FROM unpaid_invoices
+    WHERE unpaid_amount > 0
 )
 SELECT 
     CASE
-        WHEN days_overdue <= 30 THEN 'Current'
-        WHEN days_overdue BETWEEN 31 AND 60 THEN '31-60'
-        WHEN days_overdue BETWEEN 61 AND 90 THEN '61-90'
-        WHEN days_overdue BETWEEN 91 AND 120 THEN '91-120'
-        WHEN days_overdue BETWEEN 121 AND 150 THEN '121-150'
-        WHEN days_overdue BETWEEN 151 AND 180 THEN '151-180'
+        WHEN days_since_invoice <= 0 THEN 'Current'
+        WHEN days_since_invoice BETWEEN 1 AND 30 THEN '1-30'
+        WHEN days_since_invoice BETWEEN 31 AND 60 THEN '31-60'
+        WHEN days_since_invoice BETWEEN 61 AND 90 THEN '61-90'
+        WHEN days_since_invoice BETWEEN 91 AND 120 THEN '91-120'
+        WHEN days_since_invoice BETWEEN 121 AND 150 THEN '121-150'
+        WHEN days_since_invoice BETWEEN 151 AND 180 THEN '151-180'
         ELSE '180+'
     END AS age_bucket,
-    SUM(net_amount) AS gia_tri
+    SUM(unpaid_amount) AS gia_tri
 FROM aging_calc
-WHERE net_amount > 0
-GROUP BY 1;
+GROUP BY 1
+ORDER BY age_bucket;
 
 /* RESULT LOG:
--- GHI CHÚ FILTER:
--- WHEN days_overdue BETWEEN 31 AND 60 THEN '31-60'
--- WHEN days_overdue BETWEEN 61 AND 90 THEN '61-90'
--- WHEN days_overdue BETWEEN 91 AND 120 THEN '91-120'
--- WHEN days_overdue BETWEEN 121 AND 150 THEN '121-150'
--- WHEN days_overdue BETWEEN 151 AND 180 THEN '151-180'
--- WHERE net_amount > 0
+-- GHI CHÚ FILTER: Sử dụng logic FIFO để phân bổ nợ vào hóa đơn, tính tuổi dựa trên Days Since Invoice
 +------------+----------------+
 | age_bucket |    gia_tri     |
 +------------+----------------+
-|   91-120   | 68070502738.00 |
-|   61-90    | 88216785939.00 |
-|   31-60    | 85266702176.00 |
-|  151-180   | 24500797265.00 |
-|  Current   | 77860236984.00 |
-|  121-150   | 70868424373.00 |
-|    180+    | 68076009377.00 |
+|    1-30    | 17406223931.00 |
+|   31-60    |  3595340332.00 |
+|   61-90    |   958680227.00 |
+|   91-120   |   902561820.00 |
+|  121-150   |   224463664.00 |
+|  151-180   |   103696539.00 |
+|    180+    |   520084955.00 |
 +------------+----------------+
 */
 
