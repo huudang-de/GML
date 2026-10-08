@@ -118,16 +118,19 @@ COUNTROWS(
 )
 
 Tổng hóa đơn = 
-COUNTROWS(
-    FILTER(
-        SUMMARIZE(
-            'silver fact_accountsreceivable',
-            'silver fact_accountsreceivable'[invoice_no],
-            "DaThu", SUM('silver fact_accountsreceivable'[credit_amount]),
-            "PhaiThu", SUM('silver fact_accountsreceivable'[debit_amount])
-        ),
-        [PhaiThu] - [DaThu] > 0 && NOT(ISBLANK('silver fact_accountsreceivable'[invoice_no]))
-    )
+CALCULATE(
+    COUNTROWS(
+        FILTER(
+            SUMMARIZE(
+                'silver fact_accountsreceivable',
+                'silver fact_accountsreceivable'[invoice_no],
+                "DaThu", SUM('silver fact_accountsreceivable'[credit_amount]),
+                "PhaiThu", SUM('silver fact_accountsreceivable'[debit_amount])
+            ),
+            [PhaiThu] - [DaThu] > 0 && NOT(ISBLANK('silver fact_accountsreceivable'[invoice_no]))
+        )
+    ),
+    'silver dim_partner'[partner_group] IN {"Khách hàng", "Khách hàng/ nhà cung cấp"}
 )
 ```
 
@@ -152,7 +155,11 @@ RETURN DIVIDE([Tổng khách hàng] - ThangTruoc, ThangTruoc, 0)
 - **Trục X:** `silver Dim_Date[Month Year]`
 - **Column Y-axis:** Measure `Phải thu (Tỷ)`
 - **Column Legend:** Cột `Tuổi Nợ Biểu Đồ` (Chia thành 5 nhóm đến 90+)
-- **Line Y-axis:** Kéo lại Measure `Phải thu (Tỷ)` vào đây một lần nữa (Đường line sẽ tự động cộng tổng thành Tổng dư nợ).
+- **Line Y-axis:** Measure `Tổng hóa đơn` (Đường line xu hướng tổng số hóa đơn treo nợ theo yêu cầu BRD).
+
+> [!WARNING]
+> **CẢNH BÁO VỀ THUẬT TOÁN FIFO (CẤN TRỪ CÔNG NỢ LÙI):**
+> BRD yêu cầu Tuổi nợ phải tính theo logic FIFO (Tiền trả sẽ cấn trừ vào hóa đơn cũ nhất). Tuy nhiên, cột `Tuổi Nợ Biểu Đồ` hiện tại chỉ đếm số ngày bằng hàm `DATEDIFF` đơn giản, KHÔNG thực hiện vòng lặp cấn trừ FIFO. Việc chạy vòng lặp FIFO trên DAX thuần với bảng Ledger phẳng là cực kỳ nặng và rủi ro nhân đôi số liệu. Sếp nên feedback lại với team Data Engineer (DE) để xử lý bước cấn trừ FIFO này ở tầng ETL (bằng Python/SQL), sau đó đẩy ra một bảng Fact riêng (ví dụ: `fact_aging_receivables`) rồi mới ném lên Power BI vẽ Chart nhé! Hướng dẫn chi tiết tạo bảng FIFO đã được lưu trong test script SQL `UAT_03`.
 
 ### 2.2 Vòng quay phải thu theo tháng
 - **Loại:** Area Chart
