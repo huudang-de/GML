@@ -267,7 +267,81 @@ RETURN DIVIDE([Tổng khách hàng] - ThangTruoc, ThangTruoc, 0)
 - **Loại:** Stacked Column Chart
 - **Trục X:** Kéo cột `Tuổi Nợ Biểu Đồ` vào.
 - **Lọc phụ (Rất quan trọng):** Trọng tâm của biểu đồ này là Nợ quá hạn. Bạn kéo `Tuổi Nợ Biểu Đồ` vào cột Filters, **bỏ tích ô "Current"** đi nhé (Chỉ giữ lại 4 nhóm: 1-30, 31-60, 61-90, 90+).
-- **Trục Y:** `Phải thu (Tỷ)`
+- **Trục Y:** `Nợ FIFO Aging (Tỷ)` (Tạo Measure ở bên dưới)
+- **Cách tạo Measure Phân bổ FIFO Tuổi Nợ (BẮT BUỘC):**
+Trục Y của biểu đồ này KHÔNG THỂ dùng measure `Phải thu (Tỷ)`. Lý do: `Phải thu` lấy cột `ending_debit_balance` (là lũy kế tổng nợ). Nếu sếp dùng cột Tuổi Nợ (chỉ tính cho hóa đơn) để cắt (slice) tổng nợ thì Power BI sẽ tính sai bét (đó là lý do kéo 1-30 vào bị biến mất).
+Sếp phải tạo một Measure tính chuẩn FIFO bóc tách từng hóa đơn rồi chia dải như sau:
+
+```dax
+Nợ FIFO Aging (Tỷ) = 
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+-- Lấy dải Tuổi Nợ đang được chọn trên Trục X
+VAR _SelectedBuckets = VALUES('silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ])
+
+RETURN
+DIVIDE(
+    SUMX(
+        VALUES('silver dim_partner'[partner_code]),
+        VAR _Customer = 'silver dim_partner'[partner_code]
+        
+        -- 1. Chốt Số dư nợ tại mốc MaxDate (Xóa filter trục X để không bị tính sai)
+        VAR _TotalDebt = 
+            CALCULATE(
+                MAXX(
+                    TOPN(1, 'silver fact_accountsreceivable', 'silver fact_accountsreceivable'[posting_date], DESC, 'silver fact_accountsreceivable'[id], DESC),
+                    'silver fact_accountsreceivable'[ending_debit_balance]
+                ),
+                'silver fact_accountsreceivable'[posting_date] <= _MaxDate,
+                ALL('silver Dim_Date'),
+                REMOVEFILTERS('silver fact_accountsreceivable')
+            )
+        
+        RETURN
+        IF(ISBLANK(_TotalDebt) || _TotalDebt <= 0, BLANK(),
+            
+            -- 2. Lấy danh sách hóa đơn
+            VAR _Invoices = 
+                CALCULATETABLE(
+                    SELECTCOLUMNS(
+                        'silver fact_accountsreceivable',
+                        "InvNo", 'silver fact_accountsreceivable'[invoice_no],
+                        "InvDate", 'silver fact_accountsreceivable'[invoice_date],
+                        "InvAmt", 'silver fact_accountsreceivable'[debit_amount],
+                        "Bucket", 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ]
+                    ),
+                    'silver fact_accountsreceivable'[debit_amount] > 0,
+                    'silver fact_accountsreceivable'[posting_date] <= _MaxDate,
+                    ALL('silver Dim_Date'),
+                    REMOVEFILTERS('silver fact_accountsreceivable')
+                )
+                
+            -- 3. Chạy vòng lặp FIFO
+            VAR _UnpaidInvoices = 
+                GENERATE(
+                    _Invoices,
+                    VAR _CurrentInvDate = [InvDate]
+                    VAR _CurrentInvNo = [InvNo]
+                    VAR _RunningTotal = 
+                        SUMX(
+                            FILTER(_Invoices, [InvDate] > _CurrentInvDate || ([InvDate] = _CurrentInvDate && [InvNo] >= _CurrentInvNo)),
+                            [InvAmt]
+                        )
+                    VAR _UnpaidAmt = MIN([InvAmt], MAX(0, _TotalDebt - (_RunningTotal - [InvAmt])))
+                    RETURN ROW("UnpaidAmt", _UnpaidAmt)
+                )
+                
+            -- 4. Lọc lại chỉ lấy phần tiền của hóa đơn nằm trong dải Tuổi Nợ trục X
+            RETURN
+            SUMX(
+                FILTER(_UnpaidInvoices, [UnpaidAmt] > 0 && [Bucket] IN _SelectedBuckets),
+                [UnpaidAmt]
+            )
+        )
+    ),
+    1000000000, 0
+)
+```
+
 - **Cách tạo Cột Tuổi nợ dành riêng cho Biểu Đồ (Calculated Column):**
 Bạn click **New Column** (Cột mới) 2 lần để tạo 2 cột tính toán tách biệt nhé:
 
@@ -312,7 +386,7 @@ SWITCH(TRUE(),
 ### 2.5 Top 10 khách hàng (Nợ quá hạn)
 - **Loại:** Horizontal Bar Chart
 - **Trục Y:** `silver dim_partner[Partner_Name]`
-- **Trục X:** Kéo Measure `Phải thu (Tỷ)` vào.
+- **Trục X:** Kéo Measure `Nợ FIFO Aging (Tỷ)` vào (Tuyệt đối không dùng Phải Thu Tỷ).
 - **Lọc phụ (Rất quan trọng):** Mở cột **Filters** (Bộ lọc). Kéo cột `Tuổi Nợ Biểu Đồ` thả vào ô *Filters on this visual*. Bỏ tích ô "Current" (Chỉ giữ lại các nhóm quá hạn). Biểu đồ sẽ tự động rút gọn thành nợ quá hạn.
 
 ---
@@ -373,21 +447,21 @@ SWITCH(TRUE(),
 ```
 
 **Bước 2: Tạo các Measure rời cho từng độ tuổi nợ**
-Bạn click **New Measure** để tạo lần lượt các cột nợ:
+Bạn click **New Measure** để tạo lần lượt các cột nợ (Lưu ý: Phải dùng measure `Nợ FIFO Aging (Tỷ)` bên trên để chia cột chuẩn xác):
 ```dax
-Nợ Current = CALCULATE([Phải thu Cuối Kỳ], 'silver fact_accountsreceivable'[Tuổi Nợ Bảng] = "Current")
-Nợ 1-30 = CALCULATE([Phải thu Cuối Kỳ], 'silver fact_accountsreceivable'[Tuổi Nợ Bảng] = "1-30")
-Nợ 31-60 = CALCULATE([Phải thu Cuối Kỳ], 'silver fact_accountsreceivable'[Tuổi Nợ Bảng] = "31-60")
-Nợ 61-90 = CALCULATE([Phải thu Cuối Kỳ], 'silver fact_accountsreceivable'[Tuổi Nợ Bảng] = "61-90")
-Nợ 91-120 = CALCULATE([Phải thu Cuối Kỳ], 'silver fact_accountsreceivable'[Tuổi Nợ Bảng] = "91-120")
-Nợ 121-150 = CALCULATE([Phải thu Cuối Kỳ], 'silver fact_accountsreceivable'[Tuổi Nợ Bảng] = "121-150")
-Nợ 151-180 = CALCULATE([Phải thu Cuối Kỳ], 'silver fact_accountsreceivable'[Tuổi Nợ Bảng] = "151-180")
-Nợ 180+ = CALCULATE([Phải thu Cuối Kỳ], 'silver fact_accountsreceivable'[Tuổi Nợ Bảng] = "180+")
+Nợ Current = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "Current")
+Nợ 1-30 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "1-30")
+Nợ 31-60 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "31-60")
+Nợ 61-90 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "61-90")
+Nợ 91-120 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "91-120")
+Nợ 121-150 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "121-150")
+Nợ 151-180 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "151-180")
+Nợ 180+ = CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] = "180+")
 
 % Quá hạn = 
 DIVIDE(
-    CALCULATE([Phải thu Cuối Kỳ], 'silver fact_accountsreceivable'[Tuổi Nợ Bảng] <> "Current"),
-    [Phải thu Cuối Kỳ],
+    CALCULATE([Nợ FIFO Aging (Tỷ)], 'silver fact_accountsreceivable'[Tuổi Nợ Biểu Đồ] <> "Current"),
+    [Phải thu (Tỷ)],
     0
 )
 ```
