@@ -348,38 +348,41 @@ SELECT a.account_name AS bank_name,
 FROM silver.fact_cashflow c
 LEFT JOIN silver.dim_account a ON c.account_no = a.account_no
 WHERE (c.account_no LIKE '111%' OR c.account_no LIKE '112%')
-  AND SUBSTRING(c.voucher_no FROM 1 FOR 4) != 'CTNB'
+  AND c.voucher_no NOT LIKE 'CTNB%'
+  AND c.voucher_no NOT LIKE 'NTTK%'
+  AND c.reciprocal_account NOT LIKE '111%' 
+  AND c.reciprocal_account NOT LIKE '112%'
 GROUP BY a.account_name;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE (c.account_no LIKE '111%' OR c.account_no LIKE '112%')
--- AND SUBSTRING(c.voucher_no FROM 1 FOR 4) != 'CTNB'
-+------------------------------------------------------+-----------------+
-|                      bank_name                       |     tong_thu    |
-+------------------------------------------------------+-----------------+
-|                    EUR_Woori Bank                    |   153902633.00  |
-|                       Ngoại tệ                       |  10751611369.00 |
-|           TK 0141100123005 - MB Thanh Xuân           | 323107096337.00 |
-| TK 0141100810002 Thanh toán Thấu Chi - Ngân hàng MB  |   36760669.00   |
-|            TK 0145600027008 - MB Linh Đàm            |   519371580.00  |
-|  TK 030061999899 NH Sacombank (Sài gòn thương tín)   |  74373782604.00 |
-| TK 03401016979938 - Ngân hàng TMCP Hàng Hải Việt Nam |       0.00      |
-|   TK 097704070005119 HDBANK (TMCP phát triển HCM)    |  37646144194.00 |
-|            TK 097840070000031/006 HD Bank            |  10597708736.00 |
-|        TK 100300485745 - Ngân hàng Woori Bank        | 106280633612.00 |
-|  TK 114000046412  - Vietinbank (Công thương Mỹ Hào)  |       0.00      |
-|      TK 2035186001 -  Indovina IVB - CN Hà Nội       | 101192030358.00 |
-|    TK 2407201007052 - NH AGRIBANK  - Hưng Yên II     |  3867510981.00  |
-|                TK 474255166 - VP Bank                |  67895751047.00 |
-|           TK 5859222288 NH LPB (Lộc Phát)            |   26820456.00   |
-|             TK 89156688 - VPBANK Hội sở              |  3652300000.00  |
-|         TK 90900283720 NH TPBank Tiên Phong          |  20111566231.00 |
-|              TK 996186186  MB TT lương               |  4720002995.00  |
-|                    Tiền Việt Nam                     | 743429771064.00 |
-|                Tiền gửi không kỳ hạn                 | 754181382433.00 |
-|                       Tiền mặt                       | 593927895024.00 |
-+------------------------------------------------------+-----------------+
+-- AND c.voucher_no NOT LIKE 'CTNB%'
+-- AND c.voucher_no NOT LIKE 'NTTK%'
+-- AND c.reciprocal_account NOT LIKE '111%'
+-- AND c.reciprocal_account NOT LIKE '112%'
++-----------------------------------------------------+-----------------+
+|                      bank_name                      |     tong_thu    |
++-----------------------------------------------------+-----------------+
+|                       Ngoại tệ                      |  10597708736.00 |
+|           TK 0141100123005 - MB Thanh Xuân          | 259354391337.00 |
+| TK 0141100810002 Thanh toán Thấu Chi - Ngân hàng MB |   36760669.00   |
+|            TK 0145600027008 - MB Linh Đàm           |   519371580.00  |
+|  TK 030061999899 NH Sacombank (Sài gòn thương tín)  |  67379782604.00 |
+|   TK 097704070005119 HDBANK (TMCP phát triển HCM)   |  33401144194.00 |
+|            TK 097840070000031/006 HD Bank           |  10597708736.00 |
+|        TK 100300485745 - Ngân hàng Woori Bank       |  98890633612.00 |
+|      TK 2035186001 -  Indovina IVB - CN Hà Nội      |  82427030358.00 |
+|    TK 2407201007052 - NH AGRIBANK  - Hưng Yên II    |  2316477200.00  |
+|                TK 474255166 - VP Bank               |  67330751047.00 |
+|           TK 5859222288 NH LPB (Lộc Phát)           |   26820456.00   |
+|             TK 89156688 - VPBANK Hội sở             |  3652300000.00  |
+|         TK 90900283720 NH TPBank Tiên Phong         |  15720566231.00 |
+|              TK 996186186  MB TT lương              |  4700002995.00  |
+|                    Tiền Việt Nam                    | 635756032283.00 |
+|                Tiền gửi không kỳ hạn                | 646353741019.00 |
+|                       Tiền mặt                      | 438199376036.00 |
++-----------------------------------------------------+-----------------+
 */
 
 -- VISUAL: Cơ cấu dòng chi theo Bank
@@ -389,38 +392,41 @@ SELECT a.account_name AS bank_name,
 FROM silver.fact_cashflow c
 LEFT JOIN silver.dim_account a ON c.account_no = a.account_no
 WHERE (c.account_no LIKE '111%' OR c.account_no LIKE '112%')
-  AND SUBSTRING(c.voucher_no FROM 1 FOR 4) != 'CTNB'
+  AND c.voucher_no NOT LIKE 'CTNB%'
+  AND c.voucher_no NOT LIKE 'NTTK%'
+  AND c.reciprocal_account NOT LIKE '111%' 
+  AND c.reciprocal_account NOT LIKE '112%'
 GROUP BY a.account_name;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE (c.account_no LIKE '111%' OR c.account_no LIKE '112%')
--- AND SUBSTRING(c.voucher_no FROM 1 FOR 4) != 'CTNB'
-+------------------------------------------------------+-----------------+
-|                      bank_name                       |     tong_chi    |
-+------------------------------------------------------+-----------------+
-|                    EUR_Woori Bank                    |       0.00      |
-|                       Ngoại tệ                       |  12506548412.00 |
-|           TK 0141100123005 - MB Thanh Xuân           | 342022345619.00 |
-| TK 0141100810002 Thanh toán Thấu Chi - Ngân hàng MB  |   313760669.00  |
-|            TK 0145600027008 - MB Linh Đàm            |   250000000.00  |
-|  TK 030061999899 NH Sacombank (Sài gòn thương tín)   |  95116837258.00 |
-| TK 03401016979938 - Ngân hàng TMCP Hàng Hải Việt Nam |   242502424.00  |
-|   TK 097704070005119 HDBANK (TMCP phát triển HCM)    |  34420623381.00 |
-|            TK 097840070000031/006 HD Bank            |  12506548412.00 |
-|        TK 100300485745 - Ngân hàng Woori Bank        |  83969416547.00 |
-|  TK 114000046412  - Vietinbank (Công thương Mỹ Hào)  |   10257000.00   |
-|      TK 2035186001 -  Indovina IVB - CN Hà Nội       | 137480928766.00 |
-|    TK 2407201007052 - NH AGRIBANK  - Hưng Yên II     |  5457605384.00  |
-|                TK 474255166 - VP Bank                |  57779663382.00 |
-|           TK 5859222288 NH LPB (Lộc Phát)            |    846142.00    |
-|             TK 89156688 - VPBANK Hội sở              |       0.00      |
-|         TK 90900283720 NH TPBank Tiên Phong          |  32706078649.00 |
-|              TK 996186186  MB TT lương               |  15102356152.00 |
-|                    Tiền Việt Nam                     | 804873221373.00 |
-|                Tiền gửi không kỳ hạn                 | 817379769785.00 |
-|                       Tiền mặt                       | 297183574160.00 |
-+------------------------------------------------------+-----------------+
+-- AND c.voucher_no NOT LIKE 'CTNB%'
+-- AND c.voucher_no NOT LIKE 'NTTK%'
+-- AND c.reciprocal_account NOT LIKE '111%'
+-- AND c.reciprocal_account NOT LIKE '112%'
++-----------------------------------------------------+-----------------+
+|                      bank_name                      |     tong_chi    |
++-----------------------------------------------------+-----------------+
+|                       Ngoại tệ                      |  12506548412.00 |
+|           TK 0141100123005 - MB Thanh Xuân          | 310516142916.00 |
+| TK 0141100810002 Thanh toán Thấu Chi - Ngân hàng MB |   313760669.00  |
+|            TK 0145600027008 - MB Linh Đàm           |       0.00      |
+|  TK 030061999899 NH Sacombank (Sài gòn thương tín)  |  74516837258.00 |
+|   TK 097704070005119 HDBANK (TMCP phát triển HCM)   |  31615623381.00 |
+|            TK 097840070000031/006 HD Bank           |  12506548412.00 |
+|        TK 100300485745 - Ngân hàng Woori Bank       |  70475216547.00 |
+|      TK 2035186001 -  Indovina IVB - CN Hà Nội      | 135015928766.00 |
+|    TK 2407201007052 - NH AGRIBANK  - Hưng Yên II    |  5457605384.00  |
+|                TK 474255166 - VP Bank               |  51134663382.00 |
+|           TK 5859222288 NH LPB (Lộc Phát)           |    846142.00    |
+|             TK 89156688 - VPBANK Hội sở             |       0.00      |
+|         TK 90900283720 NH TPBank Tiên Phong         |  32706078649.00 |
+|              TK 996186186  MB TT lương              |  15102356152.00 |
+|                    Tiền Việt Nam                    | 726855059246.00 |
+|                Tiền gửi không kỳ hạn                | 739361607658.00 |
+|                       Tiền mặt                      |  84548164160.00 |
++-----------------------------------------------------+-----------------+
 */
 
 -- VISUAL: Bảng tổng hợp 18 Chỉ số

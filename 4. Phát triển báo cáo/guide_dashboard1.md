@@ -191,7 +191,9 @@ Tổng Dòng Thu =
     CALCULATE(
         SUM('silver fact_cashflow'[debit_amount]),
         LEFT('silver fact_cashflow'[account_no], 3) IN {"111", "112"},
-        LEFT('silver fact_cashflow'[voucher_no], 4) <> "CTNB"
+        LEFT('silver fact_cashflow'[voucher_no], 4) <> "CTNB",
+        LEFT('silver fact_cashflow'[voucher_no], 4) <> "NTTK",
+        NOT(LEFT('silver fact_cashflow'[reciprocal_account], 3) IN {"111", "112"})
     )
 ```
 
@@ -205,7 +207,9 @@ Tổng Dòng Chi =
     CALCULATE(
         SUM('silver fact_cashflow'[credit_amount]),
         LEFT('silver fact_cashflow'[account_no], 3) IN {"111", "112"},
-        LEFT('silver fact_cashflow'[voucher_no], 4) <> "CTNB"
+        LEFT('silver fact_cashflow'[voucher_no], 4) <> "CTNB",
+        LEFT('silver fact_cashflow'[voucher_no], 4) <> "NTTK",
+        NOT(LEFT('silver fact_cashflow'[reciprocal_account], 3) IN {"111", "112"})
     )
 ```
 
