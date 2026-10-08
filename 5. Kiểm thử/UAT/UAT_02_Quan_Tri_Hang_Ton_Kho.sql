@@ -276,28 +276,30 @@ WITH thuc_te AS (
 ),
 ke_hoach AS (
     SELECT DATE_TRUNC('month', month) AS MONTH, SUM(target_amount) AS ke_hoach
-    FROM silver.fact_businessplan WHERE indicator_code = 'B02-DN_01' GROUP BY 1
+    FROM silver.fact_businessplan WHERE indicator_code = 'B02-DN_11' GROUP BY 1
 )
 SELECT COALESCE(t.MONTH, k.MONTH) AS MONTH,
        COALESCE(t.thuc_te, 0) AS thuc_te,
        COALESCE(k.ke_hoach, 0) AS ke_hoach,
        ABS(COALESCE(t.thuc_te, 0) - COALESCE(k.ke_hoach, 0)) / NULLIF(COALESCE(k.ke_hoach, 0), 0) AS phan_tram_chenh_lech
 FROM thuc_te t
-FULL OUTER JOIN ke_hoach k ON t.MONTH = k.MONTH;
+FULL OUTER JOIN ke_hoach k ON t.MONTH = k.MONTH
+ORDER BY MONTH;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- FROM silver.fact_businessplan WHERE indicator_code = 'B02-DN_01' GROUP BY 1
-+---------------------------+---------------+----------+----------------------+
-|           month           |    thuc_te    | ke_hoach | phan_tram_chenh_lech |
-+---------------------------+---------------+----------+----------------------+
-| 2026-04-01 00:00:00+00:00 | 76769615088.0 |    0     |         None         |
-| 2026-06-01 00:00:00+00:00 | 81312507829.0 |    0     |         None         |
-| 2026-03-01 00:00:00+00:00 | 53646924511.0 |    0     |         None         |
-| 2026-02-01 00:00:00+00:00 | 20922802826.0 |    0     |         None         |
-| 2026-07-01 00:00:00+00:00 | 76844566080.0 |    0     |         None         |
-| 2026-05-01 00:00:00+00:00 | 74599184818.0 |    0     |         None         |
-| 2026-01-01 00:00:00+00:00 | 52585271668.0 |    0     |         None         |
-+---------------------------+---------------+----------+----------------------+
+-- FROM silver.fact_businessplan WHERE indicator_code = 'B02-DN_11' GROUP BY 1
++---------------------------+-----------------+-----------------+----------------------+
+|           month           |     thuc_te     |    ke_hoach     | phan_tram_chenh_lech |
++---------------------------+-----------------+-----------------+----------------------+
+| 2026-01-01 00:00:00+00:00 |  52585271668.00 |  88768735086.00 |                 0.40 |
+| 2026-02-01 00:00:00+00:00 |  20922802826.00 |  44384367543.00 |                 0.52 |
+| 2026-03-01 00:00:00+00:00 |  53646924511.00 |  44384367543.00 |                 0.20 |
+| 2026-04-01 00:00:00+00:00 |  76769615088.00 |  88768735086.00 |                 0.13 |
+| 2026-05-01 00:00:00+00:00 |  74599184818.00 |  44384367543.00 |                 0.68 |
+| 2026-06-01 00:00:00+00:00 |  81312507829.00 |  44384367543.00 |                 0.83 |
+| 2026-07-01 00:00:00+00:00 |  76844566080.00 |  44384367543.00 |                 0.73 |
+| 2026-08-01 00:00:00+00:00 |            0.00 |  44384367543.00 |                 1.00 |
++---------------------------+-----------------+-----------------+----------------------+
 */
 
