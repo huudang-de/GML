@@ -175,13 +175,13 @@ DIVIDE([Tổng Giá Trị Xuất (Thực tế)], [Kế Hoạch Giá Vốn], 0)
 1. Bấm vào mũi tên ở Measure `[Tỷ lệ hoàn thành Xuất kho (%)]` > Chọn **Conditional formatting** > **Icons**.
 2. Phần *Format style* chọn **Rules**.
 3. **QUAN TRỌNG NHẤT:** Ở TẤT CẢ các ô chứa chữ `Percent` (Phần trăm) ở đuôi, bạn phải bấm mũi tên đổi hết thành chữ `Number` (Số). (Kể cả khi cột của bạn đang hiển thị là %, trong cái bảng Rule này Power BI chỉ hiểu số thập phân).
-4. Khai báo 3 Rules y hệt như sau:
-   - **Rule 1 (Cờ Vàng - Hụt kế hoạch):** 
-     If value `>= 0` (Number) and `< 0.95` (Number) -> Chọn Icon Cờ Vàng.
-   - **Rule 2 (Cờ Xanh - Đạt chuẩn ±5%):** Bấm `+ New rule`. 
-     If value `>= 0.95` (Number) and `< 1.05` (Number) -> Chọn Icon Cờ Xanh ⛳.
+4. Khai báo 3 Rules y hệt như sau (dành cho Tỷ lệ chênh lệch có âm có dương):
+   - **Rule 1 (Cờ Vàng - Hụt kế hoạch quá 5%):** 
+     If value `>= -9999` (Number) and `< -0.05` (Number) -> Chọn Icon Cờ Vàng.
+   - **Rule 2 (Cờ Xanh - Đạt chuẩn an toàn ±5%):** Bấm `+ New rule`. 
+     If value `>= -0.05` (Number) and `<= 0.05` (Number) -> Chọn Icon Cờ Xanh ⛳.
    - **Rule 3 (Cờ Đỏ - Vượt lố >5%):** Bấm `+ New rule`. 
-     If value `>= 1.05` (Number) and `< 9999` (Number) -> Chọn Icon Cờ Đỏ 🚩.
+     If value `> 0.05` (Number) and `<= 9999` (Number) -> Chọn Icon Cờ Đỏ 🚩.
 5. Bấm **OK**.
 
 
