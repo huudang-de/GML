@@ -246,6 +246,8 @@ Số tiền gốc cần trả =
 ```
 *(Lý do phải có `USERELATIONSHIP`: Vì Relationship mặc định (Active) giữa bảng `Dim_Date` và `fact_loan` đang nối bằng `disbursement_date` (Ngày giải ngân). Nếu không dùng hàm này, khi sếp kéo `Dim_Date[Date]` vào Matrix nó sẽ chỉ hiện ngày giải ngân cuối cùng, ví dụ 28/4. Dùng `USERELATIONSHIP` sẽ kích hoạt đường nối phụ bằng `maturity_date` (Ngày đáo hạn) để lên đúng lịch trả nợ trong tương lai).*
 
+> **LƯU Ý CỰC KỲ QUAN TRỌNG:** Để hàm `USERELATIONSHIP` không bị báo lỗi *"can only use the two columns references participating in relationship"*, sếp BẮT BUỘC phải vào thẻ **Model View** (biểu đồ quan hệ) trên Power BI, sau đó **kéo thả nối thêm 1 đường** từ `Dim_Date[Date]` sang `silver fact_loan[maturity_date]`. Đường này sẽ hiện nét đứt (Inactive Relationship). Sau khi nối xong thì hàm DAX trên mới chạy được!
+
 ---
 
 ## 6. Công thức DAX Nhóm Chỉ số Tài chính (Bảng 2.8)
