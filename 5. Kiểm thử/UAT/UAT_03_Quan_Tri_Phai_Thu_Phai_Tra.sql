@@ -4,27 +4,47 @@
 
 -- VISUAL: Giá trị phải thu
 -- MEASURE: _CongNo[Gia_Tri_Phai_Thu]
-SELECT SUM(debit_amount - credit_amount) AS gia_tri_phai_thu
-FROM silver.fact_accountsreceivable;
+WITH latest_transactions AS (
+    SELECT 
+        f.partner_code,
+        f.ending_debit_balance,
+        ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    FROM silver.fact_accountsreceivable f
+    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+)
+SELECT SUM(ending_debit_balance) AS gia_tri_phai_thu
+FROM latest_transactions
+WHERE rn = 1;
 
 /* RESULT LOG:
 +------------------+
 | gia_tri_phai_thu |
 +------------------+
-| -67164276777.00  |
+|  36326095573.00  |
 +------------------+
 */
 
 -- VISUAL: Giá trị phải trả
 -- MEASURE: _CongNo[Gia_Tri_Phai_Tra]
-SELECT SUM(credit_amount - debit_amount) AS gia_tri_phai_tra
-FROM silver.fact_accountspayable;
+WITH latest_transactions AS (
+    SELECT 
+        f.partner_code,
+        f.ending_credit_balance,
+        ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    FROM silver.fact_accountspayable f
+    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    WHERE p.partner_group IN ('Nhà cung cấp', 'Khách hàng/ nhà cung cấp')
+)
+SELECT SUM(ending_credit_balance) AS gia_tri_phai_tra
+FROM latest_transactions
+WHERE rn = 1;
 
 /* RESULT LOG:
 +------------------+
 | gia_tri_phai_tra |
 +------------------+
-| -108798654202.61 |
+|  60452900187.23  |
 +------------------+
 */
 
