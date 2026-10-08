@@ -6,6 +6,7 @@
 -- MEASURE: _CongNo[Gia_Tri_Phai_Thu]
 SELECT SUM(debit_amount - credit_amount) AS gia_tri_phai_thu
 FROM silver.fact_accountsreceivable;
+
 /* RESULT LOG:
 +------------------+
 | gia_tri_phai_thu |
@@ -14,11 +15,11 @@ FROM silver.fact_accountsreceivable;
 +------------------+
 */
 
-
 -- VISUAL: Giá trị phải trả
 -- MEASURE: _CongNo[Gia_Tri_Phai_Tra]
 SELECT SUM(credit_amount - debit_amount) AS gia_tri_phai_tra
 FROM silver.fact_accountspayable;
+
 /* RESULT LOG:
 +------------------+
 | gia_tri_phai_tra |
@@ -27,14 +28,13 @@ FROM silver.fact_accountspayable;
 +------------------+
 */
 
-
 -- VISUAL: Vòng quay phải thu theo năm
 -- MEASURE: _CongNo[VQ_Phai_Thu_Nam]
 WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable),
 doanh_thu AS (
     SELECT SUM(current_period_amount) AS val
     FROM silver.fact_incomestatement
-    WHERE indicator_code=''B02-DN_10'' AND EXTRACT(YEAR FROM reporting_date) = EXTRACT(YEAR FROM (SELECT dt FROM max_date))
+    WHERE indicator_code='B02-DN_10' AND EXTRACT(YEAR FROM reporting_date) = EXTRACT(YEAR FROM (SELECT dt FROM max_date))
 ),
 du_no_avg AS (
     SELECT 
@@ -42,17 +42,17 @@ du_no_avg AS (
           (SELECT SUM(debit_amount - credit_amount) FROM silver.fact_accountsreceivable WHERE EXTRACT(YEAR FROM posting_date) < EXTRACT(YEAR FROM (SELECT dt FROM max_date))) ) / 2.0 AS val
 )
 SELECT (SELECT val FROM doanh_thu) / NULLIF((SELECT val FROM du_no_avg), 0) AS vong_quay_phai_thu_nam;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- WHERE indicator_code=''B02-DN_10'' AND EXTRACT(YEAR FROM reporting_date) = EXTRACT(YEAR FROM (SELECT dt FROM max_date))
+-- WHERE indicator_code='B02-DN_10' AND EXTRACT(YEAR FROM reporting_date) = EXTRACT(YEAR FROM (SELECT dt FROM max_date))
 -- ( (SELECT SUM(debit_amount - credit_amount) FROM silver.fact_accountsreceivable WHERE EXTRACT(YEAR FROM posting_date) <= EXTRACT(YEAR FROM (SELECT dt FROM max_date))) +
 -- (SELECT SUM(debit_amount - credit_amount) FROM silver.fact_accountsreceivable WHERE EXTRACT(YEAR FROM posting_date) < EXTRACT(YEAR FROM (SELECT dt FROM max_date))) ) / 2.0 AS val
-ERROR: syntax error at or near "B02"
-LINE 5:     WHERE indicator_code=''B02-DN_10'' AND EXTRACT(YEAR FROM...
-                                   ^
+ERROR: column "reporting_date" does not exist
+LINE 5: ... indicator_code='B02-DN_10' AND EXTRACT(YEAR FROM reporting_...
+                                                             ^
 
 */
-
 
 -- VISUAL: Vòng quay phải thu hiện tại
 -- MEASURE: _CongNo[VQ_Phai_Thu_Thang]
@@ -60,27 +60,28 @@ WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceiv
 doanh_thu AS (
     SELECT SUM(current_period_amount) AS val
     FROM silver.fact_incomestatement
-    WHERE indicator_code=''B02-DN_10'' AND DATE_TRUNC(''month'', reporting_date) = DATE_TRUNC(''month'', (SELECT dt FROM max_date))
+    WHERE indicator_code='B02-DN_10' AND DATE_TRUNC('month', reporting_date) = DATE_TRUNC('month', (SELECT dt FROM max_date))
 ),
 du_no_hien_tai AS (
     SELECT SUM(debit_amount - credit_amount) AS val
     FROM silver.fact_accountsreceivable
 )
 SELECT (SELECT val FROM doanh_thu) / NULLIF((SELECT val FROM du_no_hien_tai), 0) AS vong_quay_phai_thu_hien_tai;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- WHERE indicator_code=''B02-DN_10'' AND DATE_TRUNC(''month'', reporting_date) = DATE_TRUNC(''month'', (SELECT dt FROM max_date))
-ERROR: syntax error at or near "B02"
-LINE 5:     WHERE indicator_code=''B02-DN_10'' AND DATE_TRUNC(''mont...
-                                   ^
+-- WHERE indicator_code='B02-DN_10' AND DATE_TRUNC('month', reporting_date) = DATE_TRUNC('month', (SELECT dt FROM max_date))
+ERROR: column "reporting_date" does not exist
+LINE 5: ...ndicator_code='B02-DN_10' AND DATE_TRUNC('month', reporting_...
+                                                             ^
 
 */
-
 
 -- VISUAL: Tổng hóa đơn
 -- MEASURE: _CongNo[Tong_Hoa_Don]
 SELECT COUNT(DISTINCT invoice_no) AS tong_hoa_don
 FROM silver.fact_accountsreceivable;
+
 /* RESULT LOG:
 +--------------+
 | tong_hoa_don |
@@ -88,7 +89,6 @@ FROM silver.fact_accountsreceivable;
 |     4924     |
 +--------------+
 */
-
 
 -- VISUAL: Tổng số khách hàng
 -- MEASURE: _CongNo[Tong_KH]
@@ -99,6 +99,7 @@ FROM (
     GROUP BY partner_code
     HAVING SUM(debit_amount - credit_amount) > 0
 ) t;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- HAVING SUM(debit_amount - credit_amount) > 0
@@ -109,47 +110,54 @@ FROM (
 +-----------------+
 */
 
-
 -- VISUAL: Phải thu theo tháng
 -- MEASURE: _CongNo[Phai_Thu_Thang]
 WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable)
-SELECT DATE_TRUNC(''month'', posting_date) AS MONTH,
+SELECT DATE_TRUNC('month', posting_date) AS MONTH,
        SUM(CASE WHEN (SELECT dt FROM max_date) <= invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) AS no_trong_han,
        SUM(CASE WHEN (SELECT dt FROM max_date) > invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) AS no_qua_han,
        SUM(debit_amount - credit_amount) AS tong_no
 FROM silver.fact_accountsreceivable
 GROUP BY 1;
+
 /* RESULT LOG:
-ERROR: syntax error at or near "month"
-LINE 2: SELECT DATE_TRUNC(''month'', posting_date) AS MONTH,
-                            ^
-
++---------------------------+----------------+----------------+-----------------+
+|           month           |  no_trong_han  |   no_qua_han   |     tong_no     |
++---------------------------+----------------+----------------+-----------------+
+| 2026-04-01 00:00:00+00:00 |       0        | 82815409522.00 | -13047710599.00 |
+| 2026-06-01 00:00:00+00:00 |       0        | 87377050927.00 |  17280663724.00 |
+| 2026-03-01 00:00:00+00:00 |       0        | 57845395198.00 | -39161076360.00 |
+| 2026-02-01 00:00:00+00:00 |       0        | 22461846187.00 |  -7639515467.00 |
+| 2026-07-01 00:00:00+00:00 | 75809509710.00 | 5135023170.00  |  3965180286.00  |
+| 2026-08-01 00:00:00+00:00 |       0        |       0        |   -1374000.00   |
+| 2026-05-01 00:00:00+00:00 |       0        | 80333683232.00 | -24151392302.00 |
+| 2026-01-01 00:00:00+00:00 |       0        | 56450096083.00 |  -4409052059.00 |
++---------------------------+----------------+----------------+-----------------+
 */
-
 
 -- VISUAL: Receivable Turnover
 -- MEASURE: _CongNo[VQ_Phai_Thu]
 WITH doanh_thu AS (
-    SELECT DATE_TRUNC(''month'', reporting_date) AS MONTH, SUM(current_period_amount) AS val
-    FROM silver.fact_incomestatement WHERE indicator_code=''B02-DN_10'' GROUP BY 1
+    SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM(current_period_amount) AS val
+    FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' GROUP BY 1
 ),
 du_no AS (
-    SELECT DATE_TRUNC(''month'', posting_date) AS MONTH, SUM(debit_amount - credit_amount) AS val
+    SELECT DATE_TRUNC('month', posting_date) AS MONTH, SUM(debit_amount - credit_amount) AS val
     FROM silver.fact_accountsreceivable GROUP BY 1
 )
 SELECT d.MONTH, 
        dt.val / NULLIF(SUM(d.val) OVER (ORDER BY d.MONTH), 0) AS vong_quay_thang
 FROM du_no d
 LEFT JOIN doanh_thu dt ON d.MONTH = dt.MONTH;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- FROM silver.fact_incomestatement WHERE indicator_code=''B02-DN_10'' GROUP BY 1
-ERROR: syntax error at or near "month"
-LINE 2:     SELECT DATE_TRUNC(''month'', reporting_date) AS MONTH, S...
-                                ^
+-- FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' GROUP BY 1
+ERROR: column "reporting_date" does not exist
+LINE 2:     SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM...
+                                       ^
 
 */
-
 
 -- VISUAL: Top 10 KH nợ cao nhất
 -- MEASURE: _CongNo[Top_10_No]
@@ -160,6 +168,7 @@ GROUP BY 1
 HAVING SUM(debit_amount - credit_amount) > 0
 ORDER BY du_no DESC
 LIMIT 10;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- HAVING SUM(debit_amount - credit_amount) > 0
@@ -179,7 +188,6 @@ LIMIT 10;
 +--------------+----------------+
 */
 
-
 -- VISUAL: Top 10 KH dư nợ quá hạn (Nợ xấu)
 -- MEASURE: _CongNo[Top_10_Qua_Han]
 WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable)
@@ -192,6 +200,7 @@ GROUP BY 1
 HAVING SUM(CASE WHEN (SELECT dt FROM max_date) > invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) > 0
 ORDER BY no_qua_han DESC
 LIMIT 10;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- HAVING SUM(CASE WHEN (SELECT dt FROM max_date) > invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) > 0
@@ -211,7 +220,6 @@ LIMIT 10;
 +--------------+----------------+-----------------+----------------------+
 */
 
-
 -- VISUAL: Tuổi nợ Aging
 -- MEASURE: _CongNo[Aging]
 WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable),
@@ -223,32 +231,39 @@ aging_calc AS (
 )
 SELECT 
     CASE
-        WHEN days_overdue <= 30 THEN ''Current''
-        WHEN days_overdue BETWEEN 31 AND 60 THEN ''31-60''
-        WHEN days_overdue BETWEEN 61 AND 90 THEN ''61-90''
-        WHEN days_overdue BETWEEN 91 AND 120 THEN ''91-120''
-        WHEN days_overdue BETWEEN 121 AND 150 THEN ''121-150''
-        WHEN days_overdue BETWEEN 151 AND 180 THEN ''151-180''
-        ELSE ''180+''
+        WHEN days_overdue <= 30 THEN 'Current'
+        WHEN days_overdue BETWEEN 31 AND 60 THEN '31-60'
+        WHEN days_overdue BETWEEN 61 AND 90 THEN '61-90'
+        WHEN days_overdue BETWEEN 91 AND 120 THEN '91-120'
+        WHEN days_overdue BETWEEN 121 AND 150 THEN '121-150'
+        WHEN days_overdue BETWEEN 151 AND 180 THEN '151-180'
+        ELSE '180+'
     END AS age_bucket,
     SUM(net_amount) AS gia_tri
 FROM aging_calc
 WHERE net_amount > 0
 GROUP BY 1;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- WHEN days_overdue BETWEEN 31 AND 60 THEN ''31-60''
--- WHEN days_overdue BETWEEN 61 AND 90 THEN ''61-90''
--- WHEN days_overdue BETWEEN 91 AND 120 THEN ''91-120''
--- WHEN days_overdue BETWEEN 121 AND 150 THEN ''121-150''
--- WHEN days_overdue BETWEEN 151 AND 180 THEN ''151-180''
+-- WHEN days_overdue BETWEEN 31 AND 60 THEN '31-60'
+-- WHEN days_overdue BETWEEN 61 AND 90 THEN '61-90'
+-- WHEN days_overdue BETWEEN 91 AND 120 THEN '91-120'
+-- WHEN days_overdue BETWEEN 121 AND 150 THEN '121-150'
+-- WHEN days_overdue BETWEEN 151 AND 180 THEN '151-180'
 -- WHERE net_amount > 0
-ERROR: syntax error at or near "Current"
-LINE 10:         WHEN days_overdue <= 30 THEN ''Current''
-                                                ^
-
++------------+----------------+
+| age_bucket |    gia_tri     |
++------------+----------------+
+|   91-120   | 68070502738.00 |
+|   61-90    | 88216785939.00 |
+|   31-60    | 85266702176.00 |
+|  151-180   | 24500797265.00 |
+|  Current   | 77860236984.00 |
+|  121-150   | 70868424373.00 |
+|    180+    | 68076009377.00 |
++------------+----------------+
 */
-
 
 -- VISUAL: Bảng chi tiết các hóa đơn đang nợ
 -- MEASURE: _CongNo[Chi_Tiet_Hoa_Don]
@@ -263,6 +278,7 @@ SELECT voucher_no AS so_chung_tu,
        ((SELECT dt FROM max_date) - invoice_date - 30) AS so_ngay_qua_han
 FROM silver.fact_accountsreceivable
 WHERE (debit_amount - credit_amount) > 0;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE (debit_amount - credit_amount) > 0;
@@ -24958,7 +24974,6 @@ WHERE (debit_amount - credit_amount) > 0;
 +-------------+----------------+------------+--------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------+----------------+-----------------+
 */
 
-
 -- VISUAL: Bảng chi tiết nợ theo Khách hàng
 -- MEASURE: _CongNo[Chi_Tiet_No_KH]
 WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable)
@@ -24971,6 +24986,7 @@ SELECT partner_code AS ma_khach_hang,
 FROM silver.fact_accountsreceivable
 GROUP BY 1
 HAVING SUM(debit_amount - credit_amount) > 0;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- HAVING SUM(debit_amount - credit_amount) > 0;

@@ -7,6 +7,7 @@
 SELECT SUM(ending_quantity) AS sl_ton_kho
 FROM silver.fact_inventory_balance
 WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance);
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance);
@@ -17,12 +18,12 @@ WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_bala
 +------------+
 */
 
-
 -- VISUAL: Giá trị HTK
 -- MEASURE: _TonKho[Gia_Tri_Ton]
 SELECT SUM(ending_value) AS gt_ton_kho
 FROM silver.fact_inventory_balance
 WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance);
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance);
@@ -33,38 +34,39 @@ WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_bala
 +-----------------+
 */
 
-
 -- VISUAL: Vòng quay HTK
 -- MEASURE: _TonKho[Vong_Quay_HTK]
 SELECT
-  (SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code = ''B02-DN_11'') / 
+  (SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code = 'B02-DN_11') / 
   NULLIF((SELECT SUM(ending_value) FROM silver.fact_inventory_balance WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance)), 0) AS vong_quay_htk;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- (SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code = ''B02-DN_11'') /
+-- (SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code = 'B02-DN_11') /
 -- NULLIF((SELECT SUM(ending_value) FROM silver.fact_inventory_balance WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance)), 0) AS vong_quay_htk;
-ERROR: syntax error at or near "B02"
-LINE 2: ...ver.fact_incomestatement WHERE indicator_code = ''B02-DN_11'...
-                                                             ^
-
++---------------+
+| vong_quay_htk |
++---------------+
+|     0E-28     |
++---------------+
 */
-
 
 -- VISUAL: Inventory to sales ratio
 -- MEASURE: _TonKho[Inventory_To_Sales]
 SELECT
   (SELECT SUM(ending_value) FROM silver.fact_inventory_balance WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance)) / 
-  NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code = ''B02-DN_10''), 0) AS i_s_ratio;
+  NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code = 'B02-DN_10'), 0) AS i_s_ratio;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- (SELECT SUM(ending_value) FROM silver.fact_inventory_balance WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance)) /
--- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code = ''B02-DN_10''), 0) AS i_s_ratio;
-ERROR: syntax error at or near "B02"
-LINE 3: ...ver.fact_incomestatement WHERE indicator_code = ''B02-DN_10'...
-                                                             ^
-
+-- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code = 'B02-DN_10'), 0) AS i_s_ratio;
++--------------------+
+|     i_s_ratio      |
++--------------------+
+| 4.5564288294601285 |
++--------------------+
 */
-
 
 -- VISUAL: Tổng mã sản phẩm
 -- MEASURE: _TonKho[Tong_SKU]
@@ -72,6 +74,7 @@ SELECT COUNT(DISTINCT product_code) AS tong_sku
 FROM silver.fact_inventory_balance
 WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance)
   AND ending_quantity > 0;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance)
@@ -83,12 +86,12 @@ WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_bala
 +----------+
 */
 
-
 -- VISUAL: Giá trị hàng nhập khẩu
 -- MEASURE: _TonKho[Gia_Tri_Nhap]
 SELECT SUM(inward_value) AS gia_tri_nhap_khau
 FROM silver.fact_inventoryinward
 WHERE exchange_rate > 1;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE exchange_rate > 1;
@@ -99,87 +102,109 @@ WHERE exchange_rate > 1;
 +-------------------+
 */
 
-
 -- VISUAL: Tồn kho theo thời gian
 -- MEASURE: _TonKho[Ton_Kho_Theo_Thang]
-SELECT DATE_TRUNC(''month'', snapshot_date) AS MONTH,
+SELECT DATE_TRUNC('month', snapshot_date) AS MONTH,
        SUM(ending_quantity) AS so_luong,
        SUM(ending_value) AS gia_tri
 FROM silver.fact_inventory_balance
 GROUP BY 1
 ORDER BY 1;
+
 /* RESULT LOG:
-ERROR: syntax error at or near "month"
-LINE 1: SELECT DATE_TRUNC(''month'', snapshot_date) AS MONTH,
-                            ^
-
++---------------------------+-----------+-----------------+
+|           month           |  so_luong |     gia_tri     |
++---------------------------+-----------+-----------------+
+| 2026-07-01 00:00:00+00:00 | 673125.42 | 341692285766.00 |
+| 2026-08-01 00:00:00+00:00 | 673125.42 | 341692285766.00 |
++---------------------------+-----------+-----------------+
 */
-
 
 -- VISUAL: Vòng quay HTK theo thời gian
 -- MEASURE: _TonKho[Vong_Quay_Thang]
 WITH ton_kho AS (
-    SELECT DATE_TRUNC(''month'', snapshot_date) AS MONTH, SUM(ending_value) AS gia_tri_ton
+    SELECT DATE_TRUNC('month', snapshot_date) AS MONTH, SUM(ending_value) AS gia_tri_ton
     FROM silver.fact_inventory_balance GROUP BY 1
 ),
 gia_von AS (
-    SELECT DATE_TRUNC(''month'', reporting_date) AS MONTH, SUM(current_period_amount) AS cogs
-    FROM silver.fact_incomestatement WHERE indicator_code=''B02-DN_11'' GROUP BY 1
+    SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM(current_period_amount) AS cogs
+    FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' GROUP BY 1
 )
 SELECT t.MONTH,
        g.cogs / NULLIF(t.gia_tri_ton, 0) AS he_so_vong_quay
 FROM ton_kho t
 LEFT JOIN gia_von g ON t.MONTH = g.MONTH;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- FROM silver.fact_incomestatement WHERE indicator_code=''B02-DN_11'' GROUP BY 1
-ERROR: syntax error at or near "month"
-LINE 2:     SELECT DATE_TRUNC(''month'', snapshot_date) AS MONTH, SU...
-                                ^
+-- FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' GROUP BY 1
+ERROR: column "reporting_date" does not exist
+LINE 6:     SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM...
+                                       ^
 
 */
-
 
 -- VISUAL: Inventory to Sales
 -- MEASURE: _TonKho[IS_Theo_Thang]
 WITH ton_kho AS (
-    SELECT DATE_TRUNC(''month'', snapshot_date) AS MONTH, SUM(ending_value) AS gia_tri_ton
+    SELECT DATE_TRUNC('month', snapshot_date) AS MONTH, SUM(ending_value) AS gia_tri_ton
     FROM silver.fact_inventory_balance GROUP BY 1
 ),
 doanh_thu AS (
-    SELECT DATE_TRUNC(''month'', reporting_date) AS MONTH, SUM(current_period_amount) AS dthu
-    FROM silver.fact_incomestatement WHERE indicator_code=''B02-DN_10'' GROUP BY 1
+    SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM(current_period_amount) AS dthu
+    FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' GROUP BY 1
 )
 SELECT t.MONTH,
        t.gia_tri_ton / NULLIF(d.dthu, 0) AS ty_le_is
 FROM ton_kho t
 LEFT JOIN doanh_thu d ON t.MONTH = d.MONTH;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- FROM silver.fact_incomestatement WHERE indicator_code=''B02-DN_10'' GROUP BY 1
-ERROR: syntax error at or near "month"
-LINE 2:     SELECT DATE_TRUNC(''month'', snapshot_date) AS MONTH, SU...
-                                ^
+-- FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' GROUP BY 1
+ERROR: column "reporting_date" does not exist
+LINE 6:     SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM...
+                                       ^
 
 */
-
 
 -- VISUAL: Trạng thái Inventory
 -- MEASURE: _TonKho[Trang_Thai]
-SELECT DATE_TRUNC(''month'', snapshot_date) AS MONTH,
-       SUM(inward_value) AS tong_nhap,
-       SUM(outward_value) AS tong_xuat,
-       SUM(ending_value) AS ton_cuoi_ky
-FROM silver.fact_inventory_balance
-GROUP BY 1
+WITH ton_cuoi AS (
+    SELECT DATE_TRUNC('month', snapshot_date) AS month, SUM(ending_value) AS ton_cuoi_ky
+    FROM silver.fact_inventory_balance GROUP BY 1
+),
+nhap AS (
+    SELECT DATE_TRUNC('month', posting_date) AS month, SUM(inward_value) AS tong_nhap
+    FROM silver.fact_inventoryinward GROUP BY 1
+),
+xuat AS (
+    SELECT DATE_TRUNC('month', posting_date) AS month, SUM(outward_value) AS tong_xuat
+    FROM silver.fact_inventoryoutward GROUP BY 1
+)
+SELECT COALESCE(t.month, n.month, x.month) AS MONTH,
+       COALESCE(n.tong_nhap, 0) AS tong_nhap,
+       COALESCE(x.tong_xuat, 0) AS tong_xuat,
+       COALESCE(t.ton_cuoi_ky, 0) AS ton_cuoi_ky
+FROM ton_cuoi t
+FULL OUTER JOIN nhap n ON t.month = n.month
+FULL OUTER JOIN xuat x ON COALESCE(t.month, n.month) = x.month
 ORDER BY 1;
+
 /* RESULT LOG:
-ERROR: syntax error at or near "month"
-LINE 1: SELECT DATE_TRUNC(''month'', snapshot_date) AS MONTH,
-                            ^
-
++---------------------------+----------------+---------------+-----------------+
+|           month           |   tong_nhap    |   tong_xuat   |   ton_cuoi_ky   |
++---------------------------+----------------+---------------+-----------------+
+| 2026-01-01 00:00:00+00:00 | 66113395190.00 | 52585271668.0 |        0        |
+| 2026-02-01 00:00:00+00:00 | 45788484765.00 | 20922802826.0 |        0        |
+| 2026-03-01 00:00:00+00:00 | 60498138162.00 | 53646924511.0 |        0        |
+| 2026-04-01 00:00:00+00:00 | 58057886647.00 | 76769615088.0 |        0        |
+| 2026-05-01 00:00:00+00:00 | 75817986741.00 | 74599184818.0 |        0        |
+| 2026-06-01 00:00:00+00:00 | 41975148988.00 | 81312507829.0 |        0        |
+| 2026-07-01 00:00:00+00:00 | 53795968849.00 | 76844566080.0 | 341692285766.00 |
+| 2026-08-01 00:00:00+00:00 |       0        |      0.0      | 341692285766.00 |
++---------------------------+----------------+---------------+-----------------+
 */
-
 
 -- VISUAL: Top 10 dư tồn kho
 -- MEASURE: _TonKho[Top_10_Ton]
@@ -190,6 +215,7 @@ WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_bala
 GROUP BY 1
 ORDER BY gia_tri DESC
 LIMIT 10;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM silver.fact_inventory_balance)
@@ -209,16 +235,15 @@ LIMIT 10;
 +------------------------------+-----------------+
 */
 
-
 -- VISUAL: Xuất kho Kế hoạch vs Thực tế
 -- MEASURE: _TonKho[Xuat_Kho_ThucTe_KH]
 WITH thuc_te AS (
-    SELECT DATE_TRUNC(''month'', snapshot_date) AS MONTH, SUM(outward_value) AS thuc_te
-    FROM silver.fact_inventory_balance GROUP BY 1
+    SELECT DATE_TRUNC('month', posting_date) AS MONTH, SUM(outward_value) AS thuc_te
+    FROM silver.fact_inventoryoutward GROUP BY 1
 ),
 ke_hoach AS (
-    SELECT DATE_TRUNC(''month'', reporting_date) AS MONTH, SUM(target_amount) AS ke_hoach
-    FROM silver.fact_businessplan WHERE indicator_code = ''B02-DN_01'' GROUP BY 1
+    SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM(target_amount) AS ke_hoach
+    FROM silver.fact_businessplan WHERE indicator_code = 'B02-DN_01' GROUP BY 1
 )
 SELECT COALESCE(t.MONTH, k.MONTH) AS MONTH,
        COALESCE(t.thuc_te, 0) AS thuc_te,
@@ -226,12 +251,13 @@ SELECT COALESCE(t.MONTH, k.MONTH) AS MONTH,
        ABS(COALESCE(t.thuc_te, 0) - COALESCE(k.ke_hoach, 0)) / NULLIF(COALESCE(k.ke_hoach, 0), 0) AS phan_tram_chenh_lech
 FROM thuc_te t
 FULL OUTER JOIN ke_hoach k ON t.MONTH = k.MONTH;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- FROM silver.fact_businessplan WHERE indicator_code = ''B02-DN_01'' GROUP BY 1
-ERROR: syntax error at or near "month"
-LINE 2:     SELECT DATE_TRUNC(''month'', snapshot_date) AS MONTH, SU...
-                                ^
+-- FROM silver.fact_businessplan WHERE indicator_code = 'B02-DN_01' GROUP BY 1
+ERROR: column "reporting_date" does not exist
+LINE 6:     SELECT DATE_TRUNC('month', reporting_date) AS MONTH, SUM...
+                                       ^
 
 */
 

@@ -6,18 +6,19 @@
 -- MEASURE: _TienGui&ThanhKhoan[Tien_TuongDuongTien]
 SELECT ending_balance
 FROM silver.fact_balancesheet
-WHERE indicator_code = ''B01-DN_110''
+WHERE indicator_code = 'B01-DN_110'
   AND reporting_date = (SELECT MAX(reporting_date) FROM silver.fact_balancesheet);
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- WHERE indicator_code = ''B01-DN_110''
+-- WHERE indicator_code = 'B01-DN_110'
 -- AND reporting_date = (SELECT MAX(reporting_date) FROM silver.fact_balancesheet);
-ERROR: syntax error at or near "B01"
-LINE 3: WHERE indicator_code = ''B01-DN_110''
-                                 ^
-
++----------------+
+| ending_balance |
++----------------+
+| 91976722608.00 |
++----------------+
 */
-
 
 -- VISUAL: Tiền gửi
 -- MEASURE: silver fact_termdeposit[remaining_value]
@@ -26,6 +27,7 @@ SELECT SUM(original_amount) AS total_original_amount
 FROM silver.fact_termdeposit
 WHERE deposit_date <= (SELECT dt FROM max_date)
   AND (settlement_date > (SELECT dt FROM max_date) OR settlement_date IS NULL);
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE deposit_date <= (SELECT dt FROM max_date)
@@ -37,7 +39,6 @@ WHERE deposit_date <= (SELECT dt FROM max_date)
 +-----------------------+
 */
 
-
 -- VISUAL: Số lượng hợp đồng tiền gửi
 -- MEASURE: _TienGui&ThanhKhoan[So_HD_Theo_Ngan_Hang]
 WITH max_date AS (SELECT MAX(reporting_date) AS dt FROM silver.fact_balancesheet)
@@ -45,6 +46,7 @@ SELECT COUNT(DISTINCT passbook_no) AS active_contracts
 FROM silver.fact_termdeposit
 WHERE deposit_date <= (SELECT dt FROM max_date)
   AND (settlement_date > (SELECT dt FROM max_date) OR settlement_date IS NULL);
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE deposit_date <= (SELECT dt FROM max_date)
@@ -56,7 +58,6 @@ WHERE deposit_date <= (SELECT dt FROM max_date)
 +------------------+
 */
 
-
 -- VISUAL: Lãi suất bình quân
 -- MEASURE: _TienGui&ThanhKhoan[Lai_Suat_BQ]
 WITH max_date AS (SELECT MAX(reporting_date) AS dt FROM silver.fact_balancesheet)
@@ -64,6 +65,7 @@ SELECT SUM(original_amount * interest_rate) / NULLIF(SUM(original_amount), 0) AS
 FROM silver.fact_termdeposit
 WHERE deposit_date <= (SELECT dt FROM max_date)
   AND (settlement_date > (SELECT dt FROM max_date) OR settlement_date IS NULL);
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE deposit_date <= (SELECT dt FROM max_date)
@@ -75,21 +77,21 @@ WHERE deposit_date <= (SELECT dt FROM max_date)
 +----------------------+
 */
 
-
 -- VISUAL: Thu nhập lãi
 -- MEASURE: _TienGui&ThanhKhoan[Tong_Dedit_Account_515]
 SELECT SUM(debit_amount) AS thu_nhap_lai
 FROM silver.fact_cashflow
-WHERE reciprocal_account LIKE ''515%'';
+WHERE reciprocal_account LIKE '515%';
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- WHERE reciprocal_account LIKE ''515%'';
-ERROR: syntax error at or near "515"
-LINE 3: WHERE reciprocal_account LIKE ''515%'';
-                                        ^
-
+-- WHERE reciprocal_account LIKE '515%';
++---------------+
+|  thu_nhap_lai |
++---------------+
+| 1482534625.00 |
++---------------+
 */
-
 
 -- VISUAL: Cơ cấu theo Ngân hàng
 -- MEASURE: _TienGui&ThanhKhoan[Co_Cau_Bank]
@@ -100,6 +102,7 @@ FROM silver.fact_termdeposit
 WHERE deposit_date <= (SELECT dt FROM max_date)
   AND (settlement_date > (SELECT dt FROM max_date) OR settlement_date IS NULL)
 GROUP BY bank_code;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE deposit_date <= (SELECT dt FROM max_date)
@@ -116,7 +119,6 @@ GROUP BY bank_code;
 +-----------+----------------+
 */
 
-
 -- VISUAL: Cơ cấu theo Kỳ hạn
 -- MEASURE: _TienGui&ThanhKhoan[Co_Cau_Ky_Han]
 WITH max_date AS (SELECT MAX(reporting_date) AS dt FROM silver.fact_balancesheet)
@@ -126,6 +128,7 @@ FROM silver.fact_termdeposit
 WHERE deposit_date <= (SELECT dt FROM max_date)
   AND (settlement_date > (SELECT dt FROM max_date) OR settlement_date IS NULL)
 GROUP BY term;
+
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE deposit_date <= (SELECT dt FROM max_date)
@@ -140,7 +143,6 @@ GROUP BY term;
 +------+----------------+
 */
 
-
 -- VISUAL: Chi tiết Hợp đồng tiền gửi
 -- MEASURE: _TienGui&ThanhKhoan[Chi_Tiet_HD]
 SELECT bank_code,
@@ -152,6 +154,7 @@ SELECT bank_code,
        maturity_date,
        settlement_date
 FROM silver.fact_termdeposit;
+
 /* RESULT LOG:
 +-----------+---------------+------+-----------------+-----------------+--------------+---------------+-----------------+
 | bank_code | interest_rate | term |   passbook_no   | original_amount | deposit_date | maturity_date | settlement_date |
