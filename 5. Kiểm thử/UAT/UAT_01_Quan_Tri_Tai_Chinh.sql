@@ -431,7 +431,7 @@ GROUP BY a.account_name;
 
 -- VISUAL: Bảng tổng hợp 18 Chỉ số
 -- MEASURE: _TaiChinh[Ratios]
-WITH md AS (SELECT MAX(reporting_date) AS dt FROM silver.fact_balancesheet),
+WITH md AS (SELECT CAST('2026-07-31' AS date) AS dt),
 prev_md AS (SELECT (SELECT dt FROM md) - interval '1 year' AS dt_prev),
 b01_curr AS (
     SELECT indicator_code, SUM(ending_balance) as val 
@@ -466,7 +466,7 @@ vars AS (
         COALESCE((SELECT SUM(val) FROM b01_curr WHERE indicator_code='B01-DN_300'), 0) AS no_phai_tra,
         COALESCE((SELECT SUM(val) FROM b01_curr WHERE indicator_code='B01-DN_330'), 0) AS no_dai_han,
         COALESCE((SELECT SUM(val) FROM b01_curr WHERE indicator_code='B01-DN_440'), 0) AS tong_ts,
-        COALESCE((SELECT SUM(val) FROM b01_curr WHERE indicator_code='B01-DN_222' OR indicator_code='B01-DN_223'), 0) AS khau_hao,
+        COALESCE((SELECT SUM(val) FROM b01_curr WHERE indicator_code='B01-DN_223' OR indicator_code='B01-DN_228'), 0) AS khau_hao,
         COALESCE((SELECT SUM(val) FROM b01_prev WHERE indicator_code='B01-DN_100'), 0) AS ts_ngan_han_prev,
         COALESCE((SELECT SUM(val) FROM b01_prev WHERE indicator_code='B01-DN_310'), 0) AS no_ngan_han_prev,
         COALESCE((SELECT SUM(val) FROM b01_prev WHERE indicator_code='B01-DN_140'), 0) AS ton_kho_prev,
@@ -516,7 +516,7 @@ FROM vars;
 -- COALESCE((SELECT SUM(val) FROM b01_curr WHERE indicator_code='B01-DN_300'), 0) AS no_phai_tra,
 -- COALESCE((SELECT SUM(val) FROM b01_curr WHERE indicator_code='B01-DN_330'), 0) AS no_dai_han,
 -- COALESCE((SELECT SUM(val) FROM b01_curr WHERE indicator_code='B01-DN_440'), 0) AS tong_ts,
--- COALESCE((SELECT SUM(val) FROM b01_curr WHERE indicator_code='B01-DN_222' OR indicator_code='B01-DN_223'), 0) AS khau_hao,
+-- COALESCE((SELECT SUM(val) FROM b01_curr WHERE indicator_code='B01-DN_223' OR indicator_code='B01-DN_228'), 0) AS khau_hao,
 -- COALESCE((SELECT SUM(val) FROM b01_prev WHERE indicator_code='B01-DN_100'), 0) AS ts_ngan_han_prev,
 -- COALESCE((SELECT SUM(val) FROM b01_prev WHERE indicator_code='B01-DN_310'), 0) AS no_ngan_han_prev,
 -- COALESCE((SELECT SUM(val) FROM b01_prev WHERE indicator_code='B01-DN_140'), 0) AS ton_kho_prev,
@@ -530,11 +530,11 @@ FROM vars;
 -- COALESCE((SELECT SUM(val) FROM b02_curr WHERE indicator_code='B02-DN_30'), 0) AS ln_hdkd,
 -- COALESCE((SELECT SUM(val) FROM b02_curr WHERE indicator_code='B02-DN_51'), 0) + COALESCE((SELECT SUM(val) FROM b02_curr WHERE indicator_code='B02-DN_52'), 0) AS cp_thue,
 -- COALESCE((SELECT SUM(val) FROM b02_curr WHERE indicator_code='B02-DN_60'), 0) AS ln_st,
-+--------------------+------------------------+---------------+-------------------+--------------------+--------------------------+----------------------+------+-----------------+-------------------+---------------------+-------------+--------------+-------------+-------+-------+-------------------------+
-|   current_ratio    |      quick_ratio       | vong_quay_vld | vong_quay_ton_kho | vong_quay_phai_thu | no_phai_tra_tren_tong_ts | no_dai_han_tren_vcsh | ebit |      ebitda     | ebit_tren_lai_vay | ebitda_tren_lai_vay | bien_ln_gop | bien_ln_hdkd | bien_ebitda |  roe  |  roa  |  tong_du_no_tren_ebitda |
-+--------------------+------------------------+---------------+-------------------+--------------------+--------------------------+----------------------+------+-----------------+-------------------+---------------------+-------------+--------------+-------------+-------+-------+-------------------------+
-| 1.3861467792621685 | 0.86334807868217378402 |     0E-28     |       0E-28       |       0E-28        |  0.63580376382791085809  |        0E-28         | 0.00 | 113908673222.00 |        None       |         None        |     None    |     None     |     None    | 0E-28 | 0E-28 | -0.79182032552706401674 |
-+--------------------+------------------------+---------------+-------------------+--------------------+--------------------------+----------------------+------+-----------------+-------------------+---------------------+-------------+--------------+-------------+-------+-------+-------------------------+
++--------------------+------------------------+------------------------+-------------------+------------------------+--------------------------+----------------------+----------------+-----------------+-------------------+---------------------+------------------------+------------------------+--------------------+------------------------+------------------------+-------------------------+
+|   current_ratio    |      quick_ratio       |     vong_quay_vld      | vong_quay_ton_kho |   vong_quay_phai_thu   | no_phai_tra_tren_tong_ts | no_dai_han_tren_vcsh |      ebit      |      ebitda     | ebit_tren_lai_vay | ebitda_tren_lai_vay |      bien_ln_gop       |      bien_ln_hdkd      |    bien_ebitda     |          roe           |          roa           |  tong_du_no_tren_ebitda |
++--------------------+------------------------+------------------------+-------------------+------------------------+--------------------------+----------------------+----------------+-----------------+-------------------+---------------------+------------------------+------------------------+--------------------+------------------------+------------------------+-------------------------+
+| 1.3861467792621685 | 0.86334807868217378402 | 0.60390916554491703161 |       0E-28       | 0.38740328066320749642 |  0.63580376382791085809  |        0E-28         | 74991248312.00 | 155376091127.00 |        None       |         None        | 1.00000000000000000000 | 1.00000000000000000000 | 2.0719229860071142 | 0.40710991457805347384 | 0.14826789859766779924 | -0.58049602134267237608 |
++--------------------+------------------------+------------------------+-------------------+------------------------+--------------------------+----------------------+----------------+-----------------+-------------------+---------------------+------------------------+------------------------+--------------------+------------------------+------------------------+-------------------------+
 */
 
 -- VISUAL: Chi tiết tài sản đảm bảo
