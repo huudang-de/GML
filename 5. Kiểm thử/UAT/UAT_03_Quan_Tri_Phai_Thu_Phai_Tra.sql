@@ -127,3 +127,17 @@ SELECT
 FROM aging_calc
 WHERE net_amount > 0
 GROUP BY 1;
+
+-- VISUAL: Bảng chi tiết các hóa đơn đang nợ
+-- MEASURE: _CongNo[Chi_Tiet_Hoa_Don]
+WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable)
+SELECT voucher_no AS so_chung_tu,
+       posting_date AS ngay_hach_toan,
+       invoice_no AS so_hoa_don,
+       invoice_date AS ngay_hoa_don,
+       description AS mo_ta,
+       debit_amount AS phat_sinh_no,
+       (debit_amount - credit_amount) AS so_tien_con_no,
+       ((SELECT dt FROM max_date) - invoice_date - 30) AS so_ngay_qua_han
+FROM silver.fact_accountsreceivable
+WHERE (debit_amount - credit_amount) > 0;
