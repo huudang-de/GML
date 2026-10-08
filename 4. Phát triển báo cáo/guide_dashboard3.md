@@ -91,11 +91,20 @@ DIVIDE(
 - **DAX:**
 ```dax
 Số lượng KH nợ = 
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+RETURN
 COUNTROWS(
     FILTER(
         ADDCOLUMNS(
             FILTER('silver dim_partner', 'silver dim_partner'[partner_group] IN {"Khách hàng", "Khách hàng/ nhà cung cấp"}),
-            "DuNo", CALCULATE(MAXX(TOPN(1, 'silver fact_accountsreceivable', 'silver fact_accountsreceivable'[posting_date], DESC, 'silver fact_accountsreceivable'[id], DESC), 'silver fact_accountsreceivable'[ending_debit_balance]))
+            "DuNo", CALCULATE(
+                MAXX(
+                    TOPN(1, 'silver fact_accountsreceivable', 'silver fact_accountsreceivable'[posting_date], DESC, 'silver fact_accountsreceivable'[id], DESC),
+                    'silver fact_accountsreceivable'[ending_debit_balance]
+                ),
+                'silver fact_accountsreceivable'[posting_date] <= _MaxDate,
+                ALL('silver Dim_Date')
+            )
         ),
         [DuNo] > 0
     )
