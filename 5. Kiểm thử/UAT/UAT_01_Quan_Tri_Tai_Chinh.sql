@@ -122,7 +122,7 @@ SELECT
         FROM bs)) / NULLIF(
                              (SELECT SUM(ending_balance)
                               FROM silver.fact_balancesheet
-                              WHERE indicator_code = 'B01-DN_400'
+                              WHERE indicator_code = 'B01-DN_440'
                                 AND reporting_date =
                                   (SELECT reporting_date
                                    FROM bs)), 0);
@@ -131,13 +131,13 @@ SELECT
 -- GHI CHÚ FILTER:
 -- WHERE indicator_code = 'B01-DN_300'
 -- AND reporting_date =
--- WHERE indicator_code = 'B01-DN_400'
+-- WHERE indicator_code = 'B01-DN_440'
 -- AND reporting_date =
-+--------------------+
-|      ?column?      |
-+--------------------+
-| 1.7457724728585124 |
-+--------------------+
++------------------------+
+|        ?column?        |
++------------------------+
+| 0.63580376382791085809 |
++------------------------+
 */
 
 -- VISUAL: Nợ ngắn/dài hạn theo thời gian
