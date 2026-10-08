@@ -69,8 +69,8 @@ phai_thu_cuoi_nam AS (
     WHERE rn = 1
 )
 -- Vì data lịch sử năm trước (2025) không có trong fact_accountsreceivable, 
--- DAX trả về BLANK cho Phải thu năm ngoái, nên Trung bình = Phải thu cuối năm / 2
-SELECT (SELECT val FROM doanh_thu_nam) / NULLIF((SELECT val FROM phai_thu_cuoi_nam) / 2.0, 0) AS vong_quay_phai_thu_nam;
+-- Phải thu năm ngoái = 0, nếu áp dụng DAX IF(ISBLANK) thì Trung bình = Phải thu cuối năm
+SELECT (SELECT val FROM doanh_thu_nam) / NULLIF((SELECT val FROM phai_thu_cuoi_nam), 0) AS vong_quay_phai_thu_nam;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
@@ -78,7 +78,7 @@ SELECT (SELECT val FROM doanh_thu_nam) / NULLIF((SELECT val FROM phai_thu_cuoi_n
 +------------------------+
 | vong_quay_phai_thu_nam |
 +------------------------+
-|   4.1287955502621155   |
+|   2.0643905335967923   |
 +------------------------+
 */
 

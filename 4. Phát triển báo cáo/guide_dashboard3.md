@@ -80,9 +80,16 @@ CALCULATE(
 )
 
 Vòng quay PT theo năm = 
+VAR DuNoBQN = 
+    IF(
+        ISBLANK([Phải thu Năm Ngoái]) || [Phải thu Năm Ngoái] = 0,
+        [Phải thu Cuối Kỳ],
+        ([Phải thu Cuối Kỳ] + [Phải thu Năm Ngoái]) / 2
+    )
+RETURN
 DIVIDE(
     CALCULATE(SUM('silver fact_incomestatement'[current_period_amount]), 'silver fact_incomestatement'[indicator_code] = "B02-DN_10"),
-    ([Phải thu Cuối Kỳ] + [Phải thu Năm Ngoái]) / 2,
+    DuNoBQN,
     0
 )
 ```
