@@ -118,6 +118,7 @@ ORDER BY c.MONTH;
 -- VISUAL: Cơ cấu dòng thu theo Bank
 -- MEASURE: _DongTien[Dong_Thu_Bank]
 SELECT a.account_bank AS bank_code,
+       c.reciprocal_account,
        SUM(c.debit_amount) AS gia_tri_thu
 FROM silver.fact_cashflow c
 LEFT JOIN silver.dim_account a ON c.account_no = a.account_no
@@ -126,25 +127,28 @@ WHERE c.account_no LIKE '112%'
   AND c.voucher_no NOT LIKE 'NTTK%'
   AND c.reciprocal_account NOT LIKE '111%' 
   AND c.reciprocal_account NOT LIKE '112%'
-GROUP BY 1;
+GROUP BY 1, 2;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE account_no LIKE '112%'
 -- Lấy account_bank từ dim_account để gom nhóm theo Mã Ngân Hàng thực sự (VD: VCB, MB, BIDV)
-+----------------------------------+-----------------+
-|            bank_code             |   gia_tri_thu   |
-+----------------------------------+-----------------+
-|               VCB                |  1674726621.00  |
-|               MB                 |  55828245498.00 |
-|               TPB                |   201084000.00  |
-|              BIDV                |  32015004504.00 |
+-- Gom nhóm thêm theo reciprocal_account để hỗ trợ Power BI cross-filter hoạt động thu/chi
++----------------------------------+--------------------+-----------------+
+|            bank_code             | reciprocal_account |   gia_tri_thu   |
++----------------------------------+--------------------+-----------------+
+|               VCB                |        131         |  1674726621.00  |
+|               MB                 |        131         |  55828245498.00 |
+|               MB                 |        515         |      135.00     |
+|               TPB                |        131         |   201084000.00  |
+|              BIDV                |        131         |  32015004504.00 |
 ...(TRUNCATED FOR READABILITY)...
 */
 
 -- VISUAL: Cơ cấu dòng chi theo Bank
 -- MEASURE: _DongTien[Dong_Chi_Bank]
 SELECT a.account_bank AS bank_code,
+       c.reciprocal_account,
        SUM(c.credit_amount) AS gia_tri_chi
 FROM silver.fact_cashflow c
 LEFT JOIN silver.dim_account a ON c.account_no = a.account_no
@@ -153,19 +157,20 @@ WHERE c.account_no LIKE '112%'
   AND c.voucher_no NOT LIKE 'NTTK%'
   AND c.reciprocal_account NOT LIKE '111%' 
   AND c.reciprocal_account NOT LIKE '112%'
-GROUP BY 1;
+GROUP BY 1, 2;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE account_no LIKE '112%'
 -- Lấy account_bank từ dim_account để gom nhóm theo Mã Ngân Hàng thực sự (VD: VCB, MB, BIDV)
-+----------------------------------+-----------------+
-|            bank_code             |   gia_tri_chi   |
-+----------------------------------+-----------------+
-|               VCB                |  3681059907.00  |
-|               MB                 | 33210000000.00  |
-|               TPB                |   110130000.00  |
-|              BIDV                |   480690000.00  |
+-- Gom nhóm thêm theo reciprocal_account để hỗ trợ Power BI cross-filter hoạt động thu/chi
++----------------------------------+--------------------+-----------------+
+|            bank_code             | reciprocal_account |   gia_tri_chi   |
++----------------------------------+--------------------+-----------------+
+|               VCB                |        331         |  110130000.00   |
+|               MB                 |        331         | 33210000000.00  |
+|               TPB                |        6352        |  3681059907.00  |
+|              BIDV                |        331         |   480690000.00  |
 ...(TRUNCATED FOR READABILITY)...
 */
 
