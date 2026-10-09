@@ -387,7 +387,7 @@ DIVIDE(
 Nợ Quá Hạn (Tỷ) = 
 CALCULATE(
     [Nợ FIFO Aging (Tỷ)],
-    'Dim_AgingBucket'[Bucket] <> "Current"
+    NOT('Dim_AgingBucket'[Bucket] IN {"Current", "1-30"})
 )
 ```
 - **Top N Filter:** Bấm vào biểu tượng phễu (Filters pane), ở mục `Partner_Name`, chọn Filter Type là `Top N`, Show `Top 10` theo By value `Nợ Quá Hạn (Tỷ)` rồi Apply.
