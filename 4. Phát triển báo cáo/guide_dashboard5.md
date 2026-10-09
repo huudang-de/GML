@@ -152,22 +152,16 @@ SWITCH(
 ```
 - *Mẹo UX:* Tô màu khác nhau cho từng cột (Ví dụ: Đầu kỳ Xanh dương, Thu Xanh lá, Chi Đỏ, Cuối kỳ Cam) để Sếp dễ phân biệt 4 trạng thái dòng tiền.
 
-### 2.5 & 2.6 Cơ cấu dòng Thu / Chi theo Ngân hàng
+### 2.5 & 2.6 Cơ cấu dòng Thu / Chi theo Ngân hàng (Có Drill-down chi tiết hoạt động)
 - **Loại:** Pie Chart (Biểu đồ tròn)
-- **Trục Legend:** Kéo cột `Account_BANK` từ bảng `silver dim_account` vào (để phân loại theo VCB, BIDV, MB...). 
+- **Trục Legend (Tạo Hierarchy/Phân cấp):** 
+  1. Kéo cột `Account_BANK` từ bảng `silver dim_account` vào đầu tiên (để phân loại theo VCB, BIDV, MB...).
+  2. Kéo tiếp cột `reciprocal_account` (Tài khoản đối ứng) từ `silver fact_cashflow` vào ngay bên dưới `Account_BANK`. (Nên map mã 131, 331... ra tên tiếng Việt từ `Bang_can_doi_tai_khoan_mau_quan_tri`).
 - **Trục Values:** 
-  - Biểu đồ 2.5 (Thu): Kéo Measure `Dòng tiền vào (Tỷ)` (Đã tạo ở mục 1.1)
-  - Biểu đồ 2.6 (Chi): Kéo Measure `Dòng tiền ra (Tỷ)` (Đã tạo ở mục 1.2)
-- **Bộ lọc (Visual Filter):** Vì phân tích theo ngân hàng nên bạn filter Visual này chỉ lấy các giao dịch qua thẻ (Kéo cột `Account_No` vào filter và cho `Bắt đầu bằng 112`).
-
-### 2.5.1 & 2.6.1 Chi tiết Hoạt động Thu / Chi (Drill-down / Cross-filter)
-- **Mô tả:** Theo chuẩn nghiệp vụ, khi Sếp click vào một Ngân hàng (VD: MBBank) trên Pie Chart ở trên, hệ thống cần show ra cơ cấu hoạt động Thu/Chi của riêng Ngân hàng đó (nhờ tính năng Cross-filter).
-- **Loại:** Clustered Bar Chart (Biểu đồ thanh ngang) hoặc Matrix (Bảng ma trận) đặt kế bên Pie Chart.
-- **Trục Y (hoặc Rows):** Kéo cột `reciprocal_account` (Tài khoản đối ứng) từ bảng `silver fact_cashflow`. (Bạn có thể liên kết với bảng `Bang_can_doi_tai_khoan_mau_quan_tri` để hiển thị tên tiếng Việt của tài khoản như "Thu từ bán hàng", "Thu khác"... thay vì chỉ hiện mã 131, 711).
-- **Trục X (hoặc Values):** 
-  - Biểu đồ Thu: Measure `Dòng tiền vào (Tỷ)`
-  - Biểu đồ Chi: Measure `Dòng tiền ra (Tỷ)`
-- *Mẹo UX:* Cài Data labels hiển thị `% of total` cho Pie chart. Thao tác Click vào Pie Chart sẽ tự động filter Bar chart bên cạnh.
+  - Biểu đồ 2.5 (Thu): Kéo Measure `Dòng tiền vào (Tỷ)`
+  - Biểu đồ 2.6 (Chi): Kéo Measure `Dòng tiền ra (Tỷ)`
+- **Bộ lọc (Visual Filter):** Chỉ lấy các giao dịch qua thẻ (Kéo cột `Account_No` vào filter và chọn `Bắt đầu bằng 112`).
+- **Cách hoạt động (Chuẩn BRD):** Ở chế độ mặc định, biểu đồ tròn sẽ chia tỷ trọng theo từng Ngân hàng. Khi bật tính năng **Drill down (mũi tên đâm xuống)** trên góc biểu đồ và click vào một Ngân hàng (VD: MBBank), biểu đồ tròn sẽ tự động "đào sâu" (phân rã) thành các miếng nhỏ thể hiện tỷ lệ % các hoạt động Thu/Chi (tài khoản đối ứng) của riêng ngân hàng đó. Mẹo UX: Cài Data labels hiển thị `% of total`.
 
 ### 2.7 Tài sản ngắn hạn / Nợ ngắn hạn / Vốn lưu động
 - **Loại:** Line and Stacked Column Chart (Cột kết hợp Đường)
