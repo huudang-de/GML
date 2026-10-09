@@ -314,34 +314,70 @@ LIMIT 10;
 
 -- VISUAL: Top 10 KH dư nợ quá hạn (Nợ xấu)
 -- MEASURE: _CongNo[Top_10_Qua_Han]
-WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable)
-SELECT partner_code,
-       SUM(CASE WHEN (SELECT dt FROM max_date) > invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) AS no_qua_han,
-       SUM(debit_amount - credit_amount) AS tong_no,
-       SUM(CASE WHEN (SELECT dt FROM max_date) > invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) / NULLIF(SUM(debit_amount - credit_amount), 0) AS ty_le_qua_han
-FROM silver.fact_accountsreceivable
-GROUP BY 1
-HAVING SUM(CASE WHEN (SELECT dt FROM max_date) > invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) > 0
+WITH cust_balances AS (
+    SELECT f.partner_code, p.partner_name, f.ending_debit_balance as total_debt,
+           ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    FROM silver.fact_accountsreceivable f
+    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+      AND f.posting_date <= '2026-07-31'
+),
+positive_balances AS (
+    SELECT partner_code, partner_name, total_debt FROM cust_balances WHERE rn = 1 AND total_debt > 0
+),
+invoices AS (
+    SELECT f.partner_code, 
+           COALESCE(f.invoice_no, 'NO_INV_' || f.id::text) as invoice_no, 
+           COALESCE(f.invoice_date, f.posting_date) as invoice_date, 
+           f.debit_amount, f.id
+    FROM silver.fact_accountsreceivable f
+    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    WHERE f.debit_amount > 0 
+      AND p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+      AND f.posting_date <= '2026-07-31'
+),
+invoices_running AS (
+    SELECT i.partner_code, i.invoice_no, i.invoice_date, i.debit_amount,
+           SUM(i.debit_amount) OVER (PARTITION BY i.partner_code ORDER BY i.invoice_date DESC, i.invoice_no DESC, i.id DESC) as running_total
+    FROM invoices i
+    JOIN positive_balances pb ON i.partner_code = pb.partner_code
+),
+unpaid_invoices AS (
+    SELECT i.partner_code, pb.partner_name, i.invoice_no, i.invoice_date,
+           LEAST(i.debit_amount, GREATEST(0, pb.total_debt - (i.running_total - i.debit_amount))) as unpaid_amount
+    FROM invoices_running i
+    JOIN positive_balances pb ON i.partner_code = pb.partner_code
+),
+overdue_calc AS (
+    SELECT partner_name,
+           SUM(unpaid_amount) AS no_qua_han
+    FROM unpaid_invoices
+    WHERE unpaid_amount > 0 
+      AND ('2026-07-31'::date - invoice_date) > 30
+    GROUP BY partner_name
+)
+SELECT partner_name AS ten_khach_hang, no_qua_han
+FROM overdue_calc
 ORDER BY no_qua_han DESC
 LIMIT 10;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- HAVING SUM(CASE WHEN (SELECT dt FROM max_date) > invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) > 0
-+--------------+----------------+-----------------+----------------------+
-| partner_code |   no_qua_han   |     tong_no     |    ty_le_qua_han     |
-+--------------+----------------+-----------------+----------------------+
-|  2902167353  | 66863269719.00 | -12914560655.00 | -5.1773553514662710  |
-|  4000443802  | 44130699389.00 |  4660001000.00  |  9.4701051328100573  |
-|  0107845264  | 40889015075.00 | -37098103542.00 | -1.1021861273503693  |
-|  0109506884  | 35369154900.00 |  14105488530.00 |  2.5074746489478731  |
-|  0110888028  | 28230967681.00 |  7975099091.00  |  3.5398892676906050  |
-|  0106999920  | 20454076000.00 |  -1469812829.00 | -13.9161093143513445 |
-|  0101587539  | 20131595310.00 |  -1934468215.00 | -10.4067852621708752 |
-|  0101731327  | 10955234838.00 |   479329518.00  | 22.8553310960498786  |
-|  5000815668  | 10236870882.00 |  -1181163746.00 | -8.6667669209007368  |
-|  0106628901  | 10181330782.00 |  -237895571.00  | -42.7974793275995878 |
-+--------------+----------------+-----------------+----------------------+
+-- Lấy hóa đơn quá hạn (tuổi nợ > 30) theo phương pháp FIFO
++--------------------------------------------------+-----------------+
+|                 ten_khach_hang                   |   no_qua_han    |
++--------------------------------------------------+-----------------+
+| CÔNG TY CỔ PHẦN THƯƠNG MẠI DỊCH VỤ VIỆT ĐỨC HÀ N |   1599578123.00 |
+| Công ty Cổ phần nội thất Hà Lâm                  |    533196628.00 |
+| Công ty TNHH thương mại và khai thác khoáng sản  |    503537000.00 |
+| CÔNG TY CỔ PHẦN ĐẦU TƯ XÂY DỰNG VÀ NỘI THẤT HOÀN |    485914545.00 |
+| CÔNG TY CỔ PHẦN XÂY DỰNG VIDC                    |    376868265.00 |
+| CÔNG TY TNHH SẢN XUẤT NỘI THẤT CSC - CHI NHÁNH N |    122350014.00 |
+| CÔNG TY TNHH NỘI THẤT ALIS                       |    118392222.00 |
+| Công ty TNHH Kinh Doanh Sản Xuất và Thương Mại N |    116535919.00 |
+| CÔNG TY TNHH KIẾN TRÚC VÀ NỘI THẤT NESTORY       |    102898095.00 |
+| CÔNG TY CỔ PHẦN SẢN XUẤT PHÚ QUANG               |     98111214.00 |
++--------------------------------------------------+-----------------+
 */
 
 -- VISUAL: Tuổi nợ Aging
