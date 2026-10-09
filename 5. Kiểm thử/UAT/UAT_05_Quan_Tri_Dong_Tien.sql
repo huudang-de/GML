@@ -238,9 +238,9 @@ doanh_thu AS (
     WHERE indicator_code='B02-DN_10' AND month = (SELECT dt FROM max_date)
 ),
 gia_von AS (
-    SELECT SUM(inward_value) AS val 
-    FROM silver.fact_inventoryinward 
-    WHERE DATE_TRUNC('month', posting_date) = (SELECT dt FROM max_date)
+    SELECT SUM(current_period_amount) AS val 
+    FROM silver.fact_incomestatement 
+    WHERE indicator_code='B02-DN_11' AND month = (SELECT dt FROM max_date)
 ),
 du_no_phai_thu AS (
     SELECT SUM(debit_amount - credit_amount) AS val 
