@@ -279,31 +279,37 @@ ORDER BY d.start_month;
 
 -- VISUAL: Top 10 KH nợ cao nhất
 -- MEASURE: _CongNo[Top_10_No]
-SELECT partner_code,
-       SUM(debit_amount - credit_amount) AS du_no
-FROM silver.fact_accountsreceivable
-GROUP BY 1
-HAVING SUM(debit_amount - credit_amount) > 0
-ORDER BY du_no DESC
+SELECT p.partner_name AS ten_khach_hang,
+       f.ending_debit_balance AS du_no_cuoi_ky
+FROM silver.fact_accountsreceivable f
+JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+WHERE f.id IN (
+    SELECT MAX(id)
+    FROM silver.fact_accountsreceivable
+    GROUP BY partner_code
+) 
+AND p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+AND f.ending_debit_balance > 0
+ORDER BY du_no_cuoi_ky DESC
 LIMIT 10;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
--- HAVING SUM(debit_amount - credit_amount) > 0
-+--------------+----------------+
-| partner_code |     du_no      |
-+--------------+----------------+
-|  0109506884  | 14105488530.00 |
-|  0110888028  | 7975099091.00  |
-|  4000443802  | 4660001000.00  |
-|   KHÁCH LẺ   | 1920766207.00  |
-|  2500513074  | 1598895292.00  |
-|  0109953970  |  625364120.00  |
-|  0105903697  |  494010946.00  |
-|  0104439874  |  485966561.00  |
-|  0101731327  |  479329518.00  |
-|  0202111231  |  216453294.00  |
-+--------------+----------------+
+-- Lấy "Dư nợ cuối kỳ" của từng khách hàng (dựa trên bản ghi mới nhất) và lọc Top 10.
++--------------------------------------------------+-----------------+
+|                 ten_khach_hang                   |  du_no_cuoi_ky  |
++--------------------------------------------------+-----------------+
+| CÔNG TY CỔ PHẦN YEAHOME                          |  11468115310.00 |
+| CÔNG TY CỔ PHẦN THƯƠNG MẠI DỊCH VỤ VIỆT ĐỨC HÀ N |   6431709533.00 |
+| Công ty TNHH thương mại và khai thác khoáng sản  |   2526943621.00 |
+| Anh Lâm AIS                                      |    739242725.00 |
+| CÔNG TY TNHH ĐẦU TƯ HÒA PHÚ                      |    599111964.00 |
+| CÔNG TY CỔ PHẦN SẢN XUẤT PHÚ QUANG               |    539770700.00 |
+| Công ty Cổ phần nội thất Hà Lâm                  |    533196628.00 |
+| CÔNG TY CỔ PHẦN KINH DOANH GẠCH ỐP LÁT VIGLACERA |    520000000.00 |
+| CÔNG TY CỔ PHẦN ĐẦU TƯ XÂY DỰNG VÀ NỘI THẤT HOÀN |    485914545.00 |
+| Nội Thất Phong Lâm                               |    455108097.00 |
++--------------------------------------------------+-----------------+
 */
 
 -- VISUAL: Top 10 KH dư nợ quá hạn (Nợ xấu)
