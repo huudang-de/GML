@@ -346,6 +346,7 @@ WITH cust_balances AS (
     FROM silver.fact_accountsreceivable f
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
     WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+      AND f.posting_date <= '2026-07-31' -- Filter mô phỏng Power BI chọn T7-2026
 ),
 positive_balances AS (
     SELECT partner_code, total_debt FROM cust_balances WHERE rn = 1 AND total_debt > 0
@@ -356,6 +357,7 @@ invoices AS (
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
     WHERE f.debit_amount > 0 AND f.invoice_no IS NOT NULL AND f.invoice_no != ''
       AND p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+      AND f.posting_date <= '2026-07-31'
 ),
 invoices_running AS (
     SELECT i.partner_code, i.invoice_no, i.invoice_date, i.debit_amount,
@@ -371,7 +373,7 @@ unpaid_invoices AS (
 ),
 aging_calc AS (
     SELECT 
-        (SELECT MAX(posting_date) FROM silver.fact_accountsreceivable) - invoice_date AS days_since_invoice,
+        '2026-07-31'::date - invoice_date AS days_since_invoice,
         unpaid_amount
     FROM unpaid_invoices
     WHERE unpaid_amount > 0
@@ -393,17 +395,17 @@ GROUP BY 1
 ORDER BY age_bucket;
 
 /* RESULT LOG:
--- GHI CHÚ FILTER: Sử dụng logic FIFO để phân bổ nợ vào hóa đơn, tính tuổi dựa trên Days Since Invoice
+-- GHI CHÚ FILTER: Chốt mốc dữ liệu ngày '2026-07-31' (Tương đương việc chọn Slicer Tháng 7/2026 trên Power BI)
 +------------+----------------+
 | age_bucket |    gia_tri     |
 +------------+----------------+
-|    1-30    | 17406223931.00 |
-|   31-60    |  3595340332.00 |
-|   61-90    |   958680227.00 |
-|   91-120   |   902561820.00 |
-|  121-150   |   224463664.00 |
-|  151-180   |   103696539.00 |
-|    180+    |   520084955.00 |
+|    1-30    | 20493713144.00 |
+|   31-60    |  5296238877.00 |
+|   61-90    |  2266863249.00 |
+|   91-120   |  2028117936.00 |
+|  121-150   |  1403693393.00 |
+|  151-180   |  2004346529.00 |
+|    180+    |  3067552569.00 |
 +------------+----------------+
 */
 
