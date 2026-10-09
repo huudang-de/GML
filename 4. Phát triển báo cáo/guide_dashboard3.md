@@ -408,52 +408,57 @@ DIVIDE(
 
 ## 5. Bảng Dữ Liệu Chi Tiết (Tables & Matrix)
 
-### 2.6 Bảng chi tiết nợ theo Khách hàng (Bảng Tuổi nợ)
-**Cấu trúc bảng yêu cầu:**
-| STT | Tên trường    | Ý nghĩa                                       |
-| --: | ------------- | --------------------------------------------- |
-|   1 | **Customer**  | Tên khách hàng                                |
-|   2 | **Current**   | Khoản nợ hiện tại/chưa quá hạn                |
-|   3 | **1–30**      | Khoản nợ quá hạn từ 1 đến 30 ngày             |
-|   4 | **31–60**     | Khoản nợ quá hạn từ 31 đến 60 ngày            |
-|   5 | **61–90**     | Khoản nợ quá hạn từ 61 đến 90 ngày            |
-|   6 | **91–120**    | Khoản nợ quá hạn từ 91 đến 120 ngày           |
-|   7 | **121–150**   | Khoản nợ quá hạn từ 121 đến 150 ngày          |
-|   8 | **151–180**   | Khoản nợ quá hạn từ 151 đến 180 ngày          |
-|   9 | **180+**      | Khoản nợ quá hạn trên 180 ngày                |
-|  10 | **Số tiền**   | Tổng số tiền nợ của khách hàng                |
-|  11 | **% quá hạn** | Tỷ lệ số tiền nợ quá hạn trên tổng số tiền nợ |
+### 2.6 Bảng chi tiết nợ theo Khách hàng
+**Cấu trúc bảng yêu cầu theo chuẩn BRD:**
+| STT | Tên trường           | Ý nghĩa                                       |
+| --: | -------------------- | --------------------------------------------- |
+|   1 | **Tên Khách Hàng**   | Tên khách hàng                                |
+|   2 | **Nợ trong hạn**     | Phát sinh nợ - Có (Ngày quá hạn <= 0)         |
+|   3 | **% Trong hạn**      | Tỷ lệ Nợ trong hạn / Tổng nợ                  |
+|   4 | **Nợ quá hạn**       | Phát sinh nợ - Có (Ngày quá hạn > 0)          |
+|   5 | **% Quá hạn**        | Tỷ lệ Nợ quá hạn / Tổng nợ                    |
+|   6 | **Dư nợ phải thu**   | Tổng Phát sinh nợ - Có (Tất cả)               |
 
-**Cách thao tác (Sử dụng Table phẳng để không bị lặp % Quá hạn):**
-Để cột `% Quá hạn` chỉ xuất hiện đúng 1 lần ở cuối bảng, chúng ta BẮT BUỘC phải dùng biểu đồ **Table** (Bảng phẳng), không được dùng Matrix.
+**Tạo các Measure theo đúng công thức nguyên thủy của BRD:**
+Sếp tạo lần lượt 4 Measure dưới đây (Measure "Nợ Quá Hạn (Tỷ)" đã tạo ở trên rồi, chỉ cần tạo lại cho chuẩn tên nếu cần, hoặc dùng chung):
 
-**Tạo các Measure rời cho từng độ tuổi nợ (Sử dụng bảng Dim_AgingBucket)**
-Bạn click **New Measure** để tạo lần lượt các cột nợ:
 ```dax
-Nợ Current = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "Current")
-Nợ 1-30 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "1-30")
-Nợ 31-60 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "31-60")
-Nợ 61-90 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "61-90")
-Nợ 91-120 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "91-120")
-Nợ 121-150 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "121-150")
-Nợ 151-180 = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "151-180")
-Nợ 180+ = CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] = "180+")
+Dư nợ phải thu = 
+SUM('silver fact_accountsreceivable'[debit_amount]) - SUM('silver fact_accountsreceivable'[credit_amount])
 
-% Quá hạn = 
-DIVIDE(
-    CALCULATE([Nợ FIFO Aging (Tỷ)], 'Dim_AgingBucket'[Bucket] <> "Current"),
-    [Phải thu (Tỷ)],
-    0
+Nợ trong hạn = 
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+RETURN
+SUMX(
+    'silver fact_accountsreceivable',
+    VAR _DaysOverdue = DATEDIFF('silver fact_accountsreceivable'[invoice_date] + 30, _MaxDate, DAY)
+    RETURN IF(_DaysOverdue <= 0, 'silver fact_accountsreceivable'[debit_amount] - 'silver fact_accountsreceivable'[credit_amount], 0)
 )
+
+Nợ quá hạn = 
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+RETURN
+SUMX(
+    'silver fact_accountsreceivable',
+    VAR _DaysOverdue = DATEDIFF('silver fact_accountsreceivable'[invoice_date] + 30, _MaxDate, DAY)
+    RETURN IF(_DaysOverdue > 0, 'silver fact_accountsreceivable'[debit_amount] - 'silver fact_accountsreceivable'[credit_amount], 0)
+)
+
+% Trong hạn = DIVIDE([Nợ trong hạn], [Dư nợ phải thu], 0)
+
+% Quá hạn = DIVIDE([Nợ quá hạn], [Dư nợ phải thu], 0)
 ```
 
 **Kéo thả vào Table**
 - **Loại biểu đồ:** Chọn biểu tượng **Table** (Bảng phẳng).
-- **Columns (Kéo thả tuần tự các mục sau vào ô Columns):** 
-  1. Kéo `Partner_Name` từ bảng `silver dim_partner` vào (Click đúp sửa tên thành **Customer**).
-  2. Kéo 8 Measure nợ từ `Nợ Current` đến `Nợ 180+` thả vào.
-  3. Kéo Measure `[Phải thu (Tỷ)]` vào (Click đúp sửa tên thành **Số tiền**).
-  4. Kéo Measure `[% Quá hạn]` vào cuối cùng.
+- **Columns (Kéo thả tuần tự vào ô Columns):** 
+  1. `silver dim_partner[Partner_Name]` (Đổi tên thành **Tên Khách Hàng**)
+  2. Measure `[Nợ trong hạn]`
+  3. Measure `[% Trong hạn]` (Nhớ chọn định dạng Format là Percentage %)
+  4. Measure `[Nợ quá hạn]`
+  5. Measure `[% Quá hạn]` (Nhớ chọn định dạng Format là Percentage %)
+  6. Measure `[Dư nợ phải thu]`
+- **Filter:** Ở cột Filter on this visual, sếp cấu hình điều kiện `Dư nợ phải thu > 0` để ẩn đi các khách hàng đã thanh toán hết.
 
 ### 2.7 Bảng chi tiết các hóa đơn đang nợ
 - **Loại:** Table (Bảng phẳng)
