@@ -385,9 +385,21 @@ DIVIDE(
 
 ```dax
 Nợ Quá Hạn (Tỷ) = 
-CALCULATE(
-    [Nợ FIFO Aging (Tỷ)],
-    NOT('Dim_AgingBucket'[Bucket] IN {"Current", "1-30"})
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+RETURN
+DIVIDE(
+    SUMX(
+        'silver fact_accountsreceivable',
+        VAR _InvoiceDate = 'silver fact_accountsreceivable'[invoice_date]
+        VAR _DaysOverdue = DATEDIFF(_InvoiceDate + 30, _MaxDate, DAY)
+        RETURN
+        IF(
+            _DaysOverdue > 0, 
+            'silver fact_accountsreceivable'[debit_amount] - 'silver fact_accountsreceivable'[credit_amount], 
+            0
+        )
+    ),
+    1000000000, 0
 )
 ```
 - **Top N Filter:** Bấm vào biểu tượng phễu (Filters pane), ở mục `Partner_Name`, chọn Filter Type là `Top N`, Show `Top 10` theo By value `Nợ Quá Hạn (Tỷ)` rồi Apply.
