@@ -314,70 +314,61 @@ LIMIT 10;
 
 -- VISUAL: Top 10 KH dư nợ quá hạn (Nợ xấu)
 -- MEASURE: _CongNo[Top_10_Qua_Han]
-WITH cust_balances AS (
-    SELECT f.partner_code, p.partner_name, f.ending_debit_balance as total_debt,
-           ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+-- THEO ĐÚNG CHUẨN CÔNG THỨC TRONG BRD:
+-- + Số tiền còn nợ = Phát sinh nợ - Phát sinh có
+-- + Ngày đáo hạn = Ngày hóa đơn + 30
+-- + Số ngày quá hạn = Ngày hiện tại - Ngày đáo hạn
+-- + Nợ quá hạn = Số tiền còn nợ khi Số ngày quá hạn > 0
+WITH max_date AS (SELECT '2026-07-31'::date AS dt), -- Ngày hiện tại (Mô phỏng Power BI)
+khach_hang_no AS (
+    SELECT p.partner_name AS ten_khach_hang,
+           -- Nợ trong hạn: Số ngày quá hạn <= 0
+           SUM(CASE WHEN (SELECT dt FROM max_date) - (f.invoice_date + 30) <= 0 
+                    THEN f.debit_amount - f.credit_amount ELSE 0 END) AS no_trong_han,
+           
+           -- Nợ quá hạn (Nợ xấu): Số ngày quá hạn > 0
+           SUM(CASE WHEN (SELECT dt FROM max_date) - (f.invoice_date + 30) > 0 
+                    THEN f.debit_amount - f.credit_amount ELSE 0 END) AS no_qua_han,
+           
+           -- Số dư (Tổng nợ) = Phát sinh nợ - Phát sinh có
+           SUM(f.debit_amount - f.credit_amount) AS so_tien_con_no,
+           
+           -- Số hóa đơn (Đếm số hóa đơn)
+           COUNT(DISTINCT f.invoice_no) AS so_hoa_don
     FROM silver.fact_accountsreceivable f
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
     WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
       AND f.posting_date <= '2026-07-31'
-),
-positive_balances AS (
-    SELECT partner_code, partner_name, total_debt FROM cust_balances WHERE rn = 1 AND total_debt > 0
-),
-invoices AS (
-    SELECT f.partner_code, 
-           COALESCE(f.invoice_no, 'NO_INV_' || f.id::text) as invoice_no, 
-           COALESCE(f.invoice_date, f.posting_date) as invoice_date, 
-           f.debit_amount, f.id
-    FROM silver.fact_accountsreceivable f
-    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
-    WHERE f.debit_amount > 0 
-      AND p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
-      AND f.posting_date <= '2026-07-31'
-),
-invoices_running AS (
-    SELECT i.partner_code, i.invoice_no, i.invoice_date, i.debit_amount,
-           SUM(i.debit_amount) OVER (PARTITION BY i.partner_code ORDER BY i.invoice_date DESC, i.invoice_no DESC, i.id DESC) as running_total
-    FROM invoices i
-    JOIN positive_balances pb ON i.partner_code = pb.partner_code
-),
-unpaid_invoices AS (
-    SELECT i.partner_code, pb.partner_name, i.invoice_no, i.invoice_date,
-           LEAST(i.debit_amount, GREATEST(0, pb.total_debt - (i.running_total - i.debit_amount))) as unpaid_amount
-    FROM invoices_running i
-    JOIN positive_balances pb ON i.partner_code = pb.partner_code
-),
-overdue_calc AS (
-    SELECT partner_name,
-           SUM(unpaid_amount) AS no_qua_han
-    FROM unpaid_invoices
-    WHERE unpaid_amount > 0 
-      AND ('2026-07-31'::date - invoice_date) > 30
-    GROUP BY partner_name
+    GROUP BY p.partner_name
+    HAVING SUM(CASE WHEN (SELECT dt FROM max_date) - (f.invoice_date + 30) > 0 
+                    THEN f.debit_amount - f.credit_amount ELSE 0 END) > 0
 )
-SELECT partner_name AS ten_khach_hang, no_qua_han
-FROM overdue_calc
+SELECT ten_khach_hang,
+       no_trong_han,
+       no_qua_han,
+       so_tien_con_no,
+       no_qua_han / NULLIF(so_tien_con_no, 0) AS ty_le_qua_han,
+       so_hoa_don
+FROM khach_hang_no
 ORDER BY no_qua_han DESC
 LIMIT 10;
 
 /* RESULT LOG:
--- GHI CHÚ FILTER:
--- Lấy hóa đơn quá hạn (tuổi nợ > 30) theo phương pháp FIFO
-+--------------------------------------------------+-----------------+
-|                 ten_khach_hang                   |   no_qua_han    |
-+--------------------------------------------------+-----------------+
-| CÔNG TY CỔ PHẦN THƯƠNG MẠI DỊCH VỤ VIỆT ĐỨC HÀ N |   1599578123.00 |
-| Công ty Cổ phần nội thất Hà Lâm                  |    533196628.00 |
-| Công ty TNHH thương mại và khai thác khoáng sản  |    503537000.00 |
-| CÔNG TY CỔ PHẦN ĐẦU TƯ XÂY DỰNG VÀ NỘI THẤT HOÀN |    485914545.00 |
-| CÔNG TY CỔ PHẦN XÂY DỰNG VIDC                    |    376868265.00 |
-| CÔNG TY TNHH SẢN XUẤT NỘI THẤT CSC - CHI NHÁNH N |    122350014.00 |
-| CÔNG TY TNHH NỘI THẤT ALIS                       |    118392222.00 |
-| Công ty TNHH Kinh Doanh Sản Xuất và Thương Mại N |    116535919.00 |
-| CÔNG TY TNHH KIẾN TRÚC VÀ NỘI THẤT NESTORY       |    102898095.00 |
-| CÔNG TY CỔ PHẦN SẢN XUẤT PHÚ QUANG               |     98111214.00 |
-+--------------------------------------------------+-----------------+
+-- GHI CHÚ FILTER: Tính toán hoàn toàn dựa trên công thức Phát Sinh Nợ - Phát Sinh Có của BRD.
++--------------------------------------------------+-----------------+-----------------+-----------------+----------------------+------------+
+|                 ten_khach_hang                   |  no_trong_han   |   no_qua_han    | so_tien_con_no  |    ty_le_qua_han     | so_hoa_don |
++--------------------------------------------------+-----------------+-----------------+-----------------+----------------------+------------+
+| CÔNG TY TNHH GỖ QUỐC TẾ NTT                      |       0         |  64293042519.00 | -21609121873.00 | -2.9752732733973347  |     48     |
+| CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG DACINCO             |       0         |  44130699389.00 |  4660001000.00  |  9.4701051328100573  |    168     |
+| CÔNG TY CỔ PHẦN YEAHOME                          |       0         |  35369154900.00 |  14105488530.00 |  2.5074746489478731  |     27     |
+| CÔNG TY CỔ PHẦN THƯƠNG MẠI DỊCH VỤ VIỆT ĐỨC HÀ N |       0         |  28230967681.00 |  7975099091.00  |  3.5398892676906050  |     85     |
+| CÔNG TY CỔ PHẦN 3T GROUP VIỆT NAM                |       0         |  20454076000.00 |  -1469812829.00 | -13.9161093143513445 |     23     |
+| Công ty Cổ phần nội thất Hà Lâm                  |       0         |  10955234838.00 |   479329518.00  | 22.8553310960498786  |     11     |
+| CÔNG TY CỔ PHẦN ĐẦU TƯ XÂY DỰNG VÀ NỘI THẤT HOÀN |  1128169190.00  |   8943048994.00 |  -1181163746.00 | -7.5713876020556277  |     38     |
+| Công ty TNHH thương mại và khai thác khoáng sản  |       0         |   7053791083.00 | -34509747970.00 | -0.20440010359702220 |    137     |
+| CÔNG TY CỔ PHẦN XÂY DỰNG VIDC                    |       0         |   4624894629.00 | -34994273060.00 | -0.13216147116805844 |     51     |
+| CÔNG TY CỔ PHẦN ĐẦU TƯ XÂY DỰNG VÀ THƯƠNG MẠI LI |       0         |   2503109070.00 | -29547143924.00 | -0.08471576404285888 |     23     |
++--------------------------------------------------+-----------------+-----------------+-----------------+----------------------+------------+
 */
 
 -- VISUAL: Tuổi nợ Aging
