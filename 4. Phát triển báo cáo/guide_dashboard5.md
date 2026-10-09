@@ -152,13 +152,14 @@ SWITCH(
 ```
 - *Mẹo UX:* Tô màu khác nhau cho từng cột (Ví dụ: Đầu kỳ Xanh dương, Thu Xanh lá, Chi Đỏ, Cuối kỳ Cam) để Sếp dễ phân biệt 4 trạng thái dòng tiền.
 
-### 2.5 & 2.6 Tỷ lệ đóng góp hoạt động Thu / Chi
+### 2.5 & 2.6 Cơ cấu dòng Thu / Chi theo Ngân hàng
 - **Loại:** Pie Chart (Biểu đồ tròn)
-- **Trục Legend:** Kéo cột `reciprocal_account` (Tài khoản đối ứng) từ bảng `silver fact_cashflow` vào. Cột này giúp phân rã chính xác nguồn tiền (VD: Thu 131, Chi 331).
+- **Trục Legend:** Kéo cột `Account_BANK` từ bảng `silver dim_account` vào (để phân loại theo VCB, BIDV, MB...). 
 - **Trục Values:** 
   - Biểu đồ 2.5 (Thu): Kéo Measure `Dòng tiền vào (Tỷ)` (Đã tạo ở mục 1.1)
   - Biểu đồ 2.6 (Chi): Kéo Measure `Dòng tiền ra (Tỷ)` (Đã tạo ở mục 1.2)
-- *Mẹo UX:* Cài Data labels hiển thị `% of total` để thấy rõ tiền thu từ bán hàng hay đi vay chiếm tỷ trọng bao nhiêu.
+- **Bộ lọc (Visual Filter):** Vì phân tích theo ngân hàng nên bạn filter Visual này chỉ lấy các giao dịch qua thẻ (Kéo cột `Account_No` vào filter và cho `Bắt đầu bằng 112`).
+- *Mẹo UX:* Cài Data labels hiển thị `% of total` để thấy rõ tiền ra vào chủ yếu ở ngân hàng nào.
 
 ### 2.7 Tài sản ngắn hạn / Nợ ngắn hạn / Vốn lưu động
 - **Loại:** Line and Stacked Column Chart (Cột kết hợp Đường)

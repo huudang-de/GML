@@ -117,87 +117,55 @@ ORDER BY c.MONTH;
 
 -- VISUAL: Cơ cấu dòng thu theo Bank
 -- MEASURE: _DongTien[Dong_Thu_Bank]
-SELECT partner_code AS bank_code,
-       reciprocal_account,
-       SUM(debit_amount) AS gia_tri_thu
-FROM silver.fact_cashflow
-WHERE account_no LIKE '112%'
-  AND voucher_no NOT LIKE 'CTNB%'
-  AND voucher_no NOT LIKE 'NTTK%'
-  AND reciprocal_account NOT LIKE '111%' 
-  AND reciprocal_account NOT LIKE '112%'
-GROUP BY 1, 2;
+SELECT a.account_bank AS bank_code,
+       SUM(c.debit_amount) AS gia_tri_thu
+FROM silver.fact_cashflow c
+LEFT JOIN silver.dim_account a ON c.account_no = a.account_no
+WHERE c.account_no LIKE '112%'
+  AND c.voucher_no NOT LIKE 'CTNB%'
+  AND c.voucher_no NOT LIKE 'NTTK%'
+  AND c.reciprocal_account NOT LIKE '111%' 
+  AND c.reciprocal_account NOT LIKE '112%'
+GROUP BY 1;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE account_no LIKE '112%'
--- AND voucher_no NOT LIKE 'CTNB%'
--- AND voucher_no NOT LIKE 'NTTK%'
--- AND reciprocal_account NOT LIKE '111%'
--- AND reciprocal_account NOT LIKE '112%'
-+----------------------------------+--------------------+-----------------+
-|            bank_code             | reciprocal_account |   gia_tri_thu   |
-+----------------------------------+--------------------+-----------------+
-|            0101657828            |        131         |  1674726621.00  |
-|               TPB                |        6352        |       0.00      |
-|            0107351716            |        331         |       0.00      |
-|            0110027928            |        331         |       0.00      |
-|            2900521383            |        331         |       0.00      |
-|           Vương Văn Bộ           |        131         |   201084000.00  |
-|            0108641009            |        131         |    7482000.00   |
-|            0108587601            |        131         |  55828245498.00 |
-|            2901943557            |        131         |   96136503.00   |
-|            0111454150            |        515         |      30.00      |
-|            0100793514            |        331         |       0.00      |
-|               IVB                |        6425        |       0.00      |
-|            0100385089            |        131         |  32015004504.00 |
-|            0107716452            |        131         |   117018000.00  |
-|             NCC1054              |        331         |       0.00      |
-|            0103719325            |        515         |      135.00     |
-|            0200843159            |        131         |   154809000.00  |
+-- Lấy account_bank từ dim_account để gom nhóm theo Mã Ngân Hàng thực sự (VD: VCB, MB, BIDV)
++----------------------------------+-----------------+
+|            bank_code             |   gia_tri_thu   |
++----------------------------------+-----------------+
+|               VCB                |  1674726621.00  |
+|               MB                 |  55828245498.00 |
+|               TPB                |   201084000.00  |
+|              BIDV                |  32015004504.00 |
 ...(TRUNCATED FOR READABILITY)...
 */
 
 -- VISUAL: Cơ cấu dòng chi theo Bank
 -- MEASURE: _DongTien[Dong_Chi_Bank]
-SELECT partner_code AS bank_code,
-       reciprocal_account,
-       SUM(credit_amount) AS gia_tri_chi
-FROM silver.fact_cashflow
-WHERE account_no LIKE '112%'
-  AND voucher_no NOT LIKE 'CTNB%'
-  AND voucher_no NOT LIKE 'NTTK%'
-  AND reciprocal_account NOT LIKE '111%' 
-  AND reciprocal_account NOT LIKE '112%'
-GROUP BY 1, 2;
+SELECT a.account_bank AS bank_code,
+       SUM(c.credit_amount) AS gia_tri_chi
+FROM silver.fact_cashflow c
+LEFT JOIN silver.dim_account a ON c.account_no = a.account_no
+WHERE c.account_no LIKE '112%'
+  AND c.voucher_no NOT LIKE 'CTNB%'
+  AND c.voucher_no NOT LIKE 'NTTK%'
+  AND c.reciprocal_account NOT LIKE '111%' 
+  AND c.reciprocal_account NOT LIKE '112%'
+GROUP BY 1;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE account_no LIKE '112%'
--- AND voucher_no NOT LIKE 'CTNB%'
--- AND voucher_no NOT LIKE 'NTTK%'
--- AND reciprocal_account NOT LIKE '111%'
--- AND reciprocal_account NOT LIKE '112%'
-+----------------------------------+--------------------+-----------------+
-|            bank_code             | reciprocal_account |   gia_tri_chi   |
-+----------------------------------+--------------------+-----------------+
-|            0101657828            |        131         |       0.00      |
-|               TPB                |        6352        |  3681059907.00  |
-|            0107351716            |        331         |   110130000.00  |
-|            0110027928            |        331         |   480690000.00  |
-|            2900521383            |        331         |   43200000.00   |
-|           Vương Văn Bộ           |        131         |       0.00      |
-|            0108641009            |        131         |       0.00      |
-|            0108587601            |        131         |  33210000000.00 |
-|            2901943557            |        131         |       0.00      |
-|            0111454150            |        515         |       0.00      |
-|            0100793514            |        331         |   48438000.00   |
-|               IVB                |        6425        |   27353220.00   |
-|            0100385089            |        131         |       0.00      |
-|            0107716452            |        131         |       0.00      |
-|             NCC1054              |        331         |   129595788.00  |
-|            0103719325            |        515         |       0.00      |
-|            0200843159            |        131         |       0.00      |
+-- Lấy account_bank từ dim_account để gom nhóm theo Mã Ngân Hàng thực sự (VD: VCB, MB, BIDV)
++----------------------------------+-----------------+
+|            bank_code             |   gia_tri_chi   |
++----------------------------------+-----------------+
+|               VCB                |  3681059907.00  |
+|               MB                 | 33210000000.00  |
+|               TPB                |   110130000.00  |
+|              BIDV                |   480690000.00  |
 ...(TRUNCATED FOR READABILITY)...
 */
 
