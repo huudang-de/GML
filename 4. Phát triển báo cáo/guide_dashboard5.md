@@ -155,8 +155,9 @@ SWITCH(
 ### 2.5 & 2.6 Cơ cấu dòng Thu / Chi theo Ngân hàng (Có Drill-down chi tiết hoạt động)
 - **Loại:** Pie Chart (Biểu đồ tròn)
 - **Trục Legend (Tạo Hierarchy/Phân cấp):** 
-  1. Kéo cột `Account_BANK` từ bảng `silver dim_account` vào đầu tiên (để phân loại theo VCB, BIDV, MB...).
-  2. Kéo tiếp cột `reciprocal_account` (Tài khoản đối ứng) từ `silver fact_cashflow` vào ngay bên dưới `Account_BANK`. (Nên map mã 131, 331... ra tên tiếng Việt từ `Bang_can_doi_tai_khoan_mau_quan_tri`).
+  1. Kéo cột `Account_BANK` từ bảng `silver dim_account` vào đầu tiên (để phân loại theo VCB, BIDV, MB...). 
+     > ⚠️ **LƯU Ý QUAN TRỌNG:** Phải dùng cột `Account_BANK` của bảng `dim_account`. Tuyệt đối **không** dùng cột `account_bank` của bảng `dim_accountnumber` vì nó sẽ trả ra Số tài khoản (dài ngoằng) thay vì Tên viết tắt của Ngân hàng, đồng thời làm biểu đồ bị trắng (Blank) phần lớn do khác key (11211 vs 014...).
+  2. Kéo tiếp cột `reciprocal_account` (Tài khoản đối ứng) từ `silver fact_cashflow` vào ngay bên dưới `Account_BANK`. (Nên map mã 131, 331... ra tên tiếng Việt).
 - **Trục Values:** 
   - Biểu đồ 2.5 (Thu): Kéo Measure `Dòng tiền vào (Tỷ)`
   - Biểu đồ 2.6 (Chi): Kéo Measure `Dòng tiền ra (Tỷ)`
