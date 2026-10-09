@@ -6,7 +6,7 @@ from app.agents.synthesizer import Synthesizer
 
 class OrchestratorAgent:
     def __init__(self):
-        self.llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
+        self.llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
         self.sql_agent = SQLAgent()
         self.rag_agent = RAGAgent()
         self.synthesizer = Synthesizer(self.llm)
@@ -45,7 +45,10 @@ class OrchestratorAgent:
 
         Trả lời chỉ 1 từ: sql_only | rag_only | both
         """
-        intent = self.llm.invoke(prompt).content.strip()
+        response = self.llm.invoke(prompt)
+        content = response.content
+        intent = str(content[0].get("text", "")) if isinstance(content, list) else str(content)
+        intent = intent.strip()
         return {**state, "intent": intent}
 
     def _route(self, state: dict) -> str:

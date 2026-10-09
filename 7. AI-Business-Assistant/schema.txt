@@ -1,0 +1,619 @@
+
+CREATE TABLE silver._file_registry (
+	id BIGSERIAL NOT NULL, 
+	file_id VARCHAR(200) NOT NULL, 
+	batch_id VARCHAR(100) NOT NULL, 
+	minio_path VARCHAR(500) NOT NULL, 
+	md5 VARCHAR(64) NOT NULL, 
+	file_date DATE NOT NULL, 
+	status VARCHAR(50) DEFAULT 'uploaded'::character varying NOT NULL, 
+	created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL, 
+	updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL, 
+	CONSTRAINT _file_registry_pkey PRIMARY KEY (id), 
+	CONSTRAINT _file_registry_batch_id_key UNIQUE NULLS DISTINCT (batch_id)
+)
+
+/*
+3 rows from _file_registry table:
+id	file_id	batch_id	minio_path	md5	file_date	status	created_at	updated_at
+2	dim_report_item_b01	dim_report_item_b01_20260916_021753_53cec612	s3://raw-excel/misa/b01_bao_cao_tai_chinh/2026-09-16/09-17/B01_DN_Bao_cao_tinh_hinh_tai_chinh_2026-0	36215f0999e6ebcddc11949039d1b7a2	2026-09-16	loaded	2026-09-16 02:17:54.601736	2026-09-16 02:17:55.347540
+3	dim_report_item_b01	dim_report_item_b01_20260916_021757_26543d4b	s3://raw-excel/misa/b01_bao_cao_tai_chinh/2026-09-16/09-17/B01_DN_Bao_cao_tinh_hinh_tai_chinh_2026-0	da0d899806b05d6d451671bbcd8cd955	2026-09-16	loaded	2026-09-16 02:17:58.767569	2026-09-16 02:17:59.385063
+4	dim_report_item_b02	dim_report_item_b02_20260916_021801_868e1ce1	s3://raw-excel/misa/b02_bao_cao_hoat_dong_kinh_doanh/2026-09-16/09-18/B02_DN_Bao_cao_ket_qua_hoat_do	8cb656be2b2e7bd20cfde5ee6801b838	2026-09-16	loaded	2026-09-16 02:18:02.406640	2026-09-16 02:18:02.931914
+*/
+
+
+CREATE TABLE silver._file_registry_sheets (
+	id BIGSERIAL NOT NULL, 
+	batch_id VARCHAR(100) NOT NULL, 
+	sheet_name VARCHAR(200) NOT NULL, 
+	status VARCHAR(50) NOT NULL, 
+	rows_loaded INTEGER, 
+	updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL, 
+	CONSTRAINT _file_registry_sheets_pkey PRIMARY KEY (id), 
+	CONSTRAINT _file_registry_sheets_batch_id_sheet_name_key UNIQUE NULLS DISTINCT (batch_id, sheet_name)
+)
+
+/*
+3 rows from _file_registry_sheets table:
+id	batch_id	sheet_name	status	rows_loaded	updated_at
+2	dim_report_item_b01_20260916_021753_53cec612	index_0	loaded	None	2026-09-16 02:17:55.347540
+3	dim_report_item_b01_20260916_021757_26543d4b	index_0	loaded	None	2026-09-16 02:17:59.385063
+4	dim_report_item_b02_20260916_021801_868e1ce1	index_0	loaded	None	2026-09-16 02:18:02.931914
+*/
+
+
+CREATE TABLE silver._pipeline_log (
+	id BIGSERIAL NOT NULL, 
+	batch_id VARCHAR(100), 
+	file_id VARCHAR(200), 
+	sheet_name VARCHAR(200), 
+	target_table VARCHAR(200), 
+	source_file VARCHAR(500), 
+	rows_loaded INTEGER, 
+	status VARCHAR(50), 
+	error_msg TEXT, 
+	started_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	finished_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(), 
+	CONSTRAINT _pipeline_log_pkey PRIMARY KEY (id)
+)
+
+/*
+3 rows from _pipeline_log table:
+id	batch_id	file_id	sheet_name	target_table	source_file	rows_loaded	status	error_msg	started_at	finished_at
+1	dim_bank_20260916_021749_4ccdb918	dim_bank	index_0	Dim_Bank	s3://raw-excel/misa/Danh_sach_ngan_hang/2026-09-16/09-17/Danh_sach_ngan_hang.xlsx	43	success	None	2026-09-16 02:17:50.959357	2026-09-16 02:17:50.959357
+2	dim_report_item_b01_20260916_021753_53cec612	dim_report_item_b01	index_0	Dim_ReportItem	s3://raw-excel/misa/b01_bao_cao_tai_chinh/2026-09-16/09-17/B01_DN_Bao_cao_tinh_hinh_tai_chinh_2026-0	126	success	None	2026-09-16 02:17:55.303060	2026-09-16 02:17:55.303060
+3	dim_report_item_b01_20260916_021757_26543d4b	dim_report_item_b01	index_0	Dim_ReportItem	s3://raw-excel/misa/b01_bao_cao_tai_chinh/2026-09-16/09-17/B01_DN_Bao_cao_tinh_hinh_tai_chinh_2026-0	126	success	None	2026-09-16 02:17:59.343128	2026-09-16 02:17:59.343128
+*/
+
+
+CREATE TABLE silver.dim_account (
+	_id BIGSERIAL NOT NULL, 
+	account_no VARCHAR(50), 
+	account_name VARCHAR(500), 
+	account_bank VARCHAR(100), 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT dim_account_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from dim_account table:
+_id	account_no	account_name	account_bank	_source_file	_loaded_at	_batch_id
+1	111	Tiền mặt	None	s3://raw-excel/misa/Danh_sach_he_thong_tai_khoan/2026-09-16/09-30/Danh_sach_he_thong_tai_khoan.xlsx	2026-09-16 02:31:46.509781	dim_account_20260916_023058_1ac49347
+2	1111	Tiền mặt	None	s3://raw-excel/misa/Danh_sach_he_thong_tai_khoan/2026-09-16/09-30/Danh_sach_he_thong_tai_khoan.xlsx	2026-09-16 02:31:46.509781	dim_account_20260916_023058_1ac49347
+3	1112	Ngoại tệ	None	s3://raw-excel/misa/Danh_sach_he_thong_tai_khoan/2026-09-16/09-30/Danh_sach_he_thong_tai_khoan.xlsx	2026-09-16 02:31:46.509781	dim_account_20260916_023058_1ac49347
+*/
+
+
+CREATE TABLE silver.dim_accountnumber (
+	_id BIGSERIAL NOT NULL, 
+	account_bank VARCHAR(100), 
+	bank_name VARCHAR(255), 
+	bank_code VARCHAR(50), 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT dim_accountnumber_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from dim_accountnumber table:
+_id	account_bank	bank_name	bank_code	_source_file	_loaded_at	_batch_id
+1	0030100064513008	Ngân hàng TMCP Phương Đông	OCB	s3://raw-excel/misa/Danh_sach_tai_khoan_ngan_hang/2026-09-16/09-31/Danh_sach_tai_khoan_ngan_hang.xls	2026-09-16 02:32:03.622516	dim_account_number_20260916_023116_1ca1ba0c
+2	0140400014007	Ngân hàng TMCP Quân đội	MB	s3://raw-excel/misa/Danh_sach_tai_khoan_ngan_hang/2026-09-16/09-31/Danh_sach_tai_khoan_ngan_hang.xls	2026-09-16 02:32:03.622516	dim_account_number_20260916_023116_1ca1ba0c
+3	0141100123005	Ngân hàng TMCP Quân đội	MB	s3://raw-excel/misa/Danh_sach_tai_khoan_ngan_hang/2026-09-16/09-31/Danh_sach_tai_khoan_ngan_hang.xls	2026-09-16 02:32:03.622516	dim_account_number_20260916_023116_1ca1ba0c
+*/
+
+
+CREATE TABLE silver.dim_bank (
+	_id BIGSERIAL NOT NULL, 
+	bank_code VARCHAR(50), 
+	bank_name VARCHAR(500), 
+	code1 VARCHAR(50), 
+	code2 VARCHAR(50), 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT dim_bank_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from dim_bank table:
+_id	bank_code	bank_name	code1	code2	_source_file	_loaded_at	_batch_id
+1	ABBank	Ngân hàng TMCP An Bình	ABBANK	ABBank	s3://raw-excel/misa/Danh_sach_ngan_hang/2026-09-16/09-17/Danh_sach_ngan_hang.xlsx	2026-09-16 02:27:05.179022	dim_bank_20260916_021749_4ccdb918
+2	ACB	Ngân hàng TMCP Á Châu	ACB	ACB	s3://raw-excel/misa/Danh_sach_ngan_hang/2026-09-16/09-17/Danh_sach_ngan_hang.xlsx	2026-09-16 02:27:05.179022	dim_bank_20260916_021749_4ccdb918
+3	Agribank	Ngân hàng Nông nghiệp và Phát triển nông thôn Việt Nam	AGR	Agribank	s3://raw-excel/misa/Danh_sach_ngan_hang/2026-09-16/09-17/Danh_sach_ngan_hang.xlsx	2026-09-16 02:27:05.179022	dim_bank_20260916_021749_4ccdb918
+*/
+
+
+CREATE TABLE silver.dim_partner (
+	_id BIGSERIAL NOT NULL, 
+	partner_code VARCHAR(100), 
+	partner_name TEXT, 
+	address TEXT, 
+	tax VARCHAR(50), 
+	partner_group VARCHAR(100), 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT dim_partner_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from dim_partner table:
+_id	partner_code	partner_name	address	tax	partner_group	_source_file	_loaded_at	_batch_id
+1	001090023561	Doãn Văn Chiến	Số 176 thôn Nam Hà 3 - Phúc Lộc -Hà Nội	001090023561	Khách hàng	s3://raw-excel/misa/Danh_sach_nha_cung_cap/2026-09-16/09-31/Danh_sach_nha_cung_cap.xlsx	2026-09-16 02:31:59.195307	dim_partner_nha_cung_cap_20260916_023112_82242472
+2	001096017517	HỘ KINH DOANH NGUYỄN VĂN QUÝ 1996	Thôn 4, Xã Tây Phương, TP Hà Nội, Việt Nam.	001096017517	Khách hàng	s3://raw-excel/misa/Danh_sach_nha_cung_cap/2026-09-16/09-31/Danh_sach_nha_cung_cap.xlsx	2026-09-16 02:31:59.195307	dim_partner_nha_cung_cap_20260916_023112_82242472
+3	001165002084	Hộ kinh doanh nội thất TUMOHOME	Thôn Thanh Mạc, Xã Hát Môn,  Thành phố Hà Nội	001165002084	Khách hàng	s3://raw-excel/misa/Danh_sach_nha_cung_cap/2026-09-16/09-31/Danh_sach_nha_cung_cap.xlsx	2026-09-16 02:31:59.195307	dim_partner_nha_cung_cap_20260916_023112_82242472
+*/
+
+
+CREATE TABLE silver.dim_product (
+	_id BIGSERIAL NOT NULL, 
+	product_code VARCHAR(255), 
+	product_name TEXT, 
+	unit_of_measure VARCHAR(50), 
+	product_category VARCHAR(100), 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT dim_product_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from dim_product table:
+_id	product_code	product_name	unit_of_measure	product_category	_source_file	_loaded_at	_batch_id
+1	2481646050	Nắp đẩy bản lề Titus	Cái	Phụ kiện	s3://raw-excel/misa/Danh_sach_hang_hoa_dich_vu/2026-09-16/09-27/Danh_sach_hang_hoa_dich_vu.xlsx	2026-09-16 02:31:30.156560	dim_product_20260916_022735_02b51a3e
+2	D025TLA2TMX032XXXXXWX	Dăm 25 TL A E2 4x8 1M Mine 032WN	Tấm	Khác	s3://raw-excel/misa/Danh_sach_hang_hoa_dich_vu/2026-09-16/09-27/Danh_sach_hang_hoa_dich_vu.xlsx	2026-09-16 02:31:30.156560	dim_product_20260916_022735_02b51a3e
+3	D025TLA2TMX032XXXXXTX	Dăm 25 TL A E2 4x8 1M Mine 032T	Tấm	Khác	s3://raw-excel/misa/Danh_sach_hang_hoa_dich_vu/2026-09-16/09-27/Danh_sach_hang_hoa_dich_vu.xlsx	2026-09-16 02:31:30.156560	dim_product_20260916_022735_02b51a3e
+*/
+
+
+CREATE TABLE silver.dim_reportitem (
+	_id BIGSERIAL NOT NULL, 
+	item_id VARCHAR(100), 
+	report_type VARCHAR(50), 
+	item_code VARCHAR(50), 
+	item_name VARCHAR(500), 
+	parent_id VARCHAR(100), 
+	sort_index INTEGER, 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT dim_reportitem_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from dim_reportitem table:
+_id	item_id	report_type	item_code	item_name	parent_id	sort_index	_source_file	_loaded_at	_batch_id
+1	B01-DN_100	B01-DN	100	A. TÀI SẢN NGẮN HẠN	None	1	s3://raw-excel/misa/b01_bao_cao_tai_chinh/2026-09-16/09-27/B01_DN_Bao_cao_tinh_hinh_tai_chinh_2026-0	2026-09-16 02:27:16.294523	dim_report_item_b01_20260916_022715_23e805e4
+2	B01-DN_110	B01-DN	110	I. Tiền và các khoản tương đương tiền	B01-DN_100	2	s3://raw-excel/misa/b01_bao_cao_tai_chinh/2026-09-16/09-27/B01_DN_Bao_cao_tinh_hinh_tai_chinh_2026-0	2026-09-16 02:27:16.294523	dim_report_item_b01_20260916_022715_23e805e4
+3	B01-DN_111	B01-DN	111	1. Tiền	B01-DN_110	3	s3://raw-excel/misa/b01_bao_cao_tai_chinh/2026-09-16/09-27/B01_DN_Bao_cao_tinh_hinh_tai_chinh_2026-0	2026-09-16 02:27:16.294523	dim_report_item_b01_20260916_022715_23e805e4
+*/
+
+
+CREATE TABLE silver.dim_warehouse (
+	_id BIGSERIAL NOT NULL, 
+	warehouse_code VARCHAR(100), 
+	warehouse_name VARCHAR(255), 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT dim_warehouse_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from dim_warehouse table:
+_id	warehouse_code	warehouse_name	_source_file	_loaded_at	_batch_id
+1	CCDC	Công cụ dụng cụ	s3://raw-excel/misa/Danh_sach_kho/2026-09-16/09-31/Danh_sach_kho.xlsx	2026-09-16 02:31:54.787209	dim_warehouse_20260916_023108_3a2c8e42
+2	HÀNG HÓA	Hàng Hóa	s3://raw-excel/misa/Danh_sach_kho/2026-09-16/09-31/Danh_sach_kho.xlsx	2026-09-16 02:31:54.787209	dim_warehouse_20260916_023108_3a2c8e42
+3	NVL CHÍNH	NGUYÊN VẬT LIỆU CHÍNH	s3://raw-excel/misa/Danh_sach_kho/2026-09-16/09-31/Danh_sach_kho.xlsx	2026-09-16 02:31:54.787209	dim_warehouse_20260916_023108_3a2c8e42
+*/
+
+
+CREATE TABLE silver.fact_accountspayable (
+	_id BIGSERIAL NOT NULL, 
+	partner_code VARCHAR(300), 
+	posting_date DATE, 
+	voucher_no VARCHAR(100), 
+	invoice_no VARCHAR(100), 
+	invoice_date DATE, 
+	description TEXT, 
+	reciprocal_account VARCHAR(50), 
+	currency VARCHAR(10), 
+	exchange_rate NUMERIC(18, 4), 
+	debit_amount NUMERIC(18, 2), 
+	credit_amount NUMERIC(18, 2), 
+	ending_debit_balance NUMERIC(18, 2), 
+	ending_credit_balance NUMERIC(18, 2), 
+	id INTEGER, 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_accountspayable_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_accountspayable table:
+_id	partner_code	posting_date	voucher_no	invoice_no	invoice_date	description	reciprocal_account	currency	exchange_rate	debit_amount	credit_amount	ending_debit_balance	ending_credit_balance	id	_source_file	_loaded_at	_batch_id
+20489	0901129841	2026-01-01	None	None	None	Số dư đầu kỳ	None	None	0.0000	0.00	0.00	5000000.00	0.00	4042	s3://raw-excel/misa/Chi_tiet_cong_no_phai_tra_nha_cung_cap/2026-09-16/09-27/Chi_tiet_cong_no_phai_tr	2026-09-16 02:28:14.584418	fact_accounts_payable_20260916_022717_c4545d92
+20490	0304955040	2026-01-01	None	None	None	Số dư đầu kỳ	None	None	0.0000	0.00	0.00	99300000.00	0.00	4043	s3://raw-excel/misa/Chi_tiet_cong_no_phai_tra_nha_cung_cap/2026-09-16/09-27/Chi_tiet_cong_no_phai_tr	2026-09-16 02:28:14.584418	fact_accounts_payable_20260916_022717_c4545d92
+30353	KINGDECOR	2026-01-01	None	None	None	Số dư đầu kỳ	None	None	0.0000	0.00	0.00	0.00	1293.33	13906	s3://raw-excel/misa/Chi_tiet_cong_no_phai_tra_nha_cung_cap/2026-09-16/09-27/Chi_tiet_cong_no_phai_tr	2026-09-16 02:28:14.584418	fact_accounts_payable_20260916_022717_c4545d92
+*/
+
+
+CREATE TABLE silver.fact_accountsreceivable (
+	_id BIGSERIAL NOT NULL, 
+	posting_date DATE, 
+	voucher_no VARCHAR(100), 
+	invoice_no VARCHAR(100), 
+	invoice_date DATE, 
+	description VARCHAR(500), 
+	partner_code VARCHAR(100), 
+	reciprocal_account VARCHAR(50), 
+	debit_amount NUMERIC(18, 2), 
+	credit_amount NUMERIC(18, 2), 
+	ending_debit_balance NUMERIC(18, 2), 
+	ending_credit_balance NUMERIC(18, 2), 
+	currency VARCHAR(10), 
+	exchange_rate NUMERIC(18, 4), 
+	id INTEGER, 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_accountsreceivable_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_accountsreceivable table:
+_id	posting_date	voucher_no	invoice_no	invoice_date	description	partner_code	reciprocal_account	debit_amount	credit_amount	ending_debit_balance	ending_credit_balance	currency	exchange_rate	id	_source_file	_loaded_at	_batch_id
+57773	2026-01-01	None	None	None	Số dư đầu kỳ	NTQV03	None	0.00	0.00	1472001.00	0.00	None	None	1	s3://raw-excel/misa/Chi_tiet_cong_no_phai_thu_khach_hang/2026-09-16/09-18/Chi_tiet_cong_no_phai_thu_	2026-09-16 02:27:56.768851	fact_accounts_receivable_20260916_021809_d3e1e3d2
+57774	2026-01-22	BH00729	00000760	2026-01-22	MDF 6 DA CA E2 4x8 2M Mine 6124 T	NTHH14	5112	7055556.00	0.00	39104360.00	0.00	VND	1.0000	2	s3://raw-excel/misa/Chi_tiet_cong_no_phai_thu_khach_hang/2026-09-16/09-18/Chi_tiet_cong_no_phai_thu_	2026-09-16 02:27:56.768851	fact_accounts_receivable_20260916_021809_d3e1e3d2
+57775	2026-01-22	BH00729	00000760	2026-01-22	Thuế GTGT - MDF 6 DA CA E2 4x8 2M Mine 6124 T	NTHH14	33311	564444.00	0.00	39668804.00	0.00	VND	1.0000	3	s3://raw-excel/misa/Chi_tiet_cong_no_phai_thu_khach_hang/2026-09-16/09-18/Chi_tiet_cong_no_phai_thu_	2026-09-16 02:27:56.768851	fact_accounts_receivable_20260916_021809_d3e1e3d2
+*/
+
+
+CREATE TABLE silver.fact_ar_risk_score (
+	customer_id TEXT, 
+	score_date TEXT, 
+	risk_badge TEXT, 
+	default_probability DOUBLE PRECISION, 
+	ui_color TEXT
+)
+
+/*
+3 rows from fact_ar_risk_score table:
+customer_id	score_date	risk_badge	default_probability	ui_color
+GML-1001	2026-10-06	Low Risk	0.2427	#00C851
+GML-1002	2026-10-06	Medium Risk	0.1405	#FFBB33
+GML-1003	2026-10-06	Medium Risk	0.1169	#FFBB33
+*/
+
+
+CREATE TABLE silver.fact_balancesheet (
+	_id BIGSERIAL NOT NULL, 
+	indicator_code VARCHAR(100), 
+	ending_balance NUMERIC(18, 2), 
+	beginning_balance NUMERIC(18, 2), 
+	reporting_date DATE, 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_balancesheet_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_balancesheet table:
+_id	indicator_code	ending_balance	beginning_balance	reporting_date	_source_file	_loaded_at	_batch_id
+253	B01-DN_100	891509059900.00	880887354994.00	2026-07-31	s3://raw-excel/misa/b01_bao_cao_tai_chinh/2026-09-16/09-49/B01_DN_Bao_cao_tinh_hinh_tai_chinh_2026-0	2026-09-16 02:49:40.260088	fact_balance_sheet_20260916_024938_c4d6734a
+254	B01-DN_110	91975348608.00	142957733626.00	2026-07-31	s3://raw-excel/misa/b01_bao_cao_tai_chinh/2026-09-16/09-49/B01_DN_Bao_cao_tinh_hinh_tai_chinh_2026-0	2026-09-16 02:49:40.260088	fact_balance_sheet_20260916_024938_c4d6734a
+255	B01-DN_111	91975348608.00	142957733626.00	2026-07-31	s3://raw-excel/misa/b01_bao_cao_tai_chinh/2026-09-16/09-49/B01_DN_Bao_cao_tinh_hinh_tai_chinh_2026-0	2026-09-16 02:49:40.260088	fact_balance_sheet_20260916_024938_c4d6734a
+*/
+
+
+CREATE TABLE silver.fact_businessplan (
+	_id BIGSERIAL NOT NULL, 
+	indicator_code VARCHAR(100), 
+	month DATE, 
+	target_amount NUMERIC(18, 2), 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_businessplan_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_businessplan table:
+_id	indicator_code	month	target_amount	_source_file	_loaded_at	_batch_id
+1	B02-DN_10	2026-01-01	105636013549.00	s3://raw-excel/noibo/Ke_hoach_kinh_doanh_minh_long_2026/2026-09-16/14-48/Ke_hoach_kinh_doanh_minh_lo	2026-09-16 07:49:01.039018	fact_business_plan_20260916_074856_2a626859
+2	B02-DN_11	2026-01-01	88768735086.00	s3://raw-excel/noibo/Ke_hoach_kinh_doanh_minh_long_2026/2026-09-16/14-48/Ke_hoach_kinh_doanh_minh_lo	2026-09-16 07:49:01.039018	fact_business_plan_20260916_074856_2a626859
+3	B02-DN_20	2026-01-01	16867278463.00	s3://raw-excel/noibo/Ke_hoach_kinh_doanh_minh_long_2026/2026-09-16/14-48/Ke_hoach_kinh_doanh_minh_lo	2026-09-16 07:49:01.039018	fact_business_plan_20260916_074856_2a626859
+*/
+
+
+CREATE TABLE silver.fact_cashflow (
+	_id BIGSERIAL NOT NULL, 
+	posting_date DATE, 
+	voucher_date DATE, 
+	voucher_no VARCHAR(100), 
+	description VARCHAR(500), 
+	reciprocal_account VARCHAR(50), 
+	partner_code VARCHAR(100), 
+	debit_amount NUMERIC(18, 2), 
+	credit_amount NUMERIC(18, 2), 
+	debit_balance NUMERIC(18, 2), 
+	credit_balance NUMERIC(18, 2), 
+	id INTEGER, 
+	account_no VARCHAR(50), 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_cashflow_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_cashflow table:
+_id	posting_date	voucher_date	voucher_no	description	reciprocal_account	partner_code	debit_amount	credit_amount	debit_balance	credit_balance	id	account_no	_source_file	_loaded_at	_batch_id
+1	2026-01-01	2026-01-01	NVK0210	*************************+	34114	None	217087516.00	0.00	4713586724.00	0.00	1	111	s3://raw-excel/misa/So_chi_tiet_cac_tai_khoan/2026-09-16/09-31/So_chi_tiet_cac_tai_khoan.xlsx	2026-09-16 02:49:02.581085	fact_cashflow_20260916_023135_fdd04133
+2	2026-01-01	2026-01-01	NVK0213	*************************+	34111	None	22602570.00	0.00	4736189294.00	0.00	2	111	s3://raw-excel/misa/So_chi_tiet_cac_tai_khoan/2026-09-16/09-31/So_chi_tiet_cac_tai_khoan.xlsx	2026-09-16 02:49:02.581085	fact_cashflow_20260916_023135_fdd04133
+3	2026-01-01	2026-01-01	PT00001	Thu tiền của Nguyễn Minh Cương	1388	4NMC1	954056263.00	0.00	5690245557.00	0.00	3	111	s3://raw-excel/misa/So_chi_tiet_cac_tai_khoan/2026-09-16/09-31/So_chi_tiet_cac_tai_khoan.xlsx	2026-09-16 02:49:02.581085	fact_cashflow_20260916_023135_fdd04133
+*/
+
+
+CREATE TABLE silver.fact_collateral (
+	_id BIGSERIAL NOT NULL, 
+	collateral_type VARCHAR(50), 
+	appraised_value NUMERIC(18, 2), 
+	collateral_coefficient VARCHAR(20), 
+	loan_value NUMERIC(18, 2), 
+	max_loan_amount NUMERIC(18, 2), 
+	row_id INTEGER, 
+	bank_code VARCHAR(50), 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_collateral_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_collateral table:
+_id	collateral_type	appraised_value	collateral_coefficient	loan_value	max_loan_amount	row_id	bank_code	_source_file	_loaded_at	_batch_id
+1	BĐS	7854464000.00	0.9	7069017600.00	7069017600.00	1	MB	s3://raw-excel/noibo/bc_tin_dung/2026-09-16/09-32/bc_tin_dung_2026.xlsx	2026-09-16 02:33:02.690193	fact_collateral_20260916_023218_9c7d9481
+2	BĐS	6347108454.00	0.65	4125620495.00	4125620495.10	2	MB	s3://raw-excel/noibo/bc_tin_dung/2026-09-16/09-32/bc_tin_dung_2026.xlsx	2026-09-16 02:33:02.690193	fact_collateral_20260916_023218_9c7d9481
+3	BĐS	5349600000.00	0.9	4814640000.00	4814640000.00	3	MB	s3://raw-excel/noibo/bc_tin_dung/2026-09-16/09-32/bc_tin_dung_2026.xlsx	2026-09-16 02:33:02.690193	fact_collateral_20260916_023218_9c7d9481
+*/
+
+
+CREATE TABLE silver.fact_creditlimitsummary (
+	_id BIGSERIAL NOT NULL, 
+	stt VARCHAR(50), 
+	bank_code VARCHAR(50), 
+	granted_limit NUMERIC(18, 2), 
+	principal_balance NUMERIC(18, 2), 
+	remaining_disbursement NUMERIC(18, 2), 
+	id INTEGER, 
+	credit_limit NUMERIC(18, 2), 
+	limit_type VARCHAR(50), 
+	interest_rate DOUBLE PRECISION, 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_creditlimitsummary_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_creditlimitsummary table:
+_id	stt	bank_code	granted_limit	principal_balance	remaining_disbursement	id	credit_limit	limit_type	interest_rate	_source_file	_loaded_at	_batch_id
+1	None	MB	90000000000.00	89994431799.00	5568201.00	1	90000000000.00	Ngắn hạn	0.0861	s3://raw-excel/noibo/bc_tin_dung/2026-09-16/09-32/bc_tin_dung_2026.xlsx	2026-09-16 02:32:55.487467	fact_credit_limit_summary_20260916_023207_be48c86d
+4	None	IVB	80000000000.00	73656199042.00	6343800958.00	4	80000000000.00	Ngắn hạn	0.083	s3://raw-excel/noibo/bc_tin_dung/2026-09-16/09-32/bc_tin_dung_2026.xlsx	2026-09-16 02:32:55.487467	fact_credit_limit_summary_20260916_023207_be48c86d
+7	None	SCB	43000000000.00	31763097880.00	11236902120.00	7	43000000000.00	Ngắn hạn	0.083	s3://raw-excel/noibo/bc_tin_dung/2026-09-16/09-32/bc_tin_dung_2026.xlsx	2026-09-16 02:32:55.487467	fact_credit_limit_summary_20260916_023207_be48c86d
+*/
+
+
+CREATE TABLE silver.fact_incomestatement (
+	_id BIGSERIAL NOT NULL, 
+	indicator_code VARCHAR(100), 
+	indicator_name VARCHAR(500), 
+	current_period_amount NUMERIC(18, 2), 
+	previous_period_amount NUMERIC(18, 2), 
+	month DATE, 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_incomestatement_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_incomestatement table:
+_id	indicator_code	indicator_name	current_period_amount	previous_period_amount	month	_source_file	_loaded_at	_batch_id
+43	B02-DN_01	1. Doanh thu bán hàng và cung cấp dịch vụ	74991248312.00	81312507829.00	2026-07-31	s3://raw-excel/misa/b02_bao_cao_hoat_dong_kinh_doanh/2026-09-16/09-49/B02_DN_Bao_cao_ket_qua_hoat_do	2026-09-16 02:49:47.558554	fact_income_statement_20260916_024946_85b9c57b
+44	B02-DN_02	2. Các khoản giảm trừ doanh thu	0.00	0.00	2026-07-31	s3://raw-excel/misa/b02_bao_cao_hoat_dong_kinh_doanh/2026-09-16/09-49/B02_DN_Bao_cao_ket_qua_hoat_do	2026-09-16 02:49:47.558554	fact_income_statement_20260916_024946_85b9c57b
+45	B02-DN_10	3. Doanh thu thuần về bán hàng và cung cấp dịch vụ (10 = 01 - 02)	74991248312.00	81312507829.00	2026-07-31	s3://raw-excel/misa/b02_bao_cao_hoat_dong_kinh_doanh/2026-09-16/09-49/B02_DN_Bao_cao_ket_qua_hoat_do	2026-09-16 02:49:47.558554	fact_income_statement_20260916_024946_85b9c57b
+*/
+
+
+CREATE TABLE silver.fact_inventory_balance (
+	_id BIGSERIAL NOT NULL, 
+	warehouse_code VARCHAR(100), 
+	product_code VARCHAR(255), 
+	ending_quantity DOUBLE PRECISION, 
+	ending_value NUMERIC(18, 2), 
+	id INTEGER, 
+	snapshot_date DATE, 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_inventory_balance_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_inventory_balance table:
+_id	warehouse_code	product_code	ending_quantity	ending_value	id	snapshot_date	_source_file	_loaded_at	_batch_id
+13179	HÀNG HÓA	4603004	3.0	16072287.00	1	2026-07-31	s3://raw-excel/misa/Tong_hop_ton_kho/2026-09-16/09-49/Tong_hop_ton_kho_2026-07.xlsx	2026-09-16 02:49:55.958974	fact_inventory_balance_20260916_024953_e094637a
+13180	HÀNG HÓA	4603005	3.0	16072287.00	2	2026-07-31	s3://raw-excel/misa/Tong_hop_ton_kho/2026-09-16/09-49/Tong_hop_ton_kho_2026-07.xlsx	2026-09-16 02:49:55.958974	fact_inventory_balance_20260916_024953_e094637a
+13181	HÀNG HÓA	4603006	3.0	13878576.00	3	2026-07-31	s3://raw-excel/misa/Tong_hop_ton_kho/2026-09-16/09-49/Tong_hop_ton_kho_2026-07.xlsx	2026-09-16 02:49:55.958974	fact_inventory_balance_20260916_024953_e094637a
+*/
+
+
+CREATE TABLE silver.fact_inventory_forecast (
+	item_code TEXT, 
+	forecast_date TIMESTAMP WITHOUT TIME ZONE, 
+	demand_mean DOUBLE PRECISION, 
+	demand_lower_95 DOUBLE PRECISION, 
+	demand_upper_95 DOUBLE PRECISION
+)
+
+/*
+3 rows from fact_inventory_forecast table:
+item_code	forecast_date	demand_mean	demand_lower_95	demand_upper_95
+MDF-18MM	2026-10-01 00:00:00	42.19721463781366	40.432829072612776	57.90745559394784
+MDF-18MM	2026-10-02 00:00:00	60.001740445530515	37.03558633769823	59.44290611709204
+MDF-18MM	2026-10-03 00:00:00	43.999341311349184	36.59997832941029	52.28137298654052
+*/
+
+
+CREATE TABLE silver.fact_inventoryinward (
+	_id BIGSERIAL NOT NULL, 
+	posting_date DATE, 
+	voucher_no VARCHAR(100), 
+	invoice_no VARCHAR(100), 
+	invoice_date DATE, 
+	warehouse_code VARCHAR(100), 
+	product_code VARCHAR(255), 
+	partner_code VARCHAR(100), 
+	currency VARCHAR(50), 
+	exchange_rate DOUBLE PRECISION, 
+	inward_quantity DOUBLE PRECISION, 
+	inward_value NUMERIC(18, 2), 
+	id INTEGER, 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_inventoryinward_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_inventoryinward table:
+_id	posting_date	voucher_no	invoice_no	invoice_date	warehouse_code	product_code	partner_code	currency	exchange_rate	inward_quantity	inward_value	id	_source_file	_loaded_at	_batch_id
+8043	2026-01-01	NK00284	107847027260	2025-12-29	NVL CHÍNH	M006DAH2T	WISEWOODS	USD	26089.0	11520.0	1197068459.00	1	s3://raw-excel/misa/So_chi_tiet_mua_hang/2026-09-16/09-31/So_chi_tiet_mua_hang.xlsx	2026-09-16 02:32:35.159628	fact_inventory_inward_20260916_023143_dd2aec10
+8044	2026-01-01	NK00284	107847027260	2025-12-29	NVL CHÍNH	M015DAH2T	WISEWOODS	USD	26089.0	2484.0	616355495.00	2	s3://raw-excel/misa/So_chi_tiet_mua_hang/2026-09-16/09-31/So_chi_tiet_mua_hang.xlsx	2026-09-16 02:32:35.159628	fact_inventory_inward_20260916_023143_dd2aec10
+8045	2026-01-01	NK00284	107847027260	2025-12-29	NVL CHÍNH	M017DAH2T	WISEWOODS	USD	26089.0	3600.0	1012366426.00	3	s3://raw-excel/misa/So_chi_tiet_mua_hang/2026-09-16/09-31/So_chi_tiet_mua_hang.xlsx	2026-09-16 02:32:35.159628	fact_inventory_inward_20260916_023143_dd2aec10
+*/
+
+
+CREATE TABLE silver.fact_inventoryoutward (
+	_id BIGSERIAL NOT NULL, 
+	posting_date DATE, 
+	voucher_no VARCHAR(100), 
+	invoice_no VARCHAR(100), 
+	invoice_date DATE, 
+	warehouse_code VARCHAR(100), 
+	product_code VARCHAR(255), 
+	partner_code VARCHAR(100), 
+	currency VARCHAR(50), 
+	exchange_rate DOUBLE PRECISION, 
+	outward_quantity DOUBLE PRECISION, 
+	outward_value DOUBLE PRECISION, 
+	id INTEGER, 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_inventoryoutward_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_inventoryoutward table:
+_id	posting_date	voucher_no	invoice_no	invoice_date	warehouse_code	product_code	partner_code	currency	exchange_rate	outward_quantity	outward_value	id	_source_file	_loaded_at	_batch_id
+12472	2026-01-02	BH00001	00000001	2026-01-02	THÀNH PHẨM	M017MLH2TMM20222022SS	0109658887	VND	1.0	1.0	899074.0	1	s3://raw-excel/misa/So_chi_tiet_ban_hang/2026-09-16/09-31/So_chi_tiet_ban_hang.xlsx	2026-09-16 02:32:17.944364	fact_inventory_outward_20260916_023120_1331f284
+12473	2026-01-02	BH00002	00000002	2026-01-02	THÀNH PHẨM	M006MLH2TMM90189018VV	KHÁCH LẺ	VND	1.0	2.0	1031482.0	2	s3://raw-excel/misa/So_chi_tiet_ban_hang/2026-09-16/09-31/So_chi_tiet_ban_hang.xlsx	2026-09-16 02:32:17.944364	fact_inventory_outward_20260916_023120_1331f284
+12474	2026-01-02	BH00002	00000002	2026-01-02	THÀNH PHẨM	M017MLH2TMM90189018VV	KHÁCH LẺ	VND	1.0	3.0	2502777.0	3	s3://raw-excel/misa/So_chi_tiet_ban_hang/2026-09-16/09-31/So_chi_tiet_ban_hang.xlsx	2026-09-16 02:32:17.944364	fact_inventory_outward_20260916_023120_1331f284
+*/
+
+
+CREATE TABLE silver.fact_liquidity_actions (
+	"Action" TEXT, 
+	"Bank" TEXT, 
+	"Amount_VND" DOUBLE PRECISION, 
+	"Interest_Rate_%%" DOUBLE PRECISION, 
+	"Run_ID" TEXT, 
+	"As_Of_Date" TEXT
+)
+
+/*
+3 rows from fact_liquidity_actions table:
+Action	Bank	Amount_VND	Interest_Rate_%	Run_ID	As_Of_Date
+Vay Cầm cố Sổ Tiết Kiệm	BIDV	9000000000.0	4.29	54bacd26bc1e43ee9ca3b2f7fb618ca0	2026-10-06
+Vay Cầm cố Sổ Tiết Kiệm	Techcombank	1000000000.0	4.66	54bacd26bc1e43ee9ca3b2f7fb618ca0	2026-10-06
+*/
+
+
+CREATE TABLE silver.fact_loan (
+	_id BIGSERIAL NOT NULL, 
+	bank_code VARCHAR(50), 
+	contract_no VARCHAR(100), 
+	total_credit_limit NUMERIC(18, 2), 
+	remaining_principal NUMERIC(18, 2), 
+	interest_rate DOUBLE PRECISION, 
+	disbursement_date DATE, 
+	maturity_date DATE, 
+	principal_payment_amount NUMERIC(18, 2), 
+	id INTEGER, 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_loan_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_loan table:
+_id	bank_code	contract_no	total_credit_limit	remaining_principal	interest_rate	disbursement_date	maturity_date	principal_payment_amount	id	_source_file	_loaded_at	_batch_id
+1	MB	LD2526955948	665536532.00	0.00	0.0776	2025-09-26	2026-03-26	665536532.00	1	s3://raw-excel/noibo/bc_tin_dung/2026-09-16/09-32/bc_tin_dung_2026.xlsx	2026-09-16 02:32:59.209132	fact_loan_20260916_023213_79079faa
+2	MB	LD2527315014	2379950896.00	0.00	0.0812	2025-09-30	2026-03-30	2379950896.00	2	s3://raw-excel/noibo/bc_tin_dung/2026-09-16/09-32/bc_tin_dung_2026.xlsx	2026-09-16 02:32:59.209132	fact_loan_20260916_023213_79079faa
+3	MB	LD2527445836	2040601680.00	0.00	0.0812	2025-10-01	2026-04-01	2040601680.00	3	s3://raw-excel/noibo/bc_tin_dung/2026-09-16/09-32/bc_tin_dung_2026.xlsx	2026-09-16 02:32:59.209132	fact_loan_20260916_023213_79079faa
+*/
+
+
+CREATE TABLE silver.fact_reorder_recommendations (
+	item_code TEXT, 
+	lead_time_days BIGINT, 
+	daily_demand_avg BIGINT, 
+	demand_std_dev BIGINT, 
+	rop DOUBLE PRECISION, 
+	safety_stock DOUBLE PRECISION, 
+	eoq DOUBLE PRECISION
+)
+
+/*
+3 rows from fact_reorder_recommendations table:
+item_code	lead_time_days	daily_demand_avg	demand_std_dev	rop	safety_stock	eoq
+MDF-18MM	7	50	5	371.82744831628287	21.827448316282872	1224.744871391589
+*/
+
+
+CREATE TABLE silver.fact_termdeposit (
+	_id BIGSERIAL NOT NULL, 
+	stt INTEGER, 
+	passbook_no VARCHAR(100), 
+	bank_code VARCHAR(50), 
+	interest_rate DOUBLE PRECISION, 
+	term INTEGER, 
+	original_amount NUMERIC(18, 2), 
+	remaining_value NUMERIC(18, 2), 
+	deposit_date DATE, 
+	maturity_date DATE, 
+	settlement_date DATE, 
+	id INTEGER, 
+	_source_file VARCHAR(500), 
+	_loaded_at TIMESTAMP WITHOUT TIME ZONE, 
+	_batch_id VARCHAR(100), 
+	CONSTRAINT fact_termdeposit_pkey PRIMARY KEY (_id)
+)
+
+/*
+3 rows from fact_termdeposit table:
+_id	stt	passbook_no	bank_code	interest_rate	term	original_amount	remaining_value	deposit_date	maturity_date	settlement_date	id	_source_file	_loaded_at	_batch_id
+1	None	0474678615661	MB	0.042	6	2000000000.00	0.00	2025-04-11	2025-10-11	2025-10-24	1	s3://raw-excel/noibo/Hop_dong_tien_gui/2026-09-16/09-47/Hop_dong_tien_gui.xlsx	2026-09-16 02:47:18.105651	fact_term_deposit_20260916_024716_fe54580e
+2	None	7422243213798	MB	0.042	6	2000000000.00	0.00	2025-04-11	2025-10-11	2026-05-11	2	s3://raw-excel/noibo/Hop_dong_tien_gui/2026-09-16/09-47/Hop_dong_tien_gui.xlsx	2026-09-16 02:47:18.105651	fact_term_deposit_20260916_024716_fe54580e
+3	None	1052830331705	MB	0.042	6	2200000000.00	0.00	2025-04-11	2025-10-11	2025-08-27	3	s3://raw-excel/noibo/Hop_dong_tien_gui/2026-09-16/09-47/Hop_dong_tien_gui.xlsx	2026-09-16 02:47:18.105651	fact_term_deposit_20260916_024716_fe54580e
+*/

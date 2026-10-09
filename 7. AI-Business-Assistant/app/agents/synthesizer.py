@@ -30,5 +30,7 @@ class Synthesizer:
             sql_result=state.get("sql_result", "Không có dữ liệu từ SQL"),
             rag_context=state.get("rag_context", "Không có tài liệu liên quan")
         )
-        answer = self.llm.invoke(prompt).content
+        response = self.llm.invoke(prompt)
+        content = response.content
+        answer = str(content[0].get("text", "")) if isinstance(content, list) else str(content)
         return {**state, "answer": answer}

@@ -6,7 +6,7 @@ import os
 
 class RAGAgent:
     def __init__(self):
-        self.embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        self.embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2")
         self.vectorstore = self._load_or_build_vectorstore()
 
     def _load_or_build_vectorstore(self):
@@ -40,7 +40,7 @@ class RAGAgent:
 
     def run(self, state: dict) -> dict:
         retriever = self.vectorstore.as_retriever(search_kwargs={"k": 5})
-        relevant_docs = retriever.get_relevant_documents(state["query"])
+        relevant_docs = retriever.invoke(state["query"])
         context = "\n\n".join([doc.page_content for doc in relevant_docs])
         sources = [doc.metadata.get("source", "Unknown") for doc in relevant_docs]
 
