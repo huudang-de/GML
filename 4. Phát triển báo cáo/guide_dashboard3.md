@@ -457,48 +457,31 @@ DIVIDE(
 
 ### 2.7 Bảng chi tiết các hóa đơn đang nợ
 - **Loại:** Table (Bảng phẳng)
-- **Columns (Kéo thả tuần tự):**
-  1. `silver dim_partner[Partner_Name]` (Tên Khách hàng)
-  2. `silver fact_accountsreceivable[invoice_no]` (Số hóa đơn)
-  3. `silver fact_accountsreceivable[invoice_date]` (Ngày xuất Hóa đơn)
-  4. Tạo 1 Measure `Tuổi Nợ Động` để thả vào bảng này (Vì bảng không cho phép dùng Cột Calculated tĩnh):
+- **Cấu hình theo đúng chuẩn BRD (Kéo thẳng từ MISA):**
+Sếp tạo 2 Measure mới đơn giản theo đúng công thức "Ngây thơ" của BRD:
+
 ```dax
-Tuổi Nợ Động = 
-VAR _SelectedMaxDate = MAX('silver Dim_Date'[Date])
-VAR _ActualMaxDate = CALCULATE(MAX('silver fact_accountsreceivable'[posting_date]), REMOVEFILTERS())
-VAR _MaxDate = MIN(_SelectedMaxDate, _ActualMaxDate)
-VAR _InvDate = MAX('silver fact_accountsreceivable'[invoice_date])
-VAR _Days = DATEDIFF(_InvDate, _MaxDate, DAY)
-RETURN 
-SWITCH(TRUE(),
-    ISBLANK(_InvDate), BLANK(),
-    _Days <= 0, "Current",
-    _Days <= 30, "1-30",
-    _Days <= 60, "31-60",
-    _Days <= 90, "61-90",
-    _Days <= 120, "91-120",
-    _Days <= 150, "121-150",
-    _Days <= 180, "151-180",
-    "180+"
-)
+Số tiền còn nợ = 
+SUM('silver fact_accountsreceivable'[debit_amount]) - SUM('silver fact_accountsreceivable'[credit_amount])
+
+Số ngày quá hạn = 
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+VAR _InvoiceDate = MAX('silver fact_accountsreceivable'[invoice_date])
+RETURN
+IF(ISBLANK(_InvoiceDate), BLANK(), DATEDIFF(_InvoiceDate + 30, _MaxDate, DAY))
 ```
-  5. Kéo Measure `Tuổi Nợ Động` vào.
-  6. Thêm 1 cột hiển thị Số nợ còn lại của Hóa đơn (Phải viết measure tính riêng phần chưa thanh toán cho từng bill):
-```dax
-Hóa đơn (Chưa thanh toán) = 
-VAR _SelectedMaxDate = MAX('silver Dim_Date'[Date])
-VAR _ActualMaxDate = CALCULATE(MAX('silver fact_accountsreceivable'[posting_date]), REMOVEFILTERS())
-VAR _MaxDate = MIN(_SelectedMaxDate, _ActualMaxDate)
-VAR _TotalDebt = CALCULATE(MAXX(TOPN(1, 'silver fact_accountsreceivable', 'silver fact_accountsreceivable'[posting_date], DESC, 'silver fact_accountsreceivable'[id], DESC), 'silver fact_accountsreceivable'[ending_debit_balance]), 'silver fact_accountsreceivable'[posting_date] <= _MaxDate, ALL('silver Dim_Date'))
-VAR _Invoices = CALCULATETABLE(SELECTCOLUMNS('silver fact_accountsreceivable', "InvNo", 'silver fact_accountsreceivable'[invoice_no], "InvDate", 'silver fact_accountsreceivable'[invoice_date], "InvAmt", 'silver fact_accountsreceivable'[debit_amount]), 'silver fact_accountsreceivable'[debit_amount] > 0, 'silver fact_accountsreceivable'[posting_date] <= _MaxDate, ALL('silver Dim_Date'))
-VAR _CurrentInvDate = MAX('silver fact_accountsreceivable'[invoice_date])
-VAR _CurrentInvNo = MAX('silver fact_accountsreceivable'[invoice_no])
-VAR _InvAmt = CALCULATE(SUM('silver fact_accountsreceivable'[debit_amount]), 'silver fact_accountsreceivable'[invoice_no] = _CurrentInvNo)
-VAR _RunningTotal = SUMX(FILTER(_Invoices, [InvDate] > _CurrentInvDate || ([InvDate] = _CurrentInvDate && [InvNo] >= _CurrentInvNo)), [InvAmt])
-RETURN IF(ISBLANK(_TotalDebt) || ISBLANK(_CurrentInvNo), BLANK(), MIN(_InvAmt, MAX(0, _TotalDebt - (_RunningTotal - _InvAmt))))
-```
-  7. Kéo Measure `Hóa đơn (Chưa thanh toán)` vào cột cuối. Lọc bảng này `is greater than 0`.
-- *Mẹo UX:* Bấm mũi tên trỏ xuống ở cột `Hóa đơn (Chưa thanh toán)` > Conditional Formatting > Data bars (Thanh dữ liệu). Hóa đơn nào nợ càng nhiều thì thanh màu đỏ càng dài.
+
+- **Columns (Kéo thả tuần tự vào biểu đồ Table):**
+  1. `silver fact_accountsreceivable[voucher_no]` (Đổi tên hiển thị thành **Số chứng từ**)
+  2. `silver fact_accountsreceivable[posting_date]` (Đổi tên thành **Ngày hạch toán**)
+  3. `silver fact_accountsreceivable[invoice_no]` (Đổi tên thành **Số hóa đơn**)
+  4. `silver fact_accountsreceivable[invoice_date]` (Đổi tên thành **Ngày hóa đơn**)
+  5. `silver fact_accountsreceivable[description]` (Đổi tên thành **Mô tả**)
+  6. `silver fact_accountsreceivable[debit_amount]` (Đổi tên thành **Phát sinh nợ**)
+  7. Kéo Measure **`Số tiền còn nợ`** vừa tạo ở trên vào.
+  8. Kéo Measure **`Số ngày quá hạn`** vừa tạo ở trên vào.
+- **Filter (Bộ lọc hình phễu cho riêng Bảng này):** Để chỉ lấy các hóa đơn "đang nợ" theo đúng công thức BRD, sếp kéo Measure `Số tiền còn nợ` vào bộ lọc *Filters on this visual*, cấu hình **is greater than 0** rồi Apply.
+- *Mẹo UX:* Căn lề phải (Right-align) cho các cột Số tiền để bảng trông chuyên nghiệp.
 
 
 ---
