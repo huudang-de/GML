@@ -117,11 +117,12 @@ ORDER BY c.MONTH;
 
 -- VISUAL: Cơ cấu dòng thu theo Bank
 -- MEASURE: _DongTien[Dong_Thu_Bank]
-SELECT a.account_bank AS bank_code,
+SELECT b.bank_code AS bank_code,
        c.reciprocal_account,
        SUM(c.debit_amount) AS gia_tri_thu
 FROM silver.fact_cashflow c
 LEFT JOIN silver.dim_account a ON c.account_no = a.account_no
+LEFT JOIN silver.dim_accountnumber b ON a.account_bank = b.account_bank
 WHERE c.account_no LIKE '112%'
   AND c.voucher_no NOT LIKE 'CTNB%'
   AND c.voucher_no NOT LIKE 'NTTK%'
@@ -132,7 +133,7 @@ GROUP BY 1, 2;
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE account_no LIKE '112%'
--- Lấy account_bank từ dim_account để gom nhóm theo Mã Ngân Hàng thực sự (VD: VCB, MB, BIDV)
+-- Lấy account_bank từ dim_account, sau đó JOIN với dim_accountnumber để bóc chính xác Mã Ngân Hàng (VCB, MB, BIDV...)
 -- Gom nhóm thêm theo reciprocal_account để hỗ trợ Power BI cross-filter hoạt động thu/chi
 +----------------------------------+--------------------+-----------------+
 |            bank_code             | reciprocal_account |   gia_tri_thu   |
@@ -147,11 +148,12 @@ GROUP BY 1, 2;
 
 -- VISUAL: Cơ cấu dòng chi theo Bank
 -- MEASURE: _DongTien[Dong_Chi_Bank]
-SELECT a.account_bank AS bank_code,
+SELECT b.bank_code AS bank_code,
        c.reciprocal_account,
        SUM(c.credit_amount) AS gia_tri_chi
 FROM silver.fact_cashflow c
 LEFT JOIN silver.dim_account a ON c.account_no = a.account_no
+LEFT JOIN silver.dim_accountnumber b ON a.account_bank = b.account_bank
 WHERE c.account_no LIKE '112%'
   AND c.voucher_no NOT LIKE 'CTNB%'
   AND c.voucher_no NOT LIKE 'NTTK%'
@@ -162,7 +164,7 @@ GROUP BY 1, 2;
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- WHERE account_no LIKE '112%'
--- Lấy account_bank từ dim_account để gom nhóm theo Mã Ngân Hàng thực sự (VD: VCB, MB, BIDV)
+-- Lấy account_bank từ dim_account, sau đó JOIN với dim_accountnumber để bóc chính xác Mã Ngân Hàng (VCB, MB, BIDV...)
 -- Gom nhóm thêm theo reciprocal_account để hỗ trợ Power BI cross-filter hoạt động thu/chi
 +----------------------------------+--------------------+-----------------+
 |            bank_code             | reciprocal_account |   gia_tri_chi   |
