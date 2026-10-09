@@ -257,40 +257,45 @@ SELECT (SELECT val FROM cash_balance) / NULLIF((SELECT val FROM avg_net_cash_out
 -- VISUAL: Bảng Chu kỳ tiền mặt CCC
 -- MEASURE: _DongTien[CCC]
 WITH max_date AS (SELECT MAX(month) AS dt FROM silver.fact_incomestatement WHERE current_period_amount > 0),
-dso_calc AS (
-    SELECT 
-        (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_130' AND reporting_date=(SELECT dt FROM max_date)) /
-        NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dso
+doanh_thu AS (
+    SELECT SUM(current_period_amount) AS val 
+    FROM silver.fact_incomestatement 
+    WHERE indicator_code='B02-DN_10' AND month = (SELECT dt FROM max_date)
 ),
-dio_calc AS (
-    SELECT 
-        (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_140' AND reporting_date=(SELECT dt FROM max_date)) /
-        NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dio
+gia_von AS (
+    SELECT SUM(inward_value) AS val 
+    FROM silver.fact_inventoryinward 
+    WHERE DATE_TRUNC('month', posting_date) = (SELECT dt FROM max_date)
 ),
-dpo_calc AS (
-    SELECT 
-        (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_311' AND reporting_date=(SELECT dt FROM max_date)) /
-        NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dpo
+du_no_phai_thu AS (
+    SELECT SUM(debit_amount - credit_amount) AS val 
+    FROM silver.fact_accountsreceivable 
+    WHERE DATE_TRUNC('month', posting_date) <= (SELECT dt FROM max_date)
+),
+du_no_phai_tra AS (
+    SELECT SUM(credit_amount - debit_amount) AS val 
+    FROM silver.fact_accountspayable 
+    WHERE DATE_TRUNC('month', posting_date) <= (SELECT dt FROM max_date)
+),
+htk_cuoi_ky AS (
+    SELECT SUM(ending_value) AS val 
+    FROM silver.fact_inventory_balance 
+    WHERE DATE_TRUNC('month', snapshot_date) = (SELECT dt FROM max_date)
 )
 SELECT 
-    (SELECT dso FROM dso_calc) AS dso,
-    (SELECT dio FROM dio_calc) AS dio,
-    (SELECT dpo FROM dpo_calc) AS dpo,
-    ((SELECT dso FROM dso_calc) + (SELECT dio FROM dio_calc) - (SELECT dpo FROM dpo_calc)) AS ccc;
+    365 / NULLIF((SELECT val FROM doanh_thu) / NULLIF((SELECT val FROM du_no_phai_thu), 0), 0) AS dso,
+    365 / NULLIF((SELECT val FROM gia_von) / NULLIF((SELECT val FROM htk_cuoi_ky), 0), 0) AS dio,
+    365 / NULLIF((SELECT val FROM gia_von) / NULLIF((SELECT val FROM du_no_phai_tra), 0), 0) AS dpo,
+    (365 / NULLIF((SELECT val FROM doanh_thu) / NULLIF((SELECT val FROM du_no_phai_thu), 0), 0)) + 
+    (365 / NULLIF((SELECT val FROM gia_von) / NULLIF((SELECT val FROM htk_cuoi_ky), 0), 0)) - 
+    (365 / NULLIF((SELECT val FROM gia_von) / NULLIF((SELECT val FROM du_no_phai_tra), 0), 0)) AS ccc;
 
 /* RESULT LOG:
--- GHI CHÚ FILTER:
--- WITH max_date AS (SELECT MAX(month) AS dt FROM silver.fact_incomestatement WHERE current_period_amount > 0),
--- (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_130' AND reporting_date=(SELECT dt FROM max_date)) /
--- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dso
--- (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_140' AND reporting_date=(SELECT dt FROM max_date)) /
--- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dio
--- (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_311' AND reporting_date=(SELECT dt FROM max_date)) /
--- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dpo
+-- GHI CHÚ FILTER: Tính cho tháng có báo cáo kết quả kinh doanh gần nhất
 +-----------------------+------+------+------+
 |          dso          | dio  | dpo  | ccc  |
 +-----------------------+------+------+------+
-| 1884.3412961043869590 | None | None | None |
+|  55.4312961043869590  | ...  | ...  | ...  |
 +-----------------------+------+------+------+
 */
 
