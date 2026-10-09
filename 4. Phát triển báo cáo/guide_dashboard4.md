@@ -40,27 +40,40 @@ RETURN DIVIDE([Tiền mặt & Tương đương (Tỷ)] - ThangTruoc, ThangTruoc,
 - **DAX:**
 ```dax
 Tổng gốc Tiền gửi (Tỷ) = 
-CALCULATE(
-    SUM('silver fact_termdeposit'[remaining_value])
-) / 1000000000
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+RETURN
+DIVIDE(
+    CALCULATE(
+        SUM('silver fact_termdeposit'[original_amount]),
+        'silver fact_termdeposit'[deposit_date] <= _MaxDate,
+        'silver fact_termdeposit'[settlement_date] > _MaxDate || ISBLANK('silver fact_termdeposit'[settlement_date])
+    ),
+    1000000000, 0
+)
 ```
 
 ### 1.3 & 1.4 Số lượng hợp đồng & Lãi suất BQ
 - **DAX:**
 ```dax
 Số sổ tiết kiệm = 
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+RETURN
 CALCULATE(
-    COUNTROWS('silver fact_termdeposit'),
-    'silver fact_termdeposit'[remaining_value] > 0
+    DISTINCTCOUNT('silver fact_termdeposit'[passbook_no]),
+    'silver fact_termdeposit'[deposit_date] <= _MaxDate,
+    'silver fact_termdeposit'[settlement_date] > _MaxDate || ISBLANK('silver fact_termdeposit'[settlement_date])
 )
 
 Lãi suất BQ Tiền gửi (%) = 
+VAR _MaxDate = MAX('silver Dim_Date'[Date])
+RETURN
 CALCULATE(
     DIVIDE(
         SUMX('silver fact_termdeposit', 'silver fact_termdeposit'[original_amount] * 'silver fact_termdeposit'[interest_rate]),
         SUM('silver fact_termdeposit'[original_amount])
     ),
-    'silver fact_termdeposit'[remaining_value] > 0
+    'silver fact_termdeposit'[deposit_date] <= _MaxDate,
+    'silver fact_termdeposit'[settlement_date] > _MaxDate || ISBLANK('silver fact_termdeposit'[settlement_date])
 )
 ```
 
