@@ -380,8 +380,17 @@ DIVIDE(
 ### 2.5 Top 10 khách hàng (Nợ quá hạn)
 - **Loại:** Horizontal Bar Chart
 - **Trục Y:** `silver dim_partner[Partner_Name]`
-- **Trục X:** Kéo Measure `Nợ FIFO Aging (Tỷ)` vào.
-- **Lọc phụ (Rất quan trọng):** Mở cột **Filters** (Bộ lọc). Kéo cột `Dim_AgingBucket[Bucket]` thả vào ô *Filters on this visual*. Bỏ tích ô "Current" (Chỉ giữ lại các nhóm quá hạn). Biểu đồ sẽ tự động rút gọn thành nợ quá hạn.
+- **Trục X:** `Nợ Quá Hạn (Tỷ)`
+- **Cách làm nhanh nhất:** Nhấp **New Measure** và dán đoạn code sau để tạo ra một Measure chỉ bốc đúng số tiền Nợ Quá Hạn (Tuổi nợ > 0 ngày) dựa trên cái form FIFO đã xây:
+
+```dax
+Nợ Quá Hạn (Tỷ) = 
+CALCULATE(
+    [Nợ FIFO Aging (Tỷ)],
+    'Dim_AgingBucket'[Bucket] <> "Current"
+)
+```
+- **Top N Filter:** Bấm vào biểu tượng phễu (Filters pane), ở mục `Partner_Name`, chọn Filter Type là `Top N`, Show `Top 10` theo By value `Nợ Quá Hạn (Tỷ)` rồi Apply.
 
 ---
 
