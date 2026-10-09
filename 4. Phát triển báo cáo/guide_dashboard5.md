@@ -159,7 +159,15 @@ SWITCH(
   - Biểu đồ 2.5 (Thu): Kéo Measure `Dòng tiền vào (Tỷ)` (Đã tạo ở mục 1.1)
   - Biểu đồ 2.6 (Chi): Kéo Measure `Dòng tiền ra (Tỷ)` (Đã tạo ở mục 1.2)
 - **Bộ lọc (Visual Filter):** Vì phân tích theo ngân hàng nên bạn filter Visual này chỉ lấy các giao dịch qua thẻ (Kéo cột `Account_No` vào filter và cho `Bắt đầu bằng 112`).
-- *Mẹo UX:* Cài Data labels hiển thị `% of total` để thấy rõ tiền ra vào chủ yếu ở ngân hàng nào.
+
+### 2.5.1 & 2.6.1 Chi tiết Hoạt động Thu / Chi (Drill-down / Cross-filter)
+- **Mô tả:** Theo chuẩn nghiệp vụ, khi Sếp click vào một Ngân hàng (VD: MBBank) trên Pie Chart ở trên, hệ thống cần show ra cơ cấu hoạt động Thu/Chi của riêng Ngân hàng đó (nhờ tính năng Cross-filter).
+- **Loại:** Clustered Bar Chart (Biểu đồ thanh ngang) hoặc Matrix (Bảng ma trận) đặt kế bên Pie Chart.
+- **Trục Y (hoặc Rows):** Kéo cột `reciprocal_account` (Tài khoản đối ứng) từ bảng `silver fact_cashflow`. (Bạn có thể liên kết với bảng `Bang_can_doi_tai_khoan_mau_quan_tri` để hiển thị tên tiếng Việt của tài khoản như "Thu từ bán hàng", "Thu khác"... thay vì chỉ hiện mã 131, 711).
+- **Trục X (hoặc Values):** 
+  - Biểu đồ Thu: Measure `Dòng tiền vào (Tỷ)`
+  - Biểu đồ Chi: Measure `Dòng tiền ra (Tỷ)`
+- *Mẹo UX:* Cài Data labels hiển thị `% of total` cho Pie chart. Thao tác Click vào Pie Chart sẽ tự động filter Bar chart bên cạnh.
 
 ### 2.7 Tài sản ngắn hạn / Nợ ngắn hạn / Vốn lưu động
 - **Loại:** Line and Stacked Column Chart (Cột kết hợp Đường)
