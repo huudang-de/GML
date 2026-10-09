@@ -71,16 +71,32 @@ WHERE indicator_code = 'B01-DN_110'
 
 -- VISUAL: Thu/Chi/Số dư theo tháng
 -- MEASURE: _DongTien[Thu_Chi_Thang]
-SELECT DATE_TRUNC('month', posting_date) AS MONTH,
-       SUM(debit_amount) AS dong_tien_vao,
-       SUM(credit_amount) AS dong_tien_ra
-FROM silver.fact_cashflow
-WHERE (account_no LIKE '111%' OR account_no LIKE '112%')
-  AND voucher_no NOT LIKE 'CTNB%'
-  AND voucher_no NOT LIKE 'NTTK%'
-  AND reciprocal_account NOT LIKE '111%' 
-  AND reciprocal_account NOT LIKE '112%'
-GROUP BY 1;
+WITH cashflow AS (
+    SELECT DATE_TRUNC('month', posting_date) AS MONTH,
+           SUM(debit_amount) AS dong_tien_vao,
+           SUM(credit_amount) AS dong_tien_ra
+    FROM silver.fact_cashflow
+    WHERE (account_no LIKE '111%' OR account_no LIKE '112%')
+      AND voucher_no NOT LIKE 'CTNB%'
+      AND voucher_no NOT LIKE 'NTTK%'
+      AND reciprocal_account NOT LIKE '111%' 
+      AND reciprocal_account NOT LIKE '112%'
+    GROUP BY 1
+),
+balance AS (
+    SELECT DATE_TRUNC('month', reporting_date) AS MONTH,
+           SUM(ending_balance) AS du_quy
+    FROM silver.fact_balancesheet
+    WHERE indicator_code = 'B01-DN_110'
+    GROUP BY 1
+)
+SELECT c.MONTH,
+       c.dong_tien_vao,
+       c.dong_tien_ra,
+       b.du_quy
+FROM cashflow c
+LEFT JOIN balance b ON c.MONTH = b.MONTH
+ORDER BY c.MONTH;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
@@ -244,7 +260,7 @@ SELECT (SELECT val FROM cash_balance) / NULLIF((SELECT val FROM avg_net_cash_out
 
 -- VISUAL: Bảng Chu kỳ tiền mặt CCC
 -- MEASURE: _DongTien[CCC]
-WITH max_date AS (SELECT MAX(reporting_date) AS dt FROM silver.fact_balancesheet),
+WITH max_date AS (SELECT MAX(month) AS dt FROM silver.fact_incomestatement WHERE current_period_amount > 0),
 dso_calc AS (
     SELECT 
         (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_130' AND reporting_date=(SELECT dt FROM max_date)) /
@@ -268,16 +284,17 @@ SELECT
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
+-- WITH max_date AS (SELECT MAX(month) AS dt FROM silver.fact_incomestatement WHERE current_period_amount > 0),
 -- (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_130' AND reporting_date=(SELECT dt FROM max_date)) /
 -- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dso
 -- (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_140' AND reporting_date=(SELECT dt FROM max_date)) /
 -- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dio
 -- (SELECT SUM(ending_balance) FROM silver.fact_balancesheet WHERE indicator_code='B01-DN_311' AND reporting_date=(SELECT dt FROM max_date)) /
 -- NULLIF((SELECT SUM(current_period_amount) FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_11' AND month=(SELECT dt FROM max_date)), 0) * 365 AS dpo
-+------+------+------+------+
-| dso  | dio  | dpo  | ccc  |
-+------+------+------+------+
-| None | None | None | None |
-+------+------+------+------+
++-----------------------+------+------+------+
+|          dso          | dio  | dpo  | ccc  |
++-----------------------+------+------+------+
+| 1884.3412961043869590 | None | None | None |
++-----------------------+------+------+------+
 */
 
