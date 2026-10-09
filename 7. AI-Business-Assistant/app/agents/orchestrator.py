@@ -6,7 +6,7 @@ from app.agents.synthesizer import Synthesizer
 
 class OrchestratorAgent:
     def __init__(self):
-        self.llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
+        self.llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash")
         self.sql_agent = SQLAgent()
         self.rag_agent = RAGAgent()
         self.synthesizer = Synthesizer(self.llm)

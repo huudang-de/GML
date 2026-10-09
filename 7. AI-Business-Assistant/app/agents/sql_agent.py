@@ -36,7 +36,7 @@ class SQLAgent:
     def __init__(self):
         postgres_uri = os.environ.get("POSTGRES_URI", "postgresql://user:pass@localhost/gml")
         self.db = SQLDatabase.from_uri(postgres_uri, schema="silver")
-        self.llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
+        self.llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash")
         
         self.prompt = ChatPromptTemplate.from_template(SCHEMA_CONTEXT)
         self.chain = self.prompt | self.llm | StrOutputParser()
