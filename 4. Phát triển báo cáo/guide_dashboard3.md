@@ -288,7 +288,10 @@ Tuyệt đối KHÔNG dùng cột Calculated Column với hàm `TODAY()` để t
 **Bước 2: Tạo Measure `Nợ FIFO Aging (Tỷ)` cực mạnh sau đây:**
 ```dax
 Nợ FIFO Aging (Tỷ) = 
-VAR _MaxDate = MAX('silver Dim_Date'[Date])
+VAR _SelectedMaxDate = MAX('silver Dim_Date'[Date])
+VAR _ActualMaxDate = CALCULATE(MAX('silver fact_accountsreceivable'[posting_date]), REMOVEFILTERS())
+VAR _MaxDate = MIN(_SelectedMaxDate, _ActualMaxDate)
+
 -- Lấy dải Tuổi Nợ đang được chọn trên Trục X (của bảng phụ Dim_AgingBucket)
 VAR _SelectedBuckets = VALUES('Dim_AgingBucket'[Bucket])
 
@@ -440,7 +443,9 @@ DIVIDE(
   4. Tạo 1 Measure `Tuổi Nợ Động` để thả vào bảng này (Vì bảng không cho phép dùng Cột Calculated tĩnh):
 ```dax
 Tuổi Nợ Động = 
-VAR _MaxDate = MAX('silver Dim_Date'[Date])
+VAR _SelectedMaxDate = MAX('silver Dim_Date'[Date])
+VAR _ActualMaxDate = CALCULATE(MAX('silver fact_accountsreceivable'[posting_date]), REMOVEFILTERS())
+VAR _MaxDate = MIN(_SelectedMaxDate, _ActualMaxDate)
 VAR _InvDate = MAX('silver fact_accountsreceivable'[invoice_date])
 VAR _Days = DATEDIFF(_InvDate, _MaxDate, DAY)
 RETURN 
@@ -460,7 +465,9 @@ SWITCH(TRUE(),
   6. Thêm 1 cột hiển thị Số nợ còn lại của Hóa đơn (Phải viết measure tính riêng phần chưa thanh toán cho từng bill):
 ```dax
 Hóa đơn (Chưa thanh toán) = 
-VAR _MaxDate = MAX('silver Dim_Date'[Date])
+VAR _SelectedMaxDate = MAX('silver Dim_Date'[Date])
+VAR _ActualMaxDate = CALCULATE(MAX('silver fact_accountsreceivable'[posting_date]), REMOVEFILTERS())
+VAR _MaxDate = MIN(_SelectedMaxDate, _ActualMaxDate)
 VAR _TotalDebt = CALCULATE(MAXX(TOPN(1, 'silver fact_accountsreceivable', 'silver fact_accountsreceivable'[posting_date], DESC, 'silver fact_accountsreceivable'[id], DESC), 'silver fact_accountsreceivable'[ending_debit_balance]), 'silver fact_accountsreceivable'[posting_date] <= _MaxDate, ALL('silver Dim_Date'))
 VAR _Invoices = CALCULATETABLE(SELECTCOLUMNS('silver fact_accountsreceivable', "InvNo", 'silver fact_accountsreceivable'[invoice_no], "InvDate", 'silver fact_accountsreceivable'[invoice_date], "InvAmt", 'silver fact_accountsreceivable'[debit_amount]), 'silver fact_accountsreceivable'[debit_amount] > 0, 'silver fact_accountsreceivable'[posting_date] <= _MaxDate, ALL('silver Dim_Date'))
 VAR _CurrentInvDate = MAX('silver fact_accountsreceivable'[invoice_date])
