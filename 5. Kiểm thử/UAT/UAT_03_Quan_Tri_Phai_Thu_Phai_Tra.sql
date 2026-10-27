@@ -2,21 +2,26 @@
 -- DASHBOARD: QUẢN TRỊ PHẢI THU - PHẢI TRẢ
 -- ==========================================
 
--- VISUAL: Giá trị phải thu
--- MEASURE: _CongNo[Gia_Tri_Phai_Thu]
+--- VISUAL: Giá trị phải thu
 WITH latest_transactions AS (
+    -- Bước 1: Sử dụng Window Function (ROW_NUMBER) để đánh số thứ tự cho các giao dịch công nợ 
+    -- của từng khách hàng, sắp xếp giảm dần theo ngày chứng từ (posting_date) và mã giao dịch (id) 
+    -- để xác định đúng dòng số dư ghi nhận mới nhất cuối cùng.
     SELECT 
         f.partner_code,
         f.ending_debit_balance,
         ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
     FROM silver.fact_accountsreceivable f
+    -- Kết hợp với bảng danh mục đối tác để lọc đúng nhóm đối tượng khách hàng
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    -- Chỉ lọc các đối tượng thuộc nhóm khách hàng thuần túy hoặc nhóm kiêm nhiệm cả nhà cung cấp
     WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
 )
-SELECT SUM(ending_debit_balance) AS gia_tri_phai_thu
+-- Bước 2: Tổng hợp số dư nợ phải thu từ các dòng giao dịch mới nhất (rn = 1) của từng khách hàng
+SELECT 
+    SUM(ending_debit_balance) AS gia_tri_phai_thu
 FROM latest_transactions
 WHERE rn = 1;
-
 /* RESULT LOG:
 +------------------+
 | gia_tri_phai_thu |
@@ -25,18 +30,24 @@ WHERE rn = 1;
 +------------------+
 */
 
--- VISUAL: Giá trị phải trả
--- MEASURE: _CongNo[Gia_Tri_Phai_Tra]
+--- VISUAL: Giá trị phải trả
 WITH latest_transactions AS (
+    -- Bước 1: Sử dụng Window Function (ROW_NUMBER) để đánh số thứ tự cho các giao dịch công nợ phải trả 
+    -- của từng nhà cung cấp, sắp xếp giảm dần theo ngày chứng từ (posting_date) và mã giao dịch (id) 
+    -- để xác định đúng dòng số dư ghi nhận mới nhất cuối cùng.
     SELECT 
         f.partner_code,
         f.ending_credit_balance,
         ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
     FROM silver.fact_accountspayable f
+    -- Kết hợp với bảng danh mục đối tác để lọc đúng nhóm đối tượng nhà cung cấp
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    -- Chỉ lọc các đối tượng thuộc nhóm nhà cung cấp thuần túy hoặc nhóm kiêm nhiệm cả khách hàng
     WHERE p.partner_group IN ('Nhà cung cấp', 'Khách hàng/ nhà cung cấp')
 )
-SELECT SUM(ending_credit_balance) AS gia_tri_phai_tra
+-- Bước 2: Tổng hợp số dư có phải trả từ các dòng giao dịch mới nhất (rn = 1) của từng nhà cung cấp
+SELECT 
+    SUM(ending_credit_balance) AS gia_tri_phai_tra
 FROM latest_transactions
 WHERE rn = 1;
 
@@ -48,26 +59,36 @@ WHERE rn = 1;
 +------------------+
 */
 
--- VISUAL: Vòng quay phải thu theo năm
--- MEASURE: _CongNo[VQ_Phai_Thu_Nam]
-WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable),
+--- VISUAL: Vòng quay phải thu theo năm
+WITH max_date AS (
+    -- Bước 1: Tìm mốc ngày giao dịch lớn nhất có trong hệ thống để xác định năm hiện tại cần báo cáo
+    SELECT MAX(posting_date) AS dt 
+    FROM silver.fact_accountsreceivable
+),
 doanh_thu_nam AS (
+    -- Bước 2: Tổng hợp doanh thu thuần lũy kế trong năm tài chính tương ứng với năm của ngày max_date
     SELECT SUM(current_period_amount) AS val
     FROM silver.fact_incomestatement
-    WHERE indicator_code='B02-DN_10' AND EXTRACT(YEAR FROM month) = EXTRACT(YEAR FROM (SELECT dt FROM max_date))
+    WHERE indicator_code = 'B02-DN_10' 
+      AND EXTRACT(YEAR FROM month) = EXTRACT(YEAR FROM (SELECT dt FROM max_date))
 ),
 latest_transactions AS (
-    SELECT f.partner_code, f.ending_debit_balance,
-           ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    -- Bước 3: Dùng Window Function (ROW_NUMBER) để lọc ra số dư công nợ cuối cùng của từng khách hàng
+    SELECT 
+        f.partner_code, 
+        f.ending_debit_balance,
+        ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) AS rn
     FROM silver.fact_accountsreceivable f
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
     WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
 ),
 phai_thu_cuoi_nam AS (
+    -- Bước 4: Tổng hợp tổng số dư nợ phải thu cuối kỳ của toàn bộ khách hàng (rn = 1)
     SELECT SUM(ending_debit_balance) AS val
     FROM latest_transactions
     WHERE rn = 1
 )
+-- Bước 5: Tính hệ số vòng quay phải thu = Doanh thu thuần trong năm / Số dư phải thu cuối kỳ
 -- Vì data lịch sử năm trước (2025) không có trong fact_accountsreceivable, 
 -- Phải thu năm ngoái = 0, nếu áp dụng DAX IF(ISBLANK) thì Trung bình = Phải thu cuối năm
 SELECT (SELECT val FROM doanh_thu_nam) / NULLIF((SELECT val FROM phai_thu_cuoi_nam), 0) AS vong_quay_phai_thu_nam;
@@ -82,29 +103,39 @@ SELECT (SELECT val FROM doanh_thu_nam) / NULLIF((SELECT val FROM phai_thu_cuoi_n
 +------------------------+
 */
 
--- VISUAL: Vòng quay phải thu hiện tại
--- MEASURE: _CongNo[VQ_Phai_Thu_Thang]
-WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable),
+--- VISUAL: Vòng quay phải thu hiện tại
+WITH max_date AS (
+    -- Bước 1: Tìm mốc ngày giao dịch lớn nhất trong bảng phải thu để làm mốc tham chiếu nếu cần
+    SELECT MAX(posting_date) AS dt 
+    FROM silver.fact_accountsreceivable
+),
 doanh_thu_hien_tai AS (
-    -- Trong DAX, người dùng không chọn tháng cụ thể nên nó lấy toàn bộ Doanh thu (YTD)
+    -- Bước 2: Lấy toàn bộ tổng doanh thu thuần (lũy kế YTD) từ bảng kết quả kinh doanh 
+    -- (tương ứng với logic không lọc cứng tháng trên Slicer của Power BI)
     SELECT SUM(current_period_amount) AS val
     FROM silver.fact_incomestatement
-    WHERE indicator_code='B02-DN_10'
+    WHERE indicator_code = 'B02-DN_10'
 ),
 latest_transactions AS (
-    SELECT f.partner_code, f.ending_debit_balance,
-           ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    -- Bước 3: Sử dụng Window Function (ROW_NUMBER) để xác định dòng công nợ mới nhất của từng khách hàng
+    SELECT 
+        f.partner_code, 
+        f.ending_debit_balance,
+        ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) AS rn
     FROM silver.fact_accountsreceivable f
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
     WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
 ),
 phai_thu_hien_tai AS (
+    -- Bước 4: Tổng hợp tổng số dư nợ phải thu hiện tại (tại các dòng rn = 1) của toàn bộ khách hàng
     SELECT SUM(ending_debit_balance) AS val
     FROM latest_transactions
     WHERE rn = 1
 )
--- Vì Đầu kỳ = 0 nên Average = Cuối kỳ (theo logic DAX phòng hờ ISBLANK của user)
-SELECT COALESCE((SELECT val FROM doanh_thu_hien_tai), 0) / NULLIF((SELECT val FROM phai_thu_hien_tai), 0) AS vong_quay_phai_thu_hien_tai;
+-- Bước 5: Tính vòng quay phải thu hiện tại = Tổng doanh thu hiện tại / Tổng số dư phải thu cuối kỳ
+-- Sử dụng COALESCE để đảm bảo an toàn dữ liệu trống và NULLIF ở mẫu số để tránh lỗi chia cho số 0
+SELECT 
+    COALESCE((SELECT val FROM doanh_thu_hien_tai), 0) / NULLIF((SELECT val FROM phai_thu_hien_tai), 0) AS vong_quay_phai_thu_hien_tai;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
@@ -116,16 +147,23 @@ SELECT COALESCE((SELECT val FROM doanh_thu_hien_tai), 0) / NULLIF((SELECT val FR
 +-----------------------------+
 */
 
--- VISUAL: Tổng hóa đơn (Số chứng từ đang treo nợ)
--- MEASURE: _CongNo[Tong_Hoa_Don]
-SELECT COUNT(*) AS tong_hoa_don
+--- VISUAL: Tổng hóa đơn (Số chứng từ đang treo nợ)
+SELECT 
+    -- Đếm tổng số lượng hóa đơn thỏa mãn điều kiện còn nợ từ bảng tạm bên trong
+    COUNT(*) AS tong_hoa_don
 FROM (
+    -- Bước 1: Gom nhóm dữ liệu công nợ theo từng số hóa đơn từ bảng chi tiết phải thu
     SELECT invoice_no
     FROM silver.fact_accountsreceivable f
+    -- Kết hợp với bảng danh mục đối tác để lọc đúng nhóm khách hàng
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
     WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
-      AND f.invoice_no IS NOT NULL AND f.invoice_no != ''
+      -- Chỉ xét các dòng có ghi nhận số hóa đơn hợp lệ (không bị trống hoặc NULL)
+      AND f.invoice_no IS NOT NULL 
+      AND f.invoice_no != ''
     GROUP BY invoice_no
+    -- Bước 2: Lọc điều kiện HAVING chỉ lấy những hóa đơn có tổng phát sinh Nợ trừ Có lớn hơn 0 
+    -- (nghĩa là hóa đơn này vẫn còn dư nợ chưa thanh toán hết)
     HAVING SUM(debit_amount - credit_amount) > 0
 ) t;
 
@@ -139,18 +177,26 @@ FROM (
 +--------------+
 */
 
--- VISUAL: Tổng số khách hàng
--- MEASURE: _CongNo[Tong_KH]
+--- VISUAL: Tổng số khách hàng
 WITH latest_transactions AS (
-    SELECT f.partner_code, f.ending_debit_balance,
-           ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    -- Bước 1: Sử dụng Window Function (ROW_NUMBER) để xác định dòng giao dịch công nợ mới nhất 
+    -- của từng khách hàng dựa trên ngày chứng từ (posting_date) và mã giao dịch (id)
+    SELECT 
+        f.partner_code, 
+        f.ending_debit_balance,
+        ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) AS rn
     FROM silver.fact_accountsreceivable f
+    -- Kết hợp với bảng danh mục đối tác để lọc đúng nhóm đối tượng khách hàng
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
     WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
 )
-SELECT COUNT(*) AS tong_khach_hang
+-- Bước 2: Đếm số lượng khách hàng từ các dòng giao dịch mới nhất (rn = 1) 
+-- mà có số dư nợ cuối kỳ lớn hơn 0 (tức là vẫn đang nợ tiền doanh nghiệp)
+SELECT 
+    COUNT(*) AS tong_khach_hang
 FROM latest_transactions
-WHERE rn = 1 AND ending_debit_balance > 0;
+WHERE rn = 1 
+  AND ending_debit_balance > 0;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
@@ -162,101 +208,166 @@ WHERE rn = 1 AND ending_debit_balance > 0;
 +-----------------+
 */
 
--- VISUAL: Phải thu theo tháng (Phân bổ Trong hạn / Quá hạn bằng logic FIFO)
--- MEASURE: _CongNo[Phai_Thu_Thang]
-WITH months AS (
-    SELECT generate_series('2026-01-01'::date, '2026-08-01'::date, '1 month'::interval) as end_of_month
+--- VISUAL: Phải thu theo tháng (Phân bổ Trong hạn / Quá hạn bằng logic FIFO)
+WITH rng AS (
+    -- Bước 1: Xác định khoảng thời gian mốc (ngày bắt đầu và ngày kết thúc tối đa) có phát sinh giao dịch công nợ
+    SELECT MIN(posting_date) AS min_d, MAX(posting_date) AS max_d
+    FROM silver.fact_accountsreceivable
+),
+report_months AS (
+    -- Bước 2: Tạo danh sách các mốc ngày chốt báo cáo theo từng tháng trong năm 2026 (ngày cuối tháng)
+    -- Chỉ lấy những tháng có dữ liệu tính đến trước hoặc bằng ngày giao dịch mới nhất trong hệ thống
+    SELECT (date_trunc('month', gs) + interval '1 month - 1 day')::date AS report_date
+    FROM generate_series('2026-01-01'::date, '2026-12-01'::date, interval '1 month') gs
+    WHERE (date_trunc('month', gs) + interval '1 month - 1 day')::date <= (SELECT max_d FROM rng)
 ),
 cust_balances AS (
-    SELECT m.end_of_month, f.partner_code, f.ending_debit_balance as total_debt,
-           ROW_NUMBER() OVER (PARTITION BY m.end_of_month, f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
-    FROM months m
-    JOIN silver.fact_accountsreceivable f ON f.posting_date <= (m.end_of_month + interval '1 month - 1 day')
+    -- Bước 3: Tính toán số dư công nợ lũy kế của từng khách hàng tại từng mốc tháng báo cáo
+    SELECT 
+        m.report_date, 
+        f.partner_code, 
+        f.ending_debit_balance AS total_debt,
+        ROW_NUMBER() OVER (
+            PARTITION BY m.report_date, f.partner_code 
+            ORDER BY f.posting_date DESC, f.id DESC
+        ) AS rn
+    FROM report_months m
+    JOIN silver.fact_accountsreceivable f ON f.posting_date <= m.report_date
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
     WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
 ),
 positive_balances AS (
-    SELECT end_of_month, partner_code, total_debt
-    FROM cust_balances
+    -- Bước 4: Lọc ra các dòng số dư mới nhất (rn = 1) và chỉ lấy những khách hàng đang có dư nợ dương (> 0)
+    SELECT report_date, partner_code, total_debt
+    FROM cust_balances 
     WHERE rn = 1 AND total_debt > 0
 ),
 invoices AS (
-    SELECT m.end_of_month, f.partner_code, f.invoice_no, f.invoice_date, f.debit_amount
-    FROM months m
-    JOIN silver.fact_accountsreceivable f ON f.posting_date <= (m.end_of_month + interval '1 month - 1 day')
-    WHERE f.debit_amount > 0 AND f.invoice_no IS NOT NULL AND f.invoice_no != ''
+    -- Bước 5: Gom nhóm chi tiết các phát sinh theo từng số hóa đơn của từng khách hàng tính đến thời điểm báo cáo
+    SELECT 
+        m.report_date, 
+        f.partner_code, 
+        f.invoice_no,
+        MIN(f.invoice_date) AS invoice_date,
+        SUM(f.debit_amount) AS debit_amount
+    FROM report_months m
+    JOIN silver.fact_accountsreceivable f ON f.posting_date <= m.report_date
+    JOIN positive_balances pb ON pb.report_date = m.report_date AND pb.partner_code = f.partner_code
+    WHERE f.debit_amount > 0 AND f.invoice_no IS NOT NULL AND f.invoice_no <> ''
+    GROUP BY m.report_date, f.partner_code, f.invoice_no
 ),
 invoices_running AS (
-    SELECT i.end_of_month, i.partner_code, i.invoice_no, i.invoice_date, i.debit_amount,
-           SUM(i.debit_amount) OVER (PARTITION BY i.end_of_month, i.partner_code ORDER BY i.invoice_date DESC, i.invoice_no DESC) as running_total
+    -- Bước 6: Sắp xếp hóa đơn theo thời gian giảm dần và tính tổng cộng dồn (running total) giá trị nợ hóa đơn
+    SELECT 
+        i.*,
+        SUM(i.debit_amount) OVER (
+            PARTITION BY i.report_date, i.partner_code
+            ORDER BY i.invoice_date DESC, i.invoice_no DESC
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS running_total
     FROM invoices i
-    JOIN positive_balances pb ON i.partner_code = pb.partner_code AND i.end_of_month = pb.end_of_month
 ),
 unpaid_invoices AS (
-    SELECT i.end_of_month, i.partner_code, i.invoice_no, i.invoice_date,
-           LEAST(i.debit_amount, GREATEST(0, pb.total_debt - (i.running_total - i.debit_amount))) as unpaid_amount
-    FROM invoices_running i
-    JOIN positive_balances pb ON i.partner_code = pb.partner_code AND i.end_of_month = pb.end_of_month
+    -- Bước 7: Áp dụng thuật toán FIFO để phân bổ tổng số dư nợ thực tế vào các hóa đơn chưa thanh toán
+    SELECT 
+        r.report_date, 
+        r.partner_code, 
+        r.invoice_no, 
+        r.invoice_date,
+        LEAST(
+            r.debit_amount,
+            GREATEST(0, pb.total_debt - (r.running_total - r.debit_amount))
+        ) AS unpaid_amount
+    FROM invoices_running r
+    JOIN positive_balances pb USING (report_date, partner_code)
+),
+categorized AS (
+    -- Bước 8: Phân loại hóa đơn thành "Trong hạn" (<= 30 ngày) hoặc "Quá hạn" (> 30 ngày) dựa trên khoảng cách ngày
+    SELECT 
+        pb.report_date, 
+        pb.partner_code, 
+        pb.total_debt,
+        COALESCE(SUM(ui.unpaid_amount), 0) AS total_inv_unpaid,
+        COALESCE(SUM(CASE WHEN pb.report_date - ui.invoice_date <= 30 THEN ui.unpaid_amount END), 0) AS no_trong_han,
+        COALESCE(SUM(CASE WHEN pb.report_date - ui.invoice_date > 30 THEN ui.unpaid_amount END), 0) AS no_qua_han,
+        COUNT(DISTINCT CASE WHEN ui.unpaid_amount > 0 THEN ui.invoice_no END) AS so_hd
+    FROM positive_balances pb
+    LEFT JOIN unpaid_invoices ui USING (report_date, partner_code)
+    GROUP BY pb.report_date, pb.partner_code, pb.total_debt
 )
+-- Bước 9: Tổng hợp kết quả cuối cùng theo từng tháng để đưa lên biểu đồ phân tích
 SELECT 
-    end_of_month AS MONTH,
-    SUM(CASE WHEN (end_of_month + interval '1 month - 1 day')::date - invoice_date <= 30 THEN unpaid_amount ELSE 0 END) as no_trong_han,
-    SUM(CASE WHEN (end_of_month + interval '1 month - 1 day')::date - invoice_date > 30 THEN unpaid_amount ELSE 0 END) as no_qua_han,
-    SUM(unpaid_amount) as tong_no
-FROM unpaid_invoices
-WHERE unpaid_amount > 0
-GROUP BY end_of_month
-ORDER BY end_of_month;
+    TO_CHAR(c.report_date, 'YYYY-MM') AS thang_nam,
+    SUM(no_trong_han)                                           AS trong_han,
+    SUM(no_qua_han)                                             AS qua_han_hoa_don,
+    SUM(GREATEST(0, total_debt - total_inv_unpaid))             AS du_dau_ky_khac,
+    -- Cộng dồn phần dư đầu kỳ cũ hơn 30 ngày vào tổng nợ quá hạn
+    SUM(no_qua_han)
+      + CASE WHEN c.report_date - ((SELECT min_d FROM rng) - 1) > 30
+             THEN SUM(GREATEST(0, total_debt - total_inv_unpaid)) ELSE 0 END AS qua_han_tong,
+    SUM(total_debt)                                             AS tong_du_no,
+    SUM(so_hd)                                                  AS tong_so_hoa_don_no
+FROM categorized c
+GROUP BY c.report_date
+ORDER BY c.report_date;
 
-/* RESULT LOG:
--- GHI CHÚ FILTER: Phân bổ FIFO số dư cuối tháng vào các hóa đơn từ mới nhất lùi về cũ nhất (Đã lọc Khách Hàng)
-+---------------------------+----------------+----------------+----------------+
-|           month           |  no_trong_han  |   no_qua_han   |    tong_no     |
-+---------------------------+----------------+----------------+----------------+
-| 2026-01-01 00:00:00+00:00 |  8709649703.00 |           0.00 |  8709649703.00 |
-| 2026-02-01 00:00:00+00:00 |  2641264450.00 |  1245031101.00 |  3886295551.00 |
-| 2026-03-01 00:00:00+00:00 |  6790803062.00 |   922992150.00 |  7713795212.00 |
-| 2026-04-01 00:00:00+00:00 |  6058367903.00 |  1119632623.00 |  7178000526.00 |
-| 2026-05-01 00:00:00+00:00 |  1809698049.00 |  1947808609.00 |  3757506658.00 |
-| 2026-06-01 00:00:00+00:00 |  8847126174.00 |  2868993665.00 | 11716119839.00 |
-| 2026-07-01 00:00:00+00:00 | 19425981847.00 |  4285069621.00 | 23711051468.00 |
-| 2026-08-01 00:00:00+00:00 |           0.00 | 23711051468.00 | 23711051468.00 |
-+---------------------------+----------------+----------------+----------------+
-*/
 
--- VISUAL: Receivable Turnover
--- MEASURE: _CongNo[VQ_Phai_Thu]
+-- VISUAL: Hệ số Vòng quay phải thu theo tháng (Monthly Receivable Turnover with Average Debt)
+
 WITH doanh_thu AS (
-    SELECT DATE_TRUNC('month', month) AS MONTH, SUM(current_period_amount) AS val
-    FROM silver.fact_incomestatement WHERE indicator_code='B02-DN_10' GROUP BY 1
+    -- Bước 1: Tổng hợp doanh thu thực tế theo từng tháng từ bảng kết quả kinh doanh (Chỉ tiêu Doanh thu thuần B02-DN_10)
+    SELECT 
+        DATE_TRUNC('month', month) AS MONTH, 
+        SUM(current_period_amount) AS val
+    FROM silver.fact_incomestatement 
+    WHERE indicator_code = 'B02-DN_10' 
+    GROUP BY 1
 ),
 months AS (
-    SELECT generate_series('2026-01-01'::date, '2026-08-01'::date, '1 month'::interval) as start_month
+    -- Bước 2: Tạo chuỗi các mốc thời gian bắt đầu từ tháng 01/2026 đến tháng 08/2026
+    SELECT 
+        generate_series('2026-01-01'::date, '2026-08-01'::date, '1 month'::interval) AS start_month
 ),
 cust_balances AS (
-    SELECT m.start_month,
-           f.partner_code, 
-           f.ending_debit_balance,
-           ROW_NUMBER() OVER (PARTITION BY m.start_month, f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
+    -- Bước 3: Xác định số dư công nợ của từng khách hàng tại thời điểm cuối mỗi tháng trong khoảng thời gian đã tạo
+    SELECT 
+        m.start_month,
+        f.partner_code, 
+        f.ending_debit_balance,
+        ROW_NUMBER() OVER (
+            PARTITION BY m.start_month, f.partner_code 
+            ORDER BY f.posting_date DESC, f.id DESC
+        ) AS rn
     FROM months m
+    -- Lấy các giao dịch công nợ phát sinh từ đầu năm đến ngày cuối cùng của tháng đó
     JOIN silver.fact_accountsreceivable f ON f.posting_date <= (m.start_month + interval '1 month - 1 day')
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
     WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
 ),
 monthly_debt AS (
-    SELECT start_month, SUM(ending_debit_balance) as total_debt
+    -- Bước 4: Tổng hợp tổng số dư nợ phải thu cuối kỳ của toàn bộ khách hàng (rn = 1) theo từng tháng
+    SELECT 
+        start_month, 
+        SUM(ending_debit_balance) AS total_debt
     FROM cust_balances
     WHERE rn = 1
     GROUP BY start_month
 ),
 monthly_avg_debt AS (
-    SELECT start_month, total_debt,
-           LAG(total_debt) OVER (ORDER BY start_month) as prev_debt,
-           (total_debt + COALESCE(LAG(total_debt) OVER (ORDER BY start_month), total_debt)) / 2.0 as avg_debt
+    -- Bước 5: Tính số dư công nợ bình quân tháng (Trung bình cộng giữa dư nợ cuối tháng hiện tại và dư nợ tháng trước)
+    -- Sử dụng hàm LAG để lấy số dư của tháng trước, nếu không có (tháng đầu tiên) thì lấy chính giá trị hiện tại
+    SELECT 
+        start_month, 
+        total_debt,
+        LAG(total_debt) OVER (ORDER BY start_month) AS prev_debt,
+        (total_debt + COALESCE(LAG(total_debt) OVER (ORDER BY start_month), total_debt)) / 2.0 AS avg_debt
     FROM monthly_debt
 )
-SELECT d.start_month as MONTH, 
-       dt.val / NULLIF(d.avg_debt, 0) AS vong_quay_thang
+-- Bước 6: Tính hệ số vòng quay phải thu theo tháng = Doanh thu tháng / Số dư nợ phải thu bình quân tháng
+-- Sử dụng NULLIF ở mẫu số để tránh lỗi chia cho số 0
+SELECT 
+    d.start_month AS MONTH, 
+    dt.val / NULLIF(d.avg_debt, 0) AS vong_quay_thang
 FROM monthly_avg_debt d
 LEFT JOIN doanh_thu dt ON d.start_month = dt.MONTH
 ORDER BY d.start_month;
@@ -277,20 +388,30 @@ ORDER BY d.start_month;
 +---------------------------+---------------------+
 */
 
--- VISUAL: Top 10 KH nợ cao nhất
--- MEASURE: _CongNo[Top_10_No]
-SELECT p.partner_name AS ten_khach_hang,
-       f.ending_debit_balance AS du_no_cuoi_ky
+--- VISUAL: Top 10 KH nợ cao nhất
+SELECT 
+    -- Lấy tên khách hàng từ bảng danh mục đối tác
+    p.partner_name AS ten_khach_hang,
+    
+    -- Lấy số dư nợ cuối kỳ của khách hàng đó tại giao dịch mới nhất
+    f.ending_debit_balance AS du_no_cuoi_ky
 FROM silver.fact_accountsreceivable f
+-- Kết hợp với bảng danh mục đối tác để lấy tên tương ứng với mã đối tác
 JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+-- Lọc điều kiện cốt lõi: Chỉ lấy dòng giao dịch có mã định danh (id) lớn nhất của từng khách hàng 
+-- (tương ứng với bản ghi/chứng từ cập nhật số dư mới nhất)
 WHERE f.id IN (
     SELECT MAX(id)
     FROM silver.fact_accountsreceivable
     GROUP BY partner_code
 ) 
-AND p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
-AND f.ending_debit_balance > 0
+-- Chỉ lấy các đối tượng thuộc nhóm khách hàng thuần túy hoặc nhóm kiêm nhiệm cả nhà cung cấp
+  AND p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
+-- Chỉ chọn những khách hàng đang thực sự còn dư nợ dương lớn hơn 0
+  AND f.ending_debit_balance > 0
+-- Sắp xếp giảm dần theo số dư nợ cuối kỳ để đưa các khách hàng nợ nhiều nhất lên đầu
 ORDER BY du_no_cuoi_ky DESC
+-- Giới hạn chỉ lấy đúng 10 khách hàng đứng đầu bảng xếp hạng
 LIMIT 10;
 
 /* RESULT LOG:
@@ -312,44 +433,56 @@ LIMIT 10;
 +--------------------------------------------------+-----------------+
 */
 
--- VISUAL: Top 10 KH dư nợ quá hạn (Nợ xấu)
--- MEASURE: _CongNo[Top_10_Qua_Han]
+--- VISUAL: Top 10 KH dư nợ quá hạn (Nợ xấu)
 -- THEO ĐÚNG CHUẨN CÔNG THỨC TRONG BRD:
 -- + Số tiền còn nợ = Phát sinh nợ - Phát sinh có
 -- + Ngày đáo hạn = Ngày hóa đơn + 30
 -- + Số ngày quá hạn = Ngày hiện tại - Ngày đáo hạn
 -- + Nợ quá hạn = Số tiền còn nợ khi Số ngày quá hạn > 0
-WITH max_date AS (SELECT '2026-07-31'::date AS dt), -- Ngày hiện tại (Mô phỏng Power BI)
+WITH max_date AS (
+    -- Bước 1: Khởi tạo mốc thời gian hiện tại (giả lập ngày chốt báo cáo cho Power BI)
+    SELECT '2026-07-31'::date AS dt
+), 
 khach_hang_no AS (
-    SELECT p.partner_name AS ten_khach_hang,
-           -- Nợ trong hạn: Số ngày quá hạn <= 0
-           SUM(CASE WHEN (SELECT dt FROM max_date) - (f.invoice_date + 30) <= 0 
-                    THEN f.debit_amount - f.credit_amount ELSE 0 END) AS no_trong_han,
-           
-           -- Nợ quá hạn (Nợ xấu): Số ngày quá hạn > 0
-           SUM(CASE WHEN (SELECT dt FROM max_date) - (f.invoice_date + 30) > 0 
-                    THEN f.debit_amount - f.credit_amount ELSE 0 END) AS no_qua_han,
-           
-           -- Số dư (Tổng nợ) = Phát sinh nợ - Phát sinh có
-           SUM(f.debit_amount - f.credit_amount) AS so_tien_con_no,
-           
-           -- Số hóa đơn (Đếm số hóa đơn)
-           COUNT(DISTINCT f.invoice_no) AS so_hoa_don
+    -- Bước 2: Tổng hợp số liệu công nợ theo từng khách hàng dựa trên hóa đơn phát sinh
+    SELECT 
+        p.partner_name AS ten_khach_hang,
+        
+        -- Nợ trong hạn: Phân bổ số tiền còn nợ nếu số ngày quá hạn <= 0 (chưa đến hạn thanh toán)
+        SUM(CASE WHEN (SELECT dt FROM max_date) - (f.invoice_date + 30) <= 0 
+                 THEN f.debit_amount - f.credit_amount ELSE 0 END) AS no_trong_han,
+        
+        -- Nợ quá hạn (Nợ xấu): Phân bổ số tiền còn nợ nếu số ngày quá hạn > 0 (đã quá thời hạn 30 ngày)
+        SUM(CASE WHEN (SELECT dt FROM max_date) - (f.invoice_date + 30) > 0 
+                 THEN f.debit_amount - f.credit_amount ELSE 0 END) AS no_qua_han,
+        
+        -- Số dư tổng (Tổng nợ hiện tại) = Tổng phát sinh nợ trừ đi tổng phát sinh có của khách hàng
+        SUM(f.debit_amount - f.credit_amount) AS so_tien_con_no,
+        
+        -- Thống kê tổng số lượng hóa đơn có phát sinh giao dịch
+        COUNT(DISTINCT f.invoice_no) AS so_hoa_don
     FROM silver.fact_accountsreceivable f
+    -- Kết hợp với bảng danh mục đối tác để lấy tên khách hàng
     JOIN silver.dim_partner p ON f.partner_code = p.partner_code
+    -- Chỉ xét các đối tượng thuộc nhóm khách hàng và lọc các giao dịch tính đến trước ngày chốt báo cáo
     WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
       AND f.posting_date <= '2026-07-31'
     GROUP BY p.partner_name
+    -- Bước 3: Lọc điều kiện HAVING chỉ lấy những khách hàng thực sự có tổng số tiền nợ quá hạn lớn hơn 0
     HAVING SUM(CASE WHEN (SELECT dt FROM max_date) - (f.invoice_date + 30) > 0 
                     THEN f.debit_amount - f.credit_amount ELSE 0 END) > 0
 )
-SELECT ten_khach_hang,
-       no_trong_han,
-       no_qua_han,
-       so_tien_con_no,
-       no_qua_han / NULLIF(so_tien_con_no, 0) AS ty_le_qua_han,
-       so_hoa_don
+-- Bước 4: Trình bày kết quả chi tiết, tính tỷ lệ quá hạn và giới hạn Top 10 khách hàng nợ xấu cao nhất
+SELECT 
+    ten_khach_hang,
+    no_trong_han,
+    no_qua_han,
+    so_tien_con_no,
+    -- Tính tỷ lệ nợ quá hạn trên tổng số tiền còn nợ (Dùng NULLIF ở mẫu số để tránh lỗi chia cho 0)
+    no_qua_han / NULLIF(so_tien_con_no, 0) AS ty_le_qua_han,
+    so_hoa_don
 FROM khach_hang_no
+-- Sắp xếp giảm dần theo giá trị nợ quá hạn để đưa các khách hàng nợ xấu nặng nhất lên đầu
 ORDER BY no_qua_han DESC
 LIMIT 10;
 
@@ -373,74 +506,56 @@ LIMIT 10;
 
 -- VISUAL: Tuổi nợ Aging
 -- MEASURE: _CongNo[Aging]
-WITH cust_balances AS (
-    SELECT f.partner_code, f.ending_debit_balance as total_debt,
-           ROW_NUMBER() OVER (PARTITION BY f.partner_code ORDER BY f.posting_date DESC, f.id DESC) as rn
-    FROM silver.fact_accountsreceivable f
-    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
-    WHERE p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
-      AND f.posting_date <= '2026-07-31' -- Filter mô phỏng Power BI chọn T7-2026
-),
-positive_balances AS (
-    SELECT partner_code, total_debt FROM cust_balances WHERE rn = 1 AND total_debt > 0
-),
-invoices AS (
-    SELECT f.partner_code, f.invoice_no, f.invoice_date, f.debit_amount, f.id
-    FROM silver.fact_accountsreceivable f
-    JOIN silver.dim_partner p ON f.partner_code = p.partner_code
-    WHERE f.debit_amount > 0 AND f.invoice_no IS NOT NULL AND f.invoice_no != ''
-      AND p.partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp')
-      AND f.posting_date <= '2026-07-31'
-),
-invoices_running AS (
-    SELECT i.partner_code, i.invoice_no, i.invoice_date, i.debit_amount,
-           SUM(i.debit_amount) OVER (PARTITION BY i.partner_code ORDER BY i.invoice_date DESC, i.invoice_no DESC) as running_total
-    FROM invoices i
-    JOIN positive_balances pb ON i.partner_code = pb.partner_code
-),
-unpaid_invoices AS (
-    SELECT i.partner_code, i.invoice_no, i.invoice_date,
-           LEAST(i.debit_amount, GREATEST(0, pb.total_debt - (i.running_total - i.debit_amount))) as unpaid_amount
-    FROM invoices_running i
-    JOIN positive_balances pb ON i.partner_code = pb.partner_code
-),
-aging_calc AS (
-    SELECT 
-        '2026-07-31'::date - invoice_date AS days_since_invoice,
-        unpaid_amount
-    FROM unpaid_invoices
-    WHERE unpaid_amount > 0
-)
-SELECT 
-    CASE
-        WHEN days_since_invoice <= 0 THEN 'Current'
-        WHEN days_since_invoice BETWEEN 1 AND 30 THEN '1-30'
-        WHEN days_since_invoice BETWEEN 31 AND 60 THEN '31-60'
-        WHEN days_since_invoice BETWEEN 61 AND 90 THEN '61-90'
-        WHEN days_since_invoice BETWEEN 91 AND 120 THEN '91-120'
-        WHEN days_since_invoice BETWEEN 121 AND 150 THEN '121-150'
-        WHEN days_since_invoice BETWEEN 151 AND 180 THEN '151-180'
-        ELSE '180+'
-    END AS age_bucket,
-    SUM(unpaid_amount) AS gia_tri
-FROM aging_calc
+WITH params AS (SELECT DATE '2026-07-31' AS d),
+cust AS (
+  SELECT DISTINCT ON (f.partner_code) f.partner_code, f.ending_debit_balance AS total_debt
+  FROM silver.fact_accountsreceivable f
+  JOIN silver.dim_partner p ON p.partner_code = f.partner_code
+  WHERE p.partner_group IN ('Khách hàng','Khách hàng/ nhà cung cấp')
+    AND f.posting_date <= (SELECT d FROM params)
+  ORDER BY f.partner_code, f.posting_date DESC, f.id DESC),
+pos AS (SELECT * FROM cust WHERE total_debt > 0),
+docs AS (
+  SELECT f.partner_code,
+         COALESCE(NULLIF(f.invoice_no,''), 'ROW-' || f.id)  AS doc_key,
+         MIN(COALESCE(f.invoice_date, f.posting_date))      AS doc_date,
+         SUM(f.debit_amount)                                AS amt
+  FROM silver.fact_accountsreceivable f
+  JOIN pos USING (partner_code)
+  WHERE f.debit_amount > 0 AND f.posting_date <= (SELECT d FROM params)
+  GROUP BY 1, 2),
+run AS (
+  SELECT d.partner_code, d.doc_date, d.amt, pos.total_debt,
+         SUM(d.amt) OVER (PARTITION BY d.partner_code
+                          ORDER BY d.doc_date DESC, d.doc_key DESC
+                          ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cum
+  FROM docs d JOIN pos USING (partner_code)),
+unpaid AS (
+  SELECT partner_code, doc_date,
+         LEAST(amt, GREATEST(0, total_debt - (cum - amt))) AS unpaid
+  FROM run),
+rest AS (
+  SELECT p.partner_code, GREATEST(0, p.total_debt - COALESCE(SUM(u.unpaid), 0)) AS unpaid
+  FROM pos p LEFT JOIN unpaid u USING (partner_code)
+  GROUP BY p.partner_code, p.total_debt),
+allrows AS (
+  SELECT (SELECT d FROM params) - doc_date AS days, unpaid FROM unpaid WHERE unpaid > 0
+  UNION ALL
+  SELECT NULL, unpaid FROM rest WHERE unpaid > 0)
+SELECT CASE WHEN days IS NULL THEN 'Khác (không có chứng từ)'
+            WHEN days <= 0   THEN 'Current'
+            WHEN days <= 30  THEN '1-30'
+            WHEN days <= 60  THEN '31-60'
+            WHEN days <= 90  THEN '61-90'
+            WHEN days <= 120 THEN '91-120'
+            WHEN days <= 150 THEN '121-150'
+            WHEN days <= 180 THEN '151-180'
+            ELSE '180+' END AS bucket,
+       SUM(unpaid) AS gia_tri
+FROM allrows
 GROUP BY 1
-ORDER BY age_bucket;
+ORDER BY MIN(COALESCE(days, 99999));
 
-/* RESULT LOG:
--- GHI CHÚ FILTER: Chốt mốc dữ liệu ngày '2026-07-31' (Tương đương việc chọn Slicer Tháng 7/2026 trên Power BI)
-+------------+----------------+
-| age_bucket |    gia_tri     |
-+------------+----------------+
-|    1-30    | 20493713144.00 |
-|   31-60    |  5296238877.00 |
-|   61-90    |  2266863249.00 |
-|   91-120   |  2028117936.00 |
-|  121-150   |  1403693393.00 |
-|  151-180   |  2004346529.00 |
-|    180+    |  3067552569.00 |
-+------------+----------------+
-*/
 
 -- VISUAL: Bảng chi tiết các hóa đơn đang nợ
 -- MEASURE: _CongNo[Chi_Tiet_Hoa_Don]
@@ -482,19 +597,50 @@ WHERE (debit_amount - credit_amount) > 0;
 ...(TRUNCATED FOR READABILITY)...
 */
 
--- VISUAL: Bảng chi tiết nợ theo Khách hàng
--- MEASURE: _CongNo[Chi_Tiet_No_KH]
-WITH max_date AS (SELECT MAX(posting_date) AS dt FROM silver.fact_accountsreceivable)
-SELECT partner_code AS ma_khach_hang,
-       SUM(CASE WHEN (SELECT dt FROM max_date) <= invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) AS no_trong_han,
-       SUM(CASE WHEN (SELECT dt FROM max_date) <= invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) / NULLIF(SUM(debit_amount - credit_amount), 0) AS phan_tram_trong_han,
-       SUM(CASE WHEN (SELECT dt FROM max_date) > invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) AS no_qua_han,
-       SUM(CASE WHEN (SELECT dt FROM max_date) > invoice_date + 30 THEN debit_amount - credit_amount ELSE 0 END) / NULLIF(SUM(debit_amount - credit_amount), 0) AS phan_tram_qua_han,
-       SUM(debit_amount - credit_amount) AS du_no_phai_thu
-FROM silver.fact_accountsreceivable
-GROUP BY 1
-HAVING SUM(debit_amount - credit_amount) > 0;
+--- VISUAL: Bảng chi tiết nợ theo Khách hàng
+WITH max_date AS (
+    -- Bước 1: Lấy mốc thời gian mới nhất có phát sinh giao dịch trong hệ thống để làm ngày chốt báo cáo ảo
+    SELECT MAX(posting_date) AS dt 
+    FROM silver.fact_accountsreceivable
+)
+SELECT 
+    partner_code AS ma_khach_hang,
+    
+    -- 1. NỢ TRONG HẠN: Khoảng cách từ ngày chốt báo cáo đến ngày hóa đơn <= 30 ngày
+    SUM(
+        CASE WHEN invoice_date IS NOT NULL AND (SELECT dt FROM max_date) <= invoice_date + 30 
+             THEN debit_amount - credit_amount ELSE 0 
+        END
+    ) AS no_trong_han,
+    
+    -- 2. TỶ TRỌNG TRONG HẠN: = Nợ trong hạn / Tổng dư nợ (Dùng NULLIF ở mẫu số để tránh lỗi Divide by Zero)
+    SUM(
+        CASE WHEN invoice_date IS NOT NULL AND (SELECT dt FROM max_date) <= invoice_date + 30 
+             THEN debit_amount - credit_amount ELSE 0 
+        END
+    ) / NULLIF(SUM(debit_amount - credit_amount), 0) AS phan_tram_trong_han,
+    
+    -- 3. NỢ QUÁ HẠN: Khoảng cách từ ngày chốt báo cáo đến ngày hóa đơn > 30 ngày
+    SUM(
+        CASE WHEN invoice_date IS NOT NULL AND (SELECT dt FROM max_date) > invoice_date + 30 
+             THEN debit_amount - credit_amount ELSE 0 
+        END
+    ) AS no_qua_han,
+    
+    -- 4. TỶ TRỌNG QUÁ HẠN: = Nợ quá hạn / Tổng dư nợ
+    SUM(
+        CASE WHEN invoice_date IS NOT NULL AND (SELECT dt FROM max_date) > invoice_date + 30 
+             THEN debit_amount - credit_amount ELSE 0 
+        END
+    ) / NULLIF(SUM(debit_amount - credit_amount), 0) AS phan_tram_qua_han,
+    
+    -- 5. TỔNG DƯ NỢ: Lấy toàn bộ phát sinh Nợ trừ đi phát sinh Có của khách hàng đó
+    SUM(debit_amount - credit_amount) AS du_no_phai_thu
 
+FROM silver.fact_accountsreceivable
+GROUP BY 1 -- Gom nhóm theo cột số 1 (partner_code)
+-- Bước 2: Bộ lọc mức tập hợp (HAVING) chỉ giữ lại những khách hàng đang thực sự có tổng dư nợ dương
+HAVING SUM(debit_amount - credit_amount) > 0;
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
 -- HAVING SUM(debit_amount - credit_amount) > 0;

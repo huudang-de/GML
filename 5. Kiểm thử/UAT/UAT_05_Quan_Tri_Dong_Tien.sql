@@ -116,19 +116,35 @@ ORDER BY c.MONTH;
 */
 
 -- VISUAL: Cơ cấu dòng thu theo Bank
--- MEASURE: _DongTien[Dong_Thu_Bank]
-SELECT b.bank_code AS bank_code,
-       c.reciprocal_account,
-       SUM(c.debit_amount) AS gia_tri_thu
+SELECT 
+    b.bank_code AS bank_code,           -- Mã ngân hàng (VD: VCB, BIDV, TCB,...)
+    c.reciprocal_account,               -- Tài khoản đối ứng (VD: 131 - Phải thu khách hàng, 331,...)
+    SUM(c.debit_amount) AS gia_tri_thu  -- Tổng giá trị tiền thu vào (Phát sinh Nợ của tài khoản tiền gửi 112)
 FROM silver.fact_cashflow c
-LEFT JOIN silver.dim_account a ON c.account_no = a.account_no
-LEFT JOIN silver.dim_accountnumber b ON a.account_bank = b.account_bank
-WHERE c.account_no LIKE '112%'
-  AND c.voucher_no NOT LIKE 'CTNB%'
-  AND c.voucher_no NOT LIKE 'NTTK%'
-  AND c.reciprocal_account NOT LIKE '111%' 
-  AND c.reciprocal_account NOT LIKE '112%'
-GROUP BY 1, 2;
+-- Liên kết với bảng danh mục tài khoản kế toán để xác định tài khoản ngân hàng nào đang phát sinh giao dịch
+LEFT JOIN silver.dim_account a 
+    ON c.account_no = a.account_no
+-- Liên kết với bảng danh mục số tài khoản ngân hàng để quy đổi ra mã viết tắt của ngân hàng
+LEFT JOIN silver.dim_accountnumber b 
+    ON a.account_bank = b.account_bank
+WHERE 
+    -- 1. Chỉ lọc các giao dịch phát sinh trên hệ thống tài khoản Tiền gửi ngân hàng (TK 112 theo Chế độ kế toán doanh nghiệp Việt Nam)
+    c.account_no LIKE '112%'
+    
+    -- 2. Loại trừ các chứng từ chuyển tiền nội bộ (Mã ký hiệu CTNB trên MISA)
+    AND c.voucher_no NOT LIKE 'CTNB%'
+    
+    -- 3. Loại trừ các chứng từ nộp tiền/chuyển tiền nội bộ khác (Mã ký hiệu NTTK)
+    AND c.voucher_no NOT LIKE 'NTTK%'
+    
+    -- 4. Lọc sạch các giao dịch đối ứng nội bộ: Không lấy tài khoản đối ứng là Tiền mặt (111) hoặc các TK Tiền gửi khác (112)
+    -- Giúp báo cáo dòng tiền chỉ phản ánh các khoản thu thực tế từ bên ngoài (Khách hàng thanh toán, đối tác chuyển tiền...), 
+    -- tránh bị sai lệch do nghiệp vụ rút tiền gửi về quỹ tiền mặt hoặc luân chuyển nội bộ giữa các tài khoản cty.
+    AND c.reciprocal_account NOT LIKE '111%' 
+    AND c.reciprocal_account NOT LIKE '112%'
+GROUP BY 
+    b.bank_code, 
+    c.reciprocal_account;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
@@ -146,20 +162,37 @@ GROUP BY 1, 2;
 ...(TRUNCATED FOR READABILITY)...
 */
 
--- VISUAL: Cơ cấu dòng chi theo Bank
--- MEASURE: _DongTien[Dong_Chi_Bank]
-SELECT b.bank_code AS bank_code,
-       c.reciprocal_account,
-       SUM(c.credit_amount) AS gia_tri_chi
+-- VISUAL: Cơ cấu dòng chi theo Bank (Phân tích dòng tiền chi thực tế từ các tài khoản ngân hàng ra bên ngoài)
+
+SELECT 
+    b.bank_code AS bank_code,           -- Mã ngân hàng chi tiền (VD: VCB, BIDV, TCB,...)
+    c.reciprocal_account,               -- Tài khoản đối ứng (VD: 331 - Phải trả người bán, 334, 333,...)
+    SUM(c.credit_amount) AS gia_tri_chi -- Tổng giá trị tiền chi ra (Phát sinh Có của tài khoản tiền gửi 112)
 FROM silver.fact_cashflow c
-LEFT JOIN silver.dim_account a ON c.account_no = a.account_no
-LEFT JOIN silver.dim_accountnumber b ON a.account_bank = b.account_bank
-WHERE c.account_no LIKE '112%'
-  AND c.voucher_no NOT LIKE 'CTNB%'
-  AND c.voucher_no NOT LIKE 'NTTK%'
-  AND c.reciprocal_account NOT LIKE '111%' 
-  AND c.reciprocal_account NOT LIKE '112%'
-GROUP BY 1, 2;
+-- Liên kết với danh mục tài khoản kế toán để ánh xạ số hiệu tài khoản
+LEFT JOIN silver.dim_account a 
+    ON c.account_no = a.account_no
+-- Liên kết với danh mục ngân hàng để quy đổi ra mã định danh ngân hàng rút tiền
+LEFT JOIN silver.dim_accountnumber b 
+    ON a.account_bank = b.account_bank
+WHERE 
+    -- 1. Chỉ tập trung vào các giao dịch xuất quỹ tiền gửi ngân hàng (TK 112)
+    c.account_no LIKE '112%'
+    
+    -- 2. Loại trừ các chứng từ chuyển tiền nội bộ hệ thống công ty (Mã CTNB)
+    AND c.voucher_no NOT LIKE 'CTNB%'
+    
+    -- 3. Loại trừ các chứng từ nộp/chuyển tiền nội bộ khác (Mã NTTK)
+    AND c.voucher_no NOT LIKE 'NTTK%'
+    
+    -- 4. Loại bỏ các bút toán đối ứng nội bộ: Không lấy tài khoản đối ứng là Tiền mặt (111) hoặc Tiền gửi khác (112)
+    -- Đảm bảo chỉ đo lường đúng dòng tiền thanh toán thực tế ra bên ngoài (trả tiền nhà cung cấp, nộp thuế, chi phí vận hành...), 
+    -- tránh làm sai lệch số liệu do nghiệp vụ rút tiền gửi nhập quỹ tiền mặt hoặc điều chuyển vốn nội bộ giữa các tài khoản.
+    AND c.reciprocal_account NOT LIKE '111%' 
+    AND c.reciprocal_account NOT LIKE '112%'
+GROUP BY 
+    b.bank_code, 
+    c.reciprocal_account;
 
 /* RESULT LOG:
 -- GHI CHÚ FILTER:
@@ -176,13 +209,26 @@ GROUP BY 1, 2;
 ...(TRUNCATED FOR READABILITY)...
 */
 
--- VISUAL: Tài sản/Nợ/VLĐ
--- MEASURE: _DongTien[Working_Capital]
-SELECT DATE_TRUNC('month', reporting_date) AS MONTH,
-       SUM(CASE WHEN indicator_code='B01-DN_100' THEN ending_balance ELSE 0 END) - 
-       SUM(CASE WHEN indicator_code='B01-DN_310' THEN ending_balance ELSE 0 END) AS vld_rong
+-- VISUAL: Bảng theo dõi Tài sản ngắn hạn, Nợ ngắn hạn và Vốn lưu động ròng theo tháng
+
+SELECT
+    DATE_TRUNC('month', reporting_date) AS thang_bao_cao,
+    
+    -- 1. Tài sản ngắn hạn (Mã chỉ tiêu B01-DN_100 theo chuẩn VAS)
+    SUM(CASE WHEN indicator_code = 'B01-DN_100' THEN ending_balance ELSE 0 END) AS tai_san_ngan_han,
+    
+    -- 2. Nợ ngắn hạn (Mã chỉ tiêu B01-DN_310 theo chuẩn VAS)
+    SUM(CASE WHEN indicator_code = 'B01-DN_310' THEN ending_balance ELSE 0 END) AS no_ngan_han,
+    
+    -- 3. Vốn lưu động ròng = Tài sản ngắn hạn - Nợ ngắn hạn
+    SUM(CASE WHEN indicator_code = 'B01-DN_100' THEN ending_balance ELSE 0 END) - 
+    SUM(CASE WHEN indicator_code = 'B01-DN_310' THEN ending_balance ELSE 0 END) AS von_luu_dong_rong
+
 FROM silver.fact_balancesheet
-GROUP BY 1;
+-- Lọc trước các mã chỉ tiêu cần thiết để tối ưu hóa hiệu năng truy vấn (Performance)
+WHERE indicator_code IN ('B01-DN_100', 'B01-DN_310')
+GROUP BY 1
+ORDER BY thang_bao_cao ASC;
 
 /* RESULT LOG:
 +---------------------------+-----------------+
@@ -193,41 +239,6 @@ GROUP BY 1;
 +---------------------------+-----------------+
 */
 
--- VISUAL: Bảng Runway
--- MEASURE: _DongTien[Runway]
-WITH max_date AS (SELECT MAX(reporting_date) AS dt FROM silver.fact_balancesheet),
-cash_balance AS (
-    SELECT SUM(ending_balance) AS val
-    FROM silver.fact_balancesheet
-    WHERE indicator_code = 'B01-DN_110' AND reporting_date = (SELECT dt FROM max_date)
-),
-avg_net_cash_out AS (
-    SELECT SUM(credit_amount - debit_amount) / NULLIF(COUNT(DISTINCT DATE_TRUNC('month', posting_date)), 0) AS val
-    FROM silver.fact_cashflow
-    WHERE EXTRACT(YEAR FROM posting_date) = EXTRACT(YEAR FROM CURRENT_DATE)
-      AND (account_no LIKE '111%' OR account_no LIKE '112%')
-      AND voucher_no NOT LIKE 'CTNB%'
-      AND voucher_no NOT LIKE 'NTTK%'
-      AND reciprocal_account NOT LIKE '111%' 
-      AND reciprocal_account NOT LIKE '112%'
-)
-SELECT (SELECT val FROM cash_balance) / NULLIF((SELECT val FROM avg_net_cash_out), 0) AS runway;
-
-/* RESULT LOG:
--- GHI CHÚ FILTER:
--- WHERE indicator_code = 'B01-DN_110' AND reporting_date = (SELECT dt FROM max_date)
--- WHERE EXTRACT(YEAR FROM posting_date) = EXTRACT(YEAR FROM CURRENT_DATE)
--- AND (account_no LIKE '111%' OR account_no LIKE '112%')
--- AND voucher_no NOT LIKE 'CTNB%'
--- AND voucher_no NOT LIKE 'NTTK%'
--- AND reciprocal_account NOT LIKE '111%'
--- AND reciprocal_account NOT LIKE '112%'
-+---------------------+
-|        runway       |
-+---------------------+
-| -9.8598060630461021 |
-+---------------------+
-*/
 
 -- VISUAL: Bảng Chu kỳ tiền mặt CCC
 -- MEASURE: _DongTien[CCC]

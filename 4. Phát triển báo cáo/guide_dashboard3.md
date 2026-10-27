@@ -135,21 +135,65 @@ COUNTROWS(
     )
 )
 
-Tổng hóa đơn = 
-CALCULATE(
-    COUNTROWS(
-        FILTER(
-            SUMMARIZE(
-                'silver fact_accountsreceivable',
-                'silver fact_accountsreceivable'[invoice_no],
-                "DaThu", SUM('silver fact_accountsreceivable'[credit_amount]),
-                "PhaiThu", SUM('silver fact_accountsreceivable'[debit_amount])
-            ),
-            [PhaiThu] - [DaThu] > 0 && NOT(ISBLANK('silver fact_accountsreceivable'[invoice_no]))
-        )
+Số lượng hóa đơn nợ FIFO = 
+VAR _LastData   = CALCULATE ( MAX ( 'silver fact_accountsreceivable'[posting_date] ),
+                              ALL ( 'silver fact_accountsreceivable' ) )
+VAR _MonthStart = MIN ( 'Dim_Date'[Date] )
+VAR _Ref        = MIN ( MAX ( 'Dim_Date'[Date] ), _LastData )
+RETURN
+IF ( _MonthStart > _LastData, BLANK (),
+SUMX (
+    CALCULATETABLE (
+        VALUES ( 'silver dim_partner'[partner_code] ),
+        'silver dim_partner'[partner_group] IN { "Khách hàng", "Khách hàng/ nhà cung cấp" }
     ),
-    'silver dim_partner'[partner_group] IN {"Khách hàng", "Khách hàng/ nhà cung cấp"}
-)
+    VAR _TotalDebt =
+        CALCULATE (
+            MAXX ( TOPN ( 1, 'silver fact_accountsreceivable',
+                          'silver fact_accountsreceivable'[posting_date], DESC,
+                          'silver fact_accountsreceivable'[id], DESC ),
+                   'silver fact_accountsreceivable'[ending_debit_balance] ),
+            'silver fact_accountsreceivable'[posting_date] <= _Ref,
+            ALL ( 'Dim_Date' )
+        )
+    RETURN
+    IF ( ISBLANK ( _TotalDebt ) || _TotalDebt <= 0, BLANK (),
+        VAR _Grouped =
+            CALCULATETABLE (
+                ADDCOLUMNS (
+                    SUMMARIZE ( 'silver fact_accountsreceivable',
+                                'silver fact_accountsreceivable'[invoice_no] ),
+                    "InvDate", CALCULATE ( MIN ( 'silver fact_accountsreceivable'[invoice_date] ) ),
+                    "InvAmt",  CALCULATE ( SUM ( 'silver fact_accountsreceivable'[debit_amount] ) )
+                ),
+                'silver fact_accountsreceivable'[debit_amount] > 0,
+                'silver fact_accountsreceivable'[invoice_no] <> BLANK (),
+                'silver fact_accountsreceivable'[invoice_no] <> "",
+                'silver fact_accountsreceivable'[posting_date] <= _Ref,
+                ALL ( 'Dim_Date' )
+            )
+        VAR _Invoices =
+            SELECTCOLUMNS (
+                _Grouped,
+                "InvNo",   'silver fact_accountsreceivable'[invoice_no],
+                "InvDate", [InvDate],
+                "InvAmt",  [InvAmt]
+            )
+        VAR _Unpaid =
+            ADDCOLUMNS (
+                _Invoices,
+                "UnpaidAmt",
+                    VAR _d = [InvDate]
+                    VAR _n = [InvNo]
+                    VAR _Run =
+                        SUMX ( FILTER ( _Invoices,
+                                   [InvDate] > _d || ( [InvDate] = _d && [InvNo] >= _n ) ),
+                               [InvAmt] )
+                    RETURN MIN ( [InvAmt], MAX ( 0, _TotalDebt - ( _Run - [InvAmt] ) ) )
+            )
+        RETURN COUNTROWS ( FILTER ( _Unpaid, [UnpaidAmt] > 0 ) )
+    )
+) )
 ```
 
 ---
@@ -185,76 +229,95 @@ RETURN DIVIDE([Tổng khách hàng] - ThangTruoc, ThangTruoc, 0)
 > 
 > **Bước 2: Viết Measure Phân bổ FIFO cực mạnh này:**
 > ```dax
-> Phải thu FIFO (Tỷ) = 
-> VAR _MaxDate = MAX('silver Dim_Date'[Date])
-> VAR _IsTrongHan = SELECTEDVALUE('Dim_TuoiNo'[Nhom]) = "Trong hạn"
-> VAR _IsQuaHan = SELECTEDVALUE('Dim_TuoiNo'[Nhom]) = "Quá hạn"
-> 
-> RETURN
-> DIVIDE(
->     SUMX(
->         VALUES('silver dim_partner'[partner_code]),
->         VAR _Customer = 'silver dim_partner'[partner_code]
->         
->         -- 1. Chốt Số dư nợ của khách hàng tại mốc _MaxDate
->         VAR _TotalDebt = 
->             CALCULATE(
->                 MAXX(
->                     TOPN(1, 'silver fact_accountsreceivable', 'silver fact_accountsreceivable'[posting_date], DESC, 'silver fact_accountsreceivable'[id], DESC),
->                     'silver fact_accountsreceivable'[ending_debit_balance]
->                 ),
->                 'silver fact_accountsreceivable'[posting_date] <= _MaxDate,
->                 ALL('silver Dim_Date')
->             )
->         
->         RETURN
->         IF(ISBLANK(_TotalDebt) || _TotalDebt <= 0, BLANK(),
->             
->             -- 2. Lấy danh sách hóa đơn từ mới đến cũ
->             VAR _Invoices = 
->                 CALCULATETABLE(
->                     SELECTCOLUMNS(
->                         'silver fact_accountsreceivable',
->                         "InvNo", 'silver fact_accountsreceivable'[invoice_no],
->                         "InvDate", 'silver fact_accountsreceivable'[invoice_date],
->                         "InvAmt", 'silver fact_accountsreceivable'[debit_amount]
->                     ),
->                     'silver fact_accountsreceivable'[debit_amount] > 0,
->                     'silver fact_accountsreceivable'[posting_date] <= _MaxDate,
->                     ALL('silver Dim_Date')
->                 )
->                 
->             -- 3. Chạy vòng lặp cấn trừ FIFO ảo
->             VAR _UnpaidInvoices = 
->                 GENERATE(
->                     _Invoices,
->                     VAR _CurrentInvDate = [InvDate]
->                     VAR _CurrentInvNo = [InvNo]
->                     VAR _RunningTotal = 
->                         SUMX(
->                             FILTER(_Invoices, [InvDate] > _CurrentInvDate || ([InvDate] = _CurrentInvDate && [InvNo] >= _CurrentInvNo)),
->                             [InvAmt]
->                         )
->                     VAR _UnpaidAmt = MIN([InvAmt], MAX(0, _TotalDebt - (_RunningTotal - [InvAmt])))
->                     RETURN ROW("UnpaidAmt", _UnpaidAmt)
->                 )
->                 
->             -- 4. Phân bổ phần chưa trả vào nhóm Trong hạn / Quá hạn
->             RETURN
->             SUMX(
->                 FILTER(_UnpaidInvoices, [UnpaidAmt] > 0 &&
->                     (
->                         (_IsTrongHan && DATEDIFF([InvDate], _MaxDate, DAY) <= 30) ||
->                         (_IsQuaHan && DATEDIFF([InvDate], _MaxDate, DAY) > 30) ||
->                         (NOT(_IsTrongHan) && NOT(_IsQuaHan))
->                     )
->                 ),
->                 [UnpaidAmt]
->             )
->         )
->     ),
->     1000000000, 0
-> )
+> Phải thu FIFO = 
+VAR _MaxDate = MAX('Dim_Date'[Date])
+VAR _NhomTuoiNo = SELECTEDVALUE('Dim_TuoiNo'[Nhom]) -- Nhóm trên Legend biểu đồ: "Trong hạn", "Quá hạn", "Dư đầu kỳ/Khác"
+
+RETURN
+SUMX(
+    -- 1. Lặp qua từng khách hàng
+    CALCULATETABLE(
+        VALUES('silver dim_partner'[partner_code]),
+        'silver dim_partner'[partner_group] IN {"Khách hàng", "Khách hàng/ nhà cung cấp"}
+    ),
+    VAR _Customer = 'silver dim_partner'[partner_code]
+    
+    -- 2. Chốt Số dư nợ tổng của khách hàng tại mốc _MaxDate
+    VAR _TotalDebt = 
+        CALCULATE(
+            MAXX(
+                TOPN(1, 'silver fact_accountsreceivable', 'silver fact_accountsreceivable'[posting_date], DESC, 'silver fact_accountsreceivable'[id], DESC),
+                'silver fact_accountsreceivable'[ending_debit_balance]
+            ),
+            'silver fact_accountsreceivable'[posting_date] <= _MaxDate,
+            ALL('Dim_Date')
+        )
+    
+    RETURN
+    IF(ISBLANK(_TotalDebt) || _TotalDebt <= 0, BLANK(),
+        
+        -- 3. GOM NHÓM TỪNG HÓA ĐƠN & LỌC BỎ HÓA ĐƠN TRỐNG (Tránh lỗi phân bổ trùng)
+        VAR _GroupedInvoices = 
+            CALCULATETABLE(
+                ADDCOLUMNS(
+                    SUMMARIZE(
+                        'silver fact_accountsreceivable',
+                        'silver fact_accountsreceivable'[invoice_no],
+                        'silver fact_accountsreceivable'[invoice_date]
+                    ),
+                    "InvAmt", CALCULATE(SUM('silver fact_accountsreceivable'[debit_amount]))
+                ),
+                'silver fact_accountsreceivable'[debit_amount] > 0,
+                'silver fact_accountsreceivable'[invoice_no] <> BLANK(),
+                'silver fact_accountsreceivable'[invoice_no] <> "",
+                'silver fact_accountsreceivable'[posting_date] <= _MaxDate,
+                ALL('Dim_Date')
+            )
+            
+        -- Chuyển đổi bảng gom nhóm thành định dạng cột
+        VAR _Invoices = 
+            SELECTCOLUMNS(
+                _GroupedInvoices,
+                "InvNo", 'silver fact_accountsreceivable'[invoice_no],
+                "InvDate", 'silver fact_accountsreceivable'[invoice_date],
+                "InvAmt", [InvAmt]
+            )
+            
+        -- Tính tổng tiền hóa đơn tìm thấy trên hệ thống
+        VAR _TotalInvoicesAmt = SUMX(_Invoices, [InvAmt])
+        
+        -- 4. Chạy vòng lặp cấn trừ FIFO 
+        VAR _UnpaidInvoices = 
+            GENERATE(
+                _Invoices,
+                VAR _CurrentInvDate = [InvDate]
+                VAR _CurrentInvNo = [InvNo]
+                VAR _RunningTotal = 
+                    SUMX(
+                        FILTER(_Invoices, [InvDate] > _CurrentInvDate || ([InvDate] = _CurrentInvDate && [InvNo] >= _CurrentInvNo)),
+                        [InvAmt]
+                    )
+                VAR _UnpaidAmt = MIN([InvAmt], MAX(0, _TotalDebt - (_RunningTotal - [InvAmt])))
+                RETURN ROW("UnpaidAmt", _UnpaidAmt)
+            )
+            
+        -- 5. Phân bổ nợ vào các nhóm tuổi nợ
+        VAR _TrongHanAmt = SUMX(FILTER(_UnpaidInvoices, DATEDIFF([InvDate], _MaxDate, DAY) <= 30), [UnpaidAmt])
+        VAR _QuaHanAmt = SUMX(FILTER(_UnpaidInvoices, DATEDIFF([InvDate], _MaxDate, DAY) > 30), [UnpaidAmt])
+        
+        -- Phần dư nợ không tìm thấy hóa đơn (Dư đầu kỳ / Bút toán điều chỉnh khác)
+        VAR _DuDauKyAmt = MAX(0, _TotalDebt - _TotalInvoicesAmt) 
+
+        RETURN
+        SWITCH(
+            _NhomTuoiNo,
+            "Trong hạn", _TrongHanAmt,
+            "Quá hạn", _QuaHanAmt,
+            "Khác", _DuDauKyAmt,
+            _TotalDebt -- Trả về tổng nợ gốc nếu view ở dạng Card hoặc không bị filter bởi nhóm
+        )
+    )
+)
 > ```
 > Sếp lấy Measure `Phải thu FIFO (Tỷ)` này thả vào **Column Y-axis** là Biểu đồ Cột Chồng của sếp sẽ chạy bao mượt, chuẩn logic FIFO 100% y như SQL mà không cần phiền tới Data Engineer!
 
