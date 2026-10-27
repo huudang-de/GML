@@ -488,6 +488,54 @@ Sổ tay liệt kê fine-tuning LLM cho lĩnh vực cụ thể trong các ví d�
 | `vectorstore` | Chroma hoặc pgvector (theo ADR-001) |
 | `llm-local` (tuỳ chọn) | Mô hình tự host nếu chọn phương án này |
 
+### 8.1 Phân công LLM theo thành phần (Dell Latitude 7490 — RAM 24GB, không GPU rời)
+
+*Cập nhật 27/10/2026. Khuyến nghị dựa trên phần cứng thực tế của môi trường phát triển: Intel i7-8650U, Intel UHD 620 tích hợp, 24GB DDR4. Không có GPU rời nên không thể offload GGUF lên GPU; inference local chạy hoàn toàn trên CPU (~6–10 token/giây với model 7B Q4_K_M).*
+
+**Chiến lược 3 lớp:**
+
+| Lớp | Mô tả | Khi nào dùng |
+| --- | --- | --- |
+| **Cloud API** | Gemini / Claude qua internet | Tác vụ suy luận nặng, sinh SQL phức tạp, tổng hợp câu trả lời |
+| **Local Ollama** | Model GGUF chạy CPU | Embedding (không phát sinh cost, dữ liệu không ra ngoài), fallback offline, test |
+| **Không dùng LLM** | SQL mẫu kiểm chứng (golden query) | Alert Engine, tính KPI theo lịch — LLM không được tham gia tính số tài chính |
+
+**Phân công theo từng thành phần:**
+
+| Thành phần (v2.0) | LLM đề xuất | Model cụ thể | Lý do |
+| --- | --- | --- | --- |
+| Orchestrator / Intent Classifier | Cloud API | `gemini-2.0-flash` | Cần structured output (enum), nhanh, rẻ |
+| SQL Agent (sinh + sửa SQL) | Cloud API | `gemini-2.0-flash` | Schema 25+ bảng, context window lớn, tự sửa lỗi x3 |
+| RAG Embedding (ChromaDB) | **Local Ollama** ⭐ | `nomic-embed-text` | Dữ liệu tài chính không ra ngoài, miễn phí, độ trễ thấp |
+| Explainer Agent | Cloud API | `gemini-2.0-flash` | Chỉ diễn đạt lại YAML công thức thành văn |
+| Trend Analyst | Cloud API | `gemini-2.0-flash` | Diễn đạt kết quả tính toán bằng SQL |
+| Decision Advisor | Cloud API | `gemini-2.0-flash` | Format lại rule từ `business_rules.yaml` |
+| Alert Engine (cron hàng ngày) | **Không dùng LLM** | SQL mẫu kiểm chứng | Theo Nguyên tắc 1 & 7: số tài chính chỉ từ SQL đã verify |
+| Bản tin tuần (synthesize) | Cloud API | `gemini-2.0-flash` | Tóm tắt ngắn 5 KPI — volume thấp, chất lượng cao |
+| Phát triển / Viết ADR / Tài liệu | Cloud API | Claude Sonnet (Thinking) | Lý luận dài, chất lượng văn bản kiến trúc cao |
+| Offline fallback / Test local | **Local Ollama** | `qwen2.5-coder:7b` (Q4_K_M, ~5GB RAM) | ~8 t/s trên CPU, test không cần internet |
+
+> ⚠️ **Bảo mật (ADR-005):** Free tier Gemini Google AI Studio **có thể dùng dữ liệu để cải thiện model**. Với dữ liệu tài chính thật của GML, **bắt buộc dùng Paid tier** (Google AI Platform hoặc Vertex AI) để đảm bảo cam kết không dùng dữ liệu cho training. Ghi vào ADR-005.
+
+**Cài Ollama local (lệnh nhanh):**
+
+```powershell
+winget install Ollama.Ollama
+
+ollama pull nomic-embed-text   # Embedding cho ChromaDB — ưu tiên pull trước
+ollama pull qwen2.5-coder:7b   # Fallback SQL generation local
+```
+
+```python
+# app/rag/embeddings.py — dùng local embedding thay vì cloud
+from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
+
+embedding_fn = OllamaEmbeddingFunction(
+    model_name="nomic-embed-text",
+    url="http://localhost:11434/api/embeddings"
+)
+```
+
 **Cấu hình** qua `pydantic-settings`, chỉ đọc từ biến môi trường. `.env.example` liệt kê: `DATABASE_URL_RO`, `DATABASE_URL_APP`, `LLM_PROVIDER`, `LLM_MODEL`, `EMBEDDING_MODEL`, `VECTORSTORE_URL`, `AUTH_SECRET`, `ALERT_CRON`. Không có giá trị bí mật nào trong repo; thêm công cụ quét bí mật vào pre-commit (ví dụ gitleaks).
 
 **CI (GitHub Actions):** kiểm tra định dạng, test đơn vị, test an toàn (4 câu nhóm `an_toan`, test `both`), benchmark rút gọn 10 câu trên dữ liệu mẫu. Ghim phiên bản mọi thư viện trong `requirements.txt` vì LangChain và LangGraph đổi API khá nhanh.
