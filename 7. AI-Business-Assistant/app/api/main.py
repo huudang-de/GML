@@ -15,8 +15,10 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
+    answer_type: str | None = None
     sql_query: str | None = None
     data: list | None = None
+    row_count: int | None = None
     sources: list[str] | None = None
     intent: str | None = None
 
@@ -26,6 +28,8 @@ async def chat(request: ChatRequest):
         result = await agent.run(request.query, request.session_id)
         return result
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
