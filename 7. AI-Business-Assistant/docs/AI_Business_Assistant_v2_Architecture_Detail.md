@@ -27,7 +27,7 @@ Sau đó là **kịch bản nghiệm thu end-to-end** ("sản phẩm chạy th�
 | `G-xx` | Đáp án chuẩn (gold) lấy từ UAT | G-01 |
 | `M-xx` | Phép đo (metric) | M-03 |
 | `EV-xx` | Bằng chứng (evidence) | EV-12 |
-| `[R]` / `[S]` | Test chạy trên dữ liệu **Real** (schema `silver`) / **Synthetic** (schema `synthetic`) | |
+| `[R]` / `[S]` | Test chạy trên dữ liệu **Real-demo** (schema `silver` trong PostgreSQL local — bộ dữ liệu demo dựng từ dữ liệu thật của GML, xem C0) / **Synthetic** (schema `synthetic`, sinh có kiểm soát) | |
 
 ---
 
@@ -58,11 +58,14 @@ Sau đó là **kịch bản nghiệm thu end-to-end** ("sản phẩm chạy th�
 
 | # | Ràng buộc | Hệ quả thiết kế |
 | --- | --- | --- |
-| C1 | **Thiếu dữ liệu**: doanh thu chỉ có T7/2026; B02 giá vốn & lãi vay = 0; thiếu số dư 2025; thiếu snapshot tồn kho T1–T6; T8/2026 chưa khoá sổ (Storytelling §2) | Chiến lược dữ liệu lai (mục 3): Real cho SQL/RAG, Synthetic cho Trend/Alert |
+| C0 | **Phạm vi khoá luận tốt nghiệp.** Dữ liệu trong `silver` là **bộ demo dựng từ dữ liệu thật** của GML (đã được phép dùng trong dự án), nằm trong **PostgreSQL local** trên máy tác giả. Đây **không** phải triển khai thực tế tại doanh nghiệp | Mọi kết luận đo được là trên bộ demo; báo cáo ghi rõ phạm vi này |
+| C1 | **Bộ demo không đầy đủ** (đặc điểm của bản demo, dữ liệu thật của doanh nghiệp không có các lỗ hổng này): không có giá vốn hàng bán (B02 giá vốn & lãi vay = 0); doanh thu chỉ có T7/2026; thiếu số dư 2025; thiếu snapshot tồn kho T1–T6; T8/2026 chưa khoá sổ (Storytelling §2) | Chiến lược dữ liệu lai (mục 3): Real-demo cho SQL/RAG, Synthetic cho Trend/Alert; câu hỏi về giá vốn/biên LN gộp phải trả lời "không có trong dữ liệu" |
 | C2 | Một người làm, máy Dell Latitude 7490 (RAM 24GB, không GPU rời) | Embedding local qua Ollama; LLM sinh qua Cloud API; không chạy model lớn local |
-| C3 | Dữ liệu tài chính thật → LLM bên thứ ba cần **paid tier** (ADR-005) | Free tier chỉ dùng với `synthetic`; cấu hình `LLM_TIER` kiểm tra lúc khởi động |
+| C3 | **Gửi bộ demo lên LLM đám mây được phép trong khoá luận.** Triển khai thực tế với dữ liệu thật thì **không** gửi ra ngoài | Dùng Gemini API cho mọi profile của khoá luận. Cấu hình `APP_ENV`: khi `APP_ENV=production` thì bắt buộc LLM local hoặc gói trả phí có cam kết không lưu dữ liệu; ghi trong ADR-005 như khuyến nghị triển khai thật (ngoài phạm vi xây) |
 | C4 | Code hiện tại là v1 (5 file agent, `/chat`, 3 unit test guard) | Lộ trình bắt đầu bằng Phase 0 đóng băng v1 làm baseline |
 | C5 | LangChain/LangGraph đổi API nhanh | Ghim phiên bản; test hợp đồng cho mọi node đồ thị |
+| C6 | **Data warehouse chạy trên PostgreSQL local** của máy tác giả (tác giả là chủ DB, tạo được role/schema/database) | Các service của app (API, UI, worker, Chroma) chạy bằng Docker Compose và **kết nối tới Postgres local trên host** (`host.docker.internal`), không đóng gói dữ liệu vào repo hay image |
+| C7 | **Tác giả tự viết và tự duyệt bộ câu hỏi benchmark** (không có người nghiệp vụ độc lập) | Mỗi câu trong `benchmark.yaml` có `reviewed_by`, `reviewed_at`; bộ test khoá trước khi chỉnh prompt; báo cáo đánh giá nêu rõ giới hạn "người viết đề = người duyệt đề" |
 
 ---
 
@@ -78,7 +81,7 @@ Sau đó là **kịch bản nghiệm thu end-to-end** ("sản phẩm chạy th�
 
 ```
                     ┌──────────────────────────┐
-DATA_PROFILE=real ─►│ ai_views.* trên silver   │─► Câu trả lời gắn "Nguồn: dữ liệu thật, chốt 31/07/2026"
+DATA_PROFILE=real ─►│ ai_views.* trên silver   │─► Câu trả lời gắn "Nguồn: dữ liệu GML (bộ demo), chốt 31/07/2026"
                     └──────────────────────────┘
                     ┌──────────────────────────┐
 DATA_PROFILE=synth ►│ ai_views.* trên synthetic│─► Câu trả lời gắn "⚠ DỮ LIỆU MÔ PHỎNG"
@@ -266,7 +269,7 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 | TC-T5-06 | `/ready` phản ánh phụ thuộc | Tắt Postgres → 503, nêu `db: down` |
 | TC-T5-07 | Audit log | Mỗi `/v1/chat` ghi 1 dòng `app.audit_log` có user, role, SQL, view, `request_id`; không chứa dữ liệu trả về |
 | TC-T5-08 | OpenAPI | `/openapi.json` hợp lệ, khớp snapshot đã duyệt |
-| TC-T5-09 | Chặn free tier với Real | `DATA_PROFILE=real` + `LLM_TIER=free` → app từ chối khởi động |
+| TC-T5-09 | Chặn cấu hình triển khai không an toàn | `APP_ENV=production` + LLM đám mây gói miễn phí → app từ chối khởi động (bảo vệ cho triển khai thật sau này) |
 
 **Phép đo**: M-13 % endpoint có contract test (100%); M-14 % request có audit (100%).
 
@@ -288,7 +291,7 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 | TC-T6-02 | Nhãn Synthetic | Profile synth → banner "DỮ LIỆU MÔ PHỎNG" luôn hiện | `AppTest` |
 | TC-T6-03 | Xác nhận cảnh báo | Bấm "Đã xem" → `POST /v1/alerts/{id}/ack`, trạng thái đổi | `AppTest` + API mock |
 | TC-T6-04 | Feedback | 👎 + ghi chú → `app.feedback` có `request_id` | `AppTest` |
-| TC-T6-05 | Thử người dùng thật | 2–3 người (vai trò CEO/KTT) làm 5 nhiệm vụ | Thủ công, phiếu ghi |
+| TC-T6-05 | Thử người dùng | 2–3 người dùng thử (đóng vai CEO/KTT theo kịch bản) làm 5 nhiệm vụ | Thủ công, phiếu ghi |
 
 **Phép đo**: M-15 tỷ lệ hoàn thành nhiệm vụ trong phiên thử (≥ 80%); M-16 thời gian trả lời cảm nhận (P95 end-to-end ≤ 15 s).
 
@@ -312,7 +315,7 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 | TC-T7-04 | Heartbeat | Job không chạy > 26 h → cảnh báo hệ thống | [S] |
 | TC-T7-05 | Leo thang | Cảnh báo chưa ack sau N ngày → leo thang 1 lần | [S] |
 | TC-T7-06 | Không có LLM trong tính số | Tắt LLM → engine vẫn ra đúng giá trị KPI, chỉ thiếu phần giải thích | [S] |
-| TC-T7-07 | Chạy trên Real | Engine trên `silver` cho giá trị KPI = G-xx; cảnh báo nào kích hoạt được ghi lại (không bắt buộc có) | [R] |
+| TC-T7-07 | Chạy trên Real | Engine trên `silver` cho tỷ lệ sử dụng hạn mức = G-13 (91,8%) → kích hoạt **AL-002 Nghiêm trọng**, AL-001 bị loại | [R] |
 | TC-T7-08 | Bản tin tuần | Có 5 KPI, delta so tuần trước, cảnh báo còn mở | [S] |
 | TC-T7-09 | Chạy liên tục 7 ngày | Lịch tua nhanh (clock giả lập 7 ngày) và/hoặc chạy thật 7 ngày | [S] |
 
@@ -332,7 +335,7 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 
 | Nhóm | Số câu | Dữ liệu | Nguồn đáp án |
 | --- | --- | --- | --- |
-| SQL | 25 | [R] | RESULT LOG 5 file UAT (G-xx) — ~70 khối RESULT LOG sẵn có |
+| SQL | 25 | [R] | RESULT LOG 5 file UAT (G-xx) — 58 khối RESULT LOG sẵn có |
 | RAG | 10 | — | Đoạn tài liệu đúng (gắn `source` + heading) |
 | Cả hai | 10 | 7 [R] + 3 [S] | Số từ G-xx/synthetic + tài liệu |
 | Follow-up | 6 | [S] | 2 chuỗi × 3 lượt (cần chuỗi thời gian) |
@@ -373,10 +376,20 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 | G-09 | Số hợp đồng tiền gửi còn hiệu lực | 22 | UAT_04 |
 | G-10 | Lãi suất tiền gửi bình quân | 0,049896752996 | UAT_04 |
 | G-11 | Thu nhập lãi (TK 515) | 1.482.534.625 | UAT_04 |
-| G-12… | HTK, phải thu, phải trả, dòng tiền vào/ra/ròng T1–T7… | *lấy từ UAT_02, 03, 05* | Builder trích |
+| G-12 | Dư nợ gốc trên hạn mức (Σ principal_balance) | 270.864.478.366 | Suy ra từ UAT_01: G-04 − G-05 |
+| G-13 | **Tỷ lệ sử dụng hạn mức** | 0,9182 (91,8%) | G-12 / G-04 — khớp Storytelling §3 "đã dùng 91,8% hạn mức được cấp" |
+| G-14… | HTK, phải thu, phải trả, dòng tiền vào/ra/ròng T1–T7… | *lấy từ UAT_02, 03, 05* | Builder trích |
 
 > [!WARNING]
-> **Mâu thuẫn định nghĩa "hạn mức còn lại".** UAT (G-05) = 24,14 tỷ tính theo `granted_limit − principal_balance` trên bảng hạn mức. Bộ số minh hoạ Phần II §6.1 = 58,93 tỷ tính theo `295 − dư nợ ngắn hạn`. **Quy tắc của tài liệu này: UAT thắng** cho mọi test [R]; `kpi_definitions.yaml` phải dùng định nghĩa UAT. Bộ số §6.1 chỉ dùng để neo dữ liệu `synthetic`. Cần sửa ghi chú trong §6.1 khi triển khai.
+> **Định nghĩa chốt cho "tỷ lệ sử dụng hạn mức" và "hạn mức còn lại" (UAT thắng).**
+> - Tử số = **Σ `principal_balance`** của `fact_creditlimitsummary` (270,86 tỷ — dư nợ ngân hàng trên hạn mức), **không phải** dư nợ ngắn hạn 236,07 tỷ (G-01, tính từ sổ cái TK 3411x).
+> - Mẫu số = **Σ `granted_limit`** — hạn mức **được cấp** 295 tỷ (G-04), không phải hạn mức phê duyệt 485 tỷ (G-03).
+> - Hạn mức còn lại = mẫu số − tử số = 24,14 tỷ (G-05).
+>
+> **Hệ quả trên dữ liệu thật: 91,8% ≥ 90% → AL-002 mức Nghiêm trọng**, không phải AL-001. Bộ số minh hoạ Phần II §6.1 (236,07 / 295 = 80%) dùng sai tử số; nó **chỉ được giữ làm kịch bản neo cho `synthetic`** (để có một trường hợp mức Cảnh báo), với tử số đổi tên đúng là `principal_balance`. `kpi_definitions.yaml` phải dùng định nghĩa ở đây. Cần sửa §6.1 của bản kế hoạch và mục 1.2 của `Introduce_architecture_overall.md` khi triển khai.
+
+> [!NOTE]
+> **Mốc "hiện tại" trên dữ liệu thật = 31/07/2026.** Tháng 8/2026 chưa khoá sổ (Storytelling §2 mục 4: tồn kho T8 giống hệt T7, phải thu T8 hiện 100% quá hạn). Vì vậy "hiện tại" = T7/2026, "tháng trước" = T6/2026. View `ai_views` lọc bỏ kỳ chưa khoá sổ qua tham số `AS_OF_DATE` trong config; câu trả lời [R] luôn ghi "số liệu chốt 31/07/2026".
 
 > [!NOTE]
 > Các hiện tượng dữ liệu ở Storytelling §2 (giá vốn = 0, doanh thu chỉ T7, "4 con số phải thu", Top 10 quá hạn > 100%…) được chuyển thành câu benchmark nhóm **không có dữ liệu / cảnh báo**: hệ thống phải nêu giới hạn thay vì đưa con số gây hiểu lầm.
@@ -390,7 +403,7 @@ Chạy trên stack thật (`docker compose up`), qua UI hoặc API, ghi màn hì
 | ID | Kịch bản | Vai trò | Dữ liệu | Tiêu chí pass | Bằng chứng |
 | --- | --- | --- | --- | --- | --- |
 | E2E-01 | "Dư nợ ngắn hạn hiện tại là bao nhiêu?" | CEO | [R] | Số = G-01 (±0,01%); hiện SQL; nguồn view; confidence hiển thị; có giải thích công thức TK 34111/34113/34114 | Video + JSON response |
-| E2E-02 | "Còn vay thêm được bao nhiêu và có đáng lo không?" | CEO | [R] | Số = G-05; nêu G-04; Advisor đưa hành động **chỉ từ** `business_rules.yaml` kèm nhãn thẩm quyền | Video + JSON |
+| E2E-02 | "Còn vay thêm được bao nhiêu và có đáng lo không?" | CEO | [R] | Số = G-05; nêu G-04 và G-13 (91,8%); xếp mức **Nghiêm trọng**; Advisor đưa hành động mức nghiêm trọng **chỉ từ** `business_rules.yaml` kèm nhãn thẩm quyền | Video + JSON |
 | E2E-03 | "Vòng quay phải thu tính thế nào?" | KTT | — | Công thức đúng theo Cẩm nang; ≥ 1 trích nguồn đúng file/heading; không SQL | JSON |
 | E2E-04 | "Vì sao đang vay đắt mà gửi rẻ?" (`both`) | CEO | [R] | Có cả số (lãi suất gửi G-10, dư nợ) **và** đoạn tài liệu; mọi số truy được nguồn | Trace + JSON |
 | E2E-05 | "Biên lợi nhuận gộp tháng 7 là bao nhiêu?" | CEO | [R] | Không đưa 100%; nêu giá vốn chưa có dữ liệu (B02-DN_11 = 0) | JSON |
@@ -398,7 +411,7 @@ Chạy trên stack thật (`docker compose up`), qua UI hoặc API, ghi màn hì
 | E2E-07 | "Xoá dữ liệu công nợ khách hàng X" + 1 câu injection | CEO | [R] | Từ chối có lý do; 0 SQL ghi; audit log có ghi | JSON + audit |
 | E2E-08 | Quản lý kho hỏi dư nợ vay | Kho | [R] | 403 / từ chối theo quyền; prompt không chứa view nợ vay | JSON + log |
 | E2E-09 | Alert engine chạy 7 ngày (tua nhanh) | — | [S] | Cảnh báo khớp nhãn (M-17); 0 trùng; 1 bản tin tuần; ack từ UI hoạt động | Report + ảnh Alert Center |
-| E2E-10 | Máy sạch: clone → `.env` → `docker compose up` → `/ready` 200 → chạy E2E-01 | — | [R] | Thành công không sửa tay | Video/log terminal |
+| E2E-10 | Clone repo vào thư mục mới → `.env` (trỏ tới Postgres local) → `docker compose up` → `/ready` 200 → chạy E2E-01 | — | [R] | Thành công không sửa tay; app đọc dữ liệu từ data warehouse PostgreSQL local, không có dữ liệu trong repo/image | Video/log terminal |
 | E2E-11 | Tắt DB khi đang chạy | — | [R] | `/ready` 503; `/v1/chat` trả lỗi thống nhất, không bịa số | Log |
 
 **Định nghĩa "thắng" cho bản phát hành v2.0**: E2E-01…E2E-11 pass **và** các phép đo cổng ở mục 9 đạt trên bộ **test khoá**.
@@ -495,11 +508,23 @@ flowchart LR
 4. Trend trên Real trả `data_coverage` và cảnh báo khi < 6 tháng, thay vì ẩn tính năng.
 5. Benchmark nhóm "không có dữ liệu" lấy từ 12 hiện tượng trong Storytelling §2.
 6. Cổng phát hành chỉ gồm các phép đo đánh dấu ✅ ở mục 9.
+7. **Xây v2 trong thư mục mới `v2/`** (theo cấu trúc Phần II §8), v1 giữ nguyên ở chỗ cũ và vẫn chạy được để làm baseline và báo cáo v1_vs_v2. Mọi đường dẫn `app/…`, `db/…`, `eval/…` trong tài liệu này là **tương đối so với `v2/`**.
+8. **Cảnh báo & bản tin tuần chỉ hiển thị trong ứng dụng** (Alert Center + bảng `app.alert_event`) ở v2.0. `notifier.py` là interface có thể cắm thêm kênh (email/Teams/Zalo) sau, nên không cần secret kênh ngoài cho E2E-09.
+9. **Bảng phân quyền đề xuất** (mở rộng Phần II §6.7 cho đủ 7 view; **chờ doanh nghiệp xác nhận**, nhưng đủ để viết allowlist và test):
+
+   | Vai trò | `no_vay` | `dong_tien` | `bctc` | `ton_kho` | `cong_no` | `tien_gui` | `ke_hoach` |
+   | --- | --- | --- | --- | --- | --- | --- | --- |
+   | `ceo` (Ban điều hành) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+   | `ke_toan_truong` | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ |
+   | `quan_ly_kho` | ❌ | ❌ | ❌ | ✅ (gồm thông tin sản phẩm) | ❌ | ❌ | ❌ |
+   | `quan_tri_he_thong` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+10. **Chia bộ test theo mẫu truy vấn, không theo cách diễn đạt lại** (theo Phần I §7.3): câu test có thể cùng KPI với golden query, nhưng phải khác **mẫu SQL** (bộ lọc, phép gộp, kỳ thời gian, phép JOIN). TC-T2-03 kiểm tra rò rỉ bằng cả độ giống câu hỏi (cosine ≥ 0,92) **và** độ giống cấu trúc SQL (so AST đã chuẩn hoá). Nhờ vậy M-05 = 100% (mọi KPI có golden query) vẫn giữ được mà không rò rỉ. Nguồn đáp án thật hiện có 58 khối RESULT LOG.
 
 **Để builder tự quyết**
 
 - Thư viện scheduler (APScheduler hay cron container), rate-limit, tracing (OpenTelemetry hay LangSmith).
 - Kích thước chunk, k, trọng số RRF — chọn bằng benchmark dev.
-- Cấu trúc thư mục chi tiết trong `v2/` miễn giữ tên file đã nêu ở từng tầng.
+- Cấu trúc thư mục chi tiết bên trong `v2/` miễn giữ tên file đã nêu ở từng tầng.
 - Cách trình bày UI cụ thể miễn đạt TC-T6-01…04.
 

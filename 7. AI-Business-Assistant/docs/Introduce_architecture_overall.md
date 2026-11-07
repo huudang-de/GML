@@ -63,9 +63,46 @@ Hệ thống được thiết kế theo kiến trúc phân tầng hướng dịc
    - **RAG Agent:** Tìm kiếm lai (Vector + BM25) trong Cẩm nang quản trị và BRD ➔ Trích xuất tài liệu về chính sách hạn mức tín dụng 295 tỷ và các tài khoản cấu thành (TK 34111, 34113, 34114).
 4. **Phân tích chuyên sâu (Explainer, Trend, Advisor):**
    - **Explainer:** Đọc `kpi_definitions.yaml` để diễn giải bản chất chỉ tiêu.
-   - **Trend Analyst:** Tính toán tỷ lệ sử dụng hạn mức = $236,07 / 295 = 80,0\%$.
-   - **Advisor:** So khớp `business_rules.yaml`: Ngưỡng cảnh báo vàng là $\ge 70\%$, nghiêm trọng là $\ge 90\%$. Ở mức $80\%$, Advisor tự động lấy hành động đã duyệt: *"Rà soát lịch đáo hạn 90 ngày tới và cập nhật dự báo dòng tiền"*. LLM chỉ biên tập lại câu chữ, **tuyệt đối không tự bịa hành động**.
+   - **Trend Analyst:** Tính toán tỷ lệ sử dụng hạn mức = $\frac{\Sigma \text{ principal\_balance}}{\Sigma \text{ granted\_limit}} = \frac{270,86}{295} = 91,8\%$ (chuẩn hóa theo kết quả UAT_01 và Storytelling §3).
+   - **Advisor:** So khớp `business_rules.yaml`: Ngưỡng cảnh báo vàng là $\ge 70\%$, nghiêm trọng là $\ge 90\%$. Ở mức $91,8\%$, hệ thống kích hoạt mức **Nghiêm trọng (AL-002)**, Advisor tự động lấy hành động đã duyệt cho mức nghiêm trọng: *"Họp rà soát cơ cấu nợ với Kế toán trưởng; làm việc với ngân hàng về kế hoạch dòng tiền và gia hạn/nâng hạn mức tín dụng"*. LLM chỉ biên tập lại câu chữ, **tuyệt đối không tự bịa hành động**.
 5. **Synthesizer & Output Guard:** Đóng gói thành định dạng đầu ra kép (*Dual Output*): Bản tóm tắt điều hành trực quan + Bảng số liệu chi tiết + Câu lệnh SQL đã chạy + Nguồn tài liệu đối soát + Điểm tin cậy (Confidence Score).
+
+### 1.3. Bảng phân bổ Công cụ, Mô hình AI & Thư viện theo 8 Tầng (Tool & Tech Stack Mapping)
+
+| Tầng kiến trúc | Tên công cụ / Thư viện (Tool & Tech) | Phiên bản (Version) | Vai trò & Trách nhiệm cụ thể trong hệ thống |
+| :--- | :--- | :--- | :--- |
+| **[T6] Client Layer** | **Streamlit** | `^1.34.0` | Giao diện Chatbot tương tác cho người dùng, Alert Center xem cảnh báo tài chính, nút xác nhận và hiển thị kết quả phân tích. |
+| | **Power BI** | Desktop / Service | Hệ thống báo cáo hiện hữu của GML, nơi người dùng lấy cảm hứng đặt câu hỏi nhanh (Quick Ask). |
+| **[T5] API Gateway** | **FastAPI** | `^0.111.0` | Khung ứng dụng RESTful API hiệu năng cao, cung cấp các endpoint `/v1/chat`, `/v1/kpi`, `/v1/alerts`. |
+| | **Uvicorn** | `^0.29.0` | ASGI Web Server siêu nhẹ giúp chạy FastAPI mượt mà với async/await. |
+| | **Pydantic (v2)** | `^2.7.0` | Định nghĩa schema dữ liệu chặt chẽ (`BaseModel`), tự động xác thực kiểu dữ liệu đầu vào/đầu ra và sinh tài liệu OpenAPI. |
+| | **Pydantic-Settings** | `^2.2.0` | Quản lý biến môi trường tập trung từ file `.env` một cách an toàn và có kiểm soát kiểu. |
+| **[T4] Orchestrator** | **LangGraph** | `^0.1.0` | Khung điều phối máy trạng thái đồ thị (`StateGraph`), quản lý rẽ nhánh điều kiện (`conditional_edges`) và chạy song song SQL + RAG. |
+| | **LangChain Core** | `^0.2.0` | Quản lý Prompt Template, Output Parser, Chat Model abstractions. |
+| **[T3] Agents & LLM** | **Google Gemini API** *(Cloud)* | `gemini-2.0-flash` / `gemini-3.8-flash` | Mô hình ngôn ngữ lớn đám mây xử lý phân loại ý định, sinh câu lệnh SQL và biên tập báo cáo tổng hợp. |
+| | **Ollama** *(Local Host)* | `v0.1.x+` | Nền tảng chạy mô hình AI cục bộ trên máy trạm (không cần mạng, bảo mật nội bộ). |
+| | **Qwen2.5-Coder:7b** *(Local LLM)* | GGUF (Q4_K_M) | Mô hình cục bộ dùng để kiểm thử offline và fallback dự phòng khi mất kết nối đám mây. |
+| | **Nomic-embed-text** *(Local Embedding)* | Model 137M param | Mô hình tạo vector nhúng chạy qua Ollama trên CPU máy trạm để dữ liệu tài chính không bị lộ ra ngoài. |
+| | **sqlglot** | `^23.0.0` | Bộ phân tích cây cú pháp trừu tượng (AST Parser) kiểm tra an toàn SQL, chặn lệnh ghi và tự thêm `LIMIT`. |
+| **[T2] Knowledge Layer** | **ChromaDB** | `^0.5.0` | Cơ sở dữ liệu Vector Store nhúng lưu trữ các đoạn tài liệu BRD và cẩm nang hướng dẫn Dashboard. |
+| | **rank-bm25** | `^0.2.2` | Thư viện tìm kiếm từ khóa tần suất (Sparse Search) phục vụ thuật toán tìm kiếm lai Hybrid Retrieval. |
+| | **PyYAML** | `^6.0.1` | Đọc và nạp các tệp tri thức tĩnh đã duyệt: `kpi_definitions.yaml` (18 KPI) và `business_rules.yaml`. |
+| **[T1] Data Layer** | **PostgreSQL** | `15+` | Hệ quản trị CSDL Kho dữ liệu (Data Warehouse GML), chứa schema `silver` và các view nghiệp vụ `ai_views.*`. |
+| | **SQLAlchemy** | `^2.0.0` | Thư viện ORM / Core kết nối CSDL, quản lý Connection Pool và thực thi truy vấn. |
+| | **psycopg2-binary** | `^2.9.0` | Driver kết nối C++ hiệu năng cao giữa Python và PostgreSQL. |
+| **[T7] Worker & Schedule** | **APScheduler** | `^3.10.4` | Bộ lập lịch tác vụ nền trong Python, tự động kích hoạt Alert Engine vào 07:00 sáng mỗi ngày và bản tin tuần. |
+| **[T8] Observability & Eval**| **pytest & pytest-asyncio** | `^8.0.0` / `^0.23.0` | Khung kiểm thử tự động cho Unit Test, Contract Test và Security Guards. |
+| | **httpx** | `^0.27.0` | HTTP client async dùng để kiểm thử hợp đồng API (API Contract Testing). |
+| | **RAGAS** | `^0.1.0` | Bộ thư viện đánh giá chất lượng RAG tự động (đo độ bám nguồn Faithfulness, Answer Relevance). |
+| | **Docker & Docker Compose** | `24+` | Đóng gói toàn bộ hệ thống (API, DB, UI, VectorStore) chạy đồng nhất trên môi trường sạch với 1 lệnh `docker compose up`. |
+
+### 1.4. Lý do lựa chọn công nghệ và tương thích phần cứng (Dell Latitude 7490)
+1. **Phù hợp hạ tầng thực tế (RAM 24GB, CPU Intel Core i7-8650U, không GPU rời):**
+   - Các tác vụ tạo vector nhúng (Embedding) chạy cục bộ qua Ollama với model siêu nhẹ `nomic-embed-text` chỉ tiêu tốn ~1GB RAM CPU.
+   - Các tác vụ suy luận phức tạp (Text-to-SQL, Synthesizer) được ủy thác cho Cloud API (`Gemini Flash`) có tốc độ cao và chi phí cực thấp ($0.10/triệu token).
+   - Khi cần kiểm thử offline, máy trạm có thể chạy mô hình lượng tử hóa `Qwen2.5-Coder:7b` (Q4_K_M ~5GB RAM) với tốc độ khả dụng ~8 tokens/s trên CPU.
+2. **Kiến trúc bền vững (Decoupled & Standardized):**
+   - Sử dụng các thư viện chuẩn công nghiệp (FastAPI, Pydantic, SQLAlchemy, LangGraph) giúp hệ thống dễ bảo trì, dễ thay thế CSDL hoặc mô hình LLM mà không phá vỡ logic nghiệp vụ.
 
 ---
 
@@ -78,7 +115,7 @@ Khi Hội đồng hỏi: *"Tại sao phải làm phức tạp như vậy mà kh�
 * **Giải pháp kiến trúc:** Tách bạch tuyệt đối **Tầng tính toán (PostgreSQL thực thi)** và **Tầng diễn đạt (LLM biên tập)**. Mọi con số trả về đều phải có mã định danh `source_query_id` hoặc trích nguồn từ tài liệu cụ thể. Nếu không có số, hệ thống trả về `no_data` thay vì để LLM "tự biên tự diễn".
 
 ### 2. Khắc phục hạn chế của các phương pháp truyền thống
-* **So với Naive Text-to-SQL (chỉ dùng prompt + LLM):** Dễ gãy khi gặp lược đồ CSDL lớn (20+ bảng), không hiểu ngữ cảnh kế toán Việt Nam (tài khoản đối ứng 111, 112, 341), sinh câu lệnh chạy chậm hoặc gây quá tải CSDL. Kiến trúc v2 sử dụng **Lớp ngữ nghĩa (Semantic Layer) + Bộ truy vấn mẫu (Golden Query Bank)** giúp tỷ lệ sinh SQL chính xác đạt trên 85%.
+* **So với Naive Text-to-SQL (chỉ dùng prompt + LLM):** Dễ gãy khi gặp lược đồ CSDL lớn (20+ bảng), không hiểu ngữ cảnh kế toán Việt Nam (tài khoản đối ứng 111, 112, 341), sinh câu lệnh chạy chậm hoặc gây quá tải CSDL. Kiến trúc v2 sử dụng **Lớp ngữ nghĩa (Semantic Layer) + Bộ truy vấn mẫu (Golden Query Bank)** với mục tiêu thiết kế đạt tỷ lệ sinh SQL chính xác $\ge 85\%$ (chuẩn BIRD benchmark).
 * **So với Naive RAG (Chatbot tài liệu):** RAG chỉ tìm kiếm được văn bản tĩnh (ISO, PDF), hoàn toàn "mù" trước dữ liệu biến động từng ngày trong kho dữ liệu (Data Warehouse).
 * **So với Single-Agent (Một Agent ôm hết):** LangGraph Multi-Agent áp dụng tư duy **"Chia để trị" (Separation of Concerns)**. Mỗi tác tử có một phạm vi nhiệm vụ hẹp (Narrow Scope), giúp giảm độ dài context window, giảm chi phí token và dễ viết Unit Test độc lập cho từng phần.
 
@@ -132,8 +169,8 @@ Một điểm cộng rất lớn khi bảo vệ khóa luận là bạn **dám nh
 ```
 
 ### Chi tiết SWOT:
-* **Strengths:** Độ tin cậy cực cao. Số liệu khớp 100% với UAT đã nghiệm thu. Lãnh đạo doanh nghiệp có thể tin tưởng vào số liệu vì mọi kết quả đều đối soát ngược lại được nguồn gốc bút toán.
-* **Weaknesses:** Luồng xử lý qua nhiều Agent (Intent ➔ SQL ➔ AST ➔ DB ➔ Synthesizer) dẫn đến thời gian phản hồi rơi vào khoảng 5–12 giây (P95). Cần tối ưu bằng caching và streaming response.
+* **Strengths:** Thiết kế hướng tới độ tin cậy và kiểm chứng cao: Mọi con số trả về đều đối soát được ngược lại nguồn gốc bút toán và đối chiếu với đáp án chuẩn UAT (Ground Truth).
+* **Weaknesses:** Luồng xử lý qua nhiều Agent (Intent ➔ SQL ➔ AST ➔ DB ➔ Synthesizer) có thể làm tăng độ trễ tổng thể, do đó hệ thống đặt mục tiêu giám sát P95 $\le 15$ giây và cần tối ưu qua streaming response cùng cơ chế caching.
 * **Opportunities:** Kiến trúc có tính module hóa cao (Decoupled). Doanh nghiệp có thể thay thế mô hình LLM từ Google Gemini sang Claude hoặc mô hình Local (Qwen 2.5 Coder chạy trên máy chủ nội bộ) mà không phải viết lại logic điều phối của LangGraph.
 * **Threats:** Khi đội ngũ Data Engineering thay đổi tên cột hoặc cấu trúc bảng trong CSDL (`Schema Drift`), SQL Agent có thể bị gãy nếu lớp Data Catalog không được cập nhật đồng bộ.
 
@@ -161,7 +198,7 @@ Dưới đây là 5 câu hỏi "kinh điển" mà các thầy cô trong Hội đ
 
 > **Gợi ý trả lời tự tin:**  
 > *"Dạ thưa Thầy/Cô, hệ thống của em được trang bị **2 chốt chặn tự động (Automated Guards)**:"*
-> 1. **Cơ chế Tự sửa lỗi (Self-Healing Loop) tối đa 3 lần:** Nếu câu SQL bị lỗi cú pháp CSDL, lỗi đó được làm sạch và gửi ngược lại cho SQL Agent kèm thông báo: *'Lần trước bạn viết lỗi này, hãy sửa lại'*. Em đã kiểm nghiệm cơ chế này trong Unit Test, giúp cứu được hơn 60% các truy vấn phức tạp bị lỗi cú pháp ban đầu.
+> 1. **Cơ chế Tự sửa lỗi (Self-Healing Loop) tối đa 3 lần:** Nếu câu SQL bị lỗi cú pháp CSDL, lỗi đó được làm sạch và gửi ngược lại cho SQL Agent kèm thông báo: *'Lần trước bạn viết lỗi này, hãy sửa lại'*. Đây là mẫu thiết kế chuẩn trong các hệ thống Text-to-SQL hiện đại (như BIRD, Dataherald), giúp khắc phục phần lớn các lỗi cú pháp ban đầu do nhầm tên cột hoặc alias.
 > 2. **Chốt chặn hợp đồng dữ liệu (Contract Guard):** Nếu sau 3 lần vẫn lỗi, hoặc câu lệnh chạy đúng nhưng CSDL trả về rỗng (`no_data`), hệ thống **ngay lập tức ngắt luồng điều phối (Short-circuit)**. Trạng thái rẽ nhánh thẳng về node `no_data_response`, tuyệt đối **không chuyển tiếp kết quả này vào Synthesizer Agent**. Nhờ đó, LLM không có cơ hội 'đoán mò' hay bịa ra số liệu giả. Hệ thống sẽ trả lời minh bạch: *'Không tìm thấy dữ liệu phát sinh trong kỳ báo cáo'*.
 
 ---
