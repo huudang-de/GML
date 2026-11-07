@@ -544,3 +544,27 @@ python-dotenv>=1.0.0
 | Tỷ lệ SQL query chạy thành công | > 85% |
 | Mức độ hài lòng CEO (Survey 1-5) | ≥ 4.0 |
 | Số câu hỏi tự phục vụ (không cần hỏi team) | Tăng 50% sau 3 tháng |
+
+---
+
+## 9. Giới hạn Kiến trúc của phiên bản v1 & Bài học kinh nghiệm (Architectural Limitations)
+
+Trong quá trình triển khai thực nghiệm và kiểm thử ban đầu của phiên bản v1, hệ thống đã bộc lộ các vấn đề nghiêm trọng liên quan đến hiện tượng ảo giác số liệu (Hallucination) và độ tin cậy truy vấn. Qua phân tích kỹ thuật, đây **không phải là lỗi code đơn thuần (bugs)** mà là **giới hạn cố hữu của kiến trúc v1 (Architectural Limitations)**.
+
+### 9.1. Bốn rào cản kiến trúc cốt lõi của v1
+1. **Thiếu Lớp ngữ nghĩa (Semantic Layer):** Lược đồ CSDL kho dữ liệu GML có hơn 20 bảng và hàng trăm tài khoản kế toán (111, 112, 341...), nhưng prompt của SQL Agent chỉ cung cấp schema thô (DDL thô). LLM phải tự đoán mã tài khoản và mối quan hệ giữa các bảng, dẫn đến việc sinh sai logic nghiệp vụ và bịa số khi không tìm thấy tài khoản tương ứng.
+2. **Thiếu bộ kiểm thực cú pháp AST (AST Validator):** Việc bảo vệ CSDL khỏi các câu lệnh nguy hiểm (`DROP`, `DELETE`, `pg_sleep`) chỉ dựa vào việc dặn dò trong prompt (System Prompt). Đây là lỗ hổng an toàn lớn theo chuẩn OWASP LLM và không có cơ chế chặn đứng câu lệnh lỗi cú pháp trước khi gửi vào PostgreSQL.
+3. **Đồ thị điều phối sơ khai (Naive LangGraph Routing):** Nhánh câu hỏi kết hợp (`both` - cần cả số liệu và giải thích) bị lỗi điều hướng: hệ thống chỉ kích hoạt SQL Agent rồi chuyển thẳng sang Synthesizer mà bỏ qua RAG Agent, khiến câu trả lời thiếu ngữ cảnh đối chiếu quy chuẩn ISO/BRD.
+4. **Bẫy "chắp vá giải pháp" (~30% Patching Trap):** Khi phát hiện lỗi ảo giác, việc cố gắng chèn thêm các đoạn code hợp đồng kiểm tra (như `sql_contracts.py`) vào thẳng mã nguồn v1 chỉ giải quyết được khoảng 30% bề nổi nhưng làm mã nguồn bị lai tạp, sinh nợ kỹ thuật (technical debt) và không giải quyết được gốc rễ bài toán.
+
+### 9.2. Quyết định chiến lược: Đóng băng v1 làm Baseline & Xây mới hoàn toàn v2 (chuẩn L5)
+- **Đóng băng v1.0 (Frozen Baseline):** Giữ nguyên phiên bản v1 ở trạng thái nguyên bản sạch sẽ để làm mốc đối chứng khoa học và thực nghiệm trong khóa luận tốt nghiệp.
+- **Xây mới v2.0 từ đầu (`v2/`):** Thay vì tiếp tục vá víu v1, toàn bộ hệ sinh thái Multi-Agent chuẩn L5 sẽ được xây dựng mới hoàn toàn trong thư mục `v2/` với các nguyên tắc:
+  - CSDL chỉ đọc (`gml_ai_ro`) và bộ lọc AST `sqlglot` bắt buộc.
+  - Lớp ngữ nghĩa máy đọc được (`kpi_definitions.yaml`, `business_rules.yaml`).
+  - Ngân hàng câu truy vấn vàng (Golden Query Bank) từ UAT.
+  - Cơ chế ngắt mạch sớm (Short-circuit) triệt tiêu hoàn toàn ảo giác khi CSDL rỗng.
+
+---
+*Tài liệu này đánh dấu việc hoàn tất và đóng băng phạm vi phát triển của phiên bản v1.*
+

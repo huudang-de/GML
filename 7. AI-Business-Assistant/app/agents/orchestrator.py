@@ -6,7 +6,7 @@ from app.agents.synthesizer import Synthesizer
 
 class OrchestratorAgent:
     def __init__(self):
-        self.llm = ChatGoogleGenerativeAI(model="gemini-3.1-flash-lite")
+        self.llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash")
         self.sql_agent = SQLAgent()
         self.rag_agent = RAGAgent()
         self.synthesizer = Synthesizer(self.llm)
@@ -18,8 +18,6 @@ class OrchestratorAgent:
         graph.add_node("classify_intent", self._classify_intent)
         graph.add_node("sql_lookup", self.sql_agent.run)
         graph.add_node("rag_lookup", self.rag_agent.run)
-        graph.add_node("no_data_response", self._no_data_response)
-        graph.add_node("sql_error_response", self._sql_error_response)
         graph.add_node("synthesize", self.synthesizer.run)
 
         graph.set_entry_point("classify_intent")
@@ -29,13 +27,7 @@ class OrchestratorAgent:
             "rag_only":  "rag_lookup",
             "both":      "sql_lookup",   # sql first, then rag in parallel
         })
-        graph.add_conditional_edges("sql_lookup", self._after_sql, {
-            "synthesize": "synthesize",
-            "no_data": "no_data_response",
-            "sql_error": "sql_error_response",
-        })
-        graph.add_edge("no_data_response", END)
-        graph.add_edge("sql_error_response", END)
+        graph.add_edge("sql_lookup", "synthesize")
         graph.add_edge("rag_lookup", "synthesize")
         graph.add_edge("synthesize", END)
 
@@ -67,40 +59,6 @@ class OrchestratorAgent:
             return "rag_only"
         else:
             return "both"
-
-    def _after_sql(self, state: dict) -> str:
-        status = state.get("sql_status")
-        if status == "ok":
-            return "synthesize"
-        if status == "no_data":
-            return "no_data"
-        return "sql_error"
-
-    @staticmethod
-    def _no_data_response(state: dict) -> dict:
-        return {
-            **state,
-            "answer_type": "no_data",
-            "answer": (
-                "Không có dữ liệu phù hợp với điều kiện bạn hỏi. "
-                "Tôi không suy diễn hoặc ước tính số liệu khi truy vấn DW không trả bản ghi."
-            ),
-            "data": [],
-            "row_count": 0,
-        }
-
-    @staticmethod
-    def _sql_error_response(state: dict) -> dict:
-        return {
-            **state,
-            "answer_type": "execution_error",
-            "answer": (
-                "Không thể lấy số liệu từ Data Warehouse cho câu hỏi này. "
-                "Vui lòng kiểm tra lại điều kiện truy vấn hoặc thử lại sau."
-            ),
-            "data": [],
-            "row_count": 0,
-        }
 
     async def run(self, query: str, session_id: str) -> dict:
         state = {"query": query, "session_id": session_id}

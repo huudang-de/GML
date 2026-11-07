@@ -5,7 +5,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph import StateGraph, END
 import sqlalchemy
-from app.agents.sql_contracts import SQLExecution
 
 SCHEMA_CONTEXT = """
 Bạn là một chuyên gia phân tích dữ liệu (Data Analyst). Hãy viết câu lệnh SQL (PostgreSQL) để trả lời câu hỏi của người dùng.
@@ -36,12 +35,8 @@ Lỗi từ lần chạy trước (nếu có - hãy sửa lỗi này trong câu l
 class SQLAgent:
     def __init__(self):
         postgres_uri = os.environ.get("POSTGRES_URI", "postgresql://user:pass@localhost/gml")
-        # SQLAlchemy 2.x selects the optional ``psycopg`` driver for a plain
-        # postgresql:// URI.  This project ships psycopg2-binary instead.
-        if postgres_uri.startswith("postgresql://"):
-            postgres_uri = postgres_uri.replace("postgresql://", "postgresql+psycopg2://", 1)
         self.db = SQLDatabase.from_uri(postgres_uri, schema="silver")
-        self.llm = ChatGoogleGenerativeAI(model="gemini-3.1-flash-lite")
+        self.llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash")
         
         self.prompt = ChatPromptTemplate.from_template(SCHEMA_CONTEXT)
         self.chain = self.prompt | self.llm | StrOutputParser()
@@ -90,23 +85,22 @@ class SQLAgent:
         retries = state.get("retries", 0)
 
         try:
-            # _execute preserves row structure; SQLDatabase.run() stringifies an
-            # empty result to "", which previously let the synthesizer invent data.
-            rows = self.db._execute(sql_query, fetch="all")
-            execution = SQLExecution(
-                status="ok" if rows else "no_data",
-                rows=rows,
-            )
+            # 2. Execute SQL
+            sql_result = str(self.db.run(sql_query))
+            
+            # Success: Clear error and return result
             return {
-                **state,
-                **execution.to_state(),
+                **state, 
+                "sql_result": sql_result,
+                "sql_error": "" 
             }
         except Exception as e:
-            execution = SQLExecution(status="execution_error", error=str(e))
+            # Error: Save error and increment retries
             return {
                 **state,
-                **execution.to_state(),
-                "retries": retries + 1,
+                "sql_result": "",
+                "sql_error": str(e),
+                "retries": retries + 1
             }
 
     def should_retry(self, state: dict) -> str:
@@ -125,10 +119,7 @@ class SQLAgent:
             "sql_error": "",
             "retries": 0,
             "sql_query": "",
-            "sql_result": "",
-            "sql_status": "execution_error",
-            "data": [],
-            "row_count": 0,
+            "sql_result": ""
         }
         
         # Run the self-healing workflow
@@ -137,6 +128,5 @@ class SQLAgent:
         # If it failed even after retries, format the error nicely
         if final_state.get("sql_error"):
             final_state["sql_result"] = f"Error after {final_state['retries']} retries: {final_state['sql_error']}"
-            final_state["sql_status"] = "execution_error"
             
         return final_state
