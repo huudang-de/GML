@@ -49,7 +49,7 @@ def extract_kpi_threshold_values(kpi_def: KpiDefinition) -> list[float]:
 
     for val in kpi_def.nguong.values():
         val_str = str(val)
-        matches = re.findall(r"\d+(?:[.,]\d+)?", val_str)
+        matches = re.findall(r"[-+]?\d+(?:[.,]\d+)?", val_str)
         for m in matches:
             try:
                 num = float(m.replace(",", "."))
@@ -79,7 +79,8 @@ def format_metric_value(val: float | None, unit: str) -> str:
         if abs(val) >= 1e9:
             val_in_billions = val / 1e9
             formatted_int = f"{val:,.0f}".replace(",", ".")
-            return f"{formatted_int} VNĐ (xấp xỉ {val_in_billions:,.2f} tỷ VNĐ)".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
+            billions_str = f"{val_in_billions:,.2f}".replace(",", "TEMP").replace(".", ",").replace("TEMP", ".")
+            return f"{formatted_int} VNĐ (xấp xỉ {billions_str} tỷ VNĐ)"
         formatted_int = f"{val:,.0f}".replace(",", ".")
         return f"{formatted_int} VNĐ"
 
