@@ -4,10 +4,13 @@ Enforces production safety gates (TC-T5-09) and centralizes environment configur
 """
 
 from datetime import date
+from pathlib import Path
 from typing import Literal
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.core.errors import UnsafeDeploymentError
+
+_DEFAULT_ENV_FILE = str(Path(__file__).resolve().parent.parent.parent / ".env")
 
 
 class Settings(BaseSettings):
@@ -21,9 +24,9 @@ class Settings(BaseSettings):
     as_of_date: date = date(2026, 7, 31)
 
     # Database Connection URIs - Real Profile
-    postgres_uri_ro: str = "postgresql+psycopg2://gml_ai_ro:ro_secret@localhost:5432/gml"
-    postgres_uri_app: str = "postgresql+psycopg2://gml_ai_app:app_secret@localhost:5432/gml"
-    postgres_uri_admin: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/gml"
+    postgres_uri_ro: str = "postgresql+psycopg2://gml_ai_ro:ro_secret@localhost:5432/data_warehouse"
+    postgres_uri_app: str = "postgresql+psycopg2://gml_ai_app:app_secret@localhost:5432/data_warehouse"
+    postgres_uri_admin: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/data_warehouse"
 
     # Database Connection URIs - Synthetic Profile
     postgres_uri_ro_synth: str = "postgresql+psycopg2://gml_ai_ro:ro_secret@localhost:5432/gml_synth"
@@ -43,8 +46,15 @@ class Settings(BaseSettings):
     embedding_provider: str = "auto"
     embedding_model: str = "nomic-embed-text"
 
+    # API Security, Rate Limiting & Cache Settings (T5)
+    auth_tokens_json: str = ""
+    rate_limit_per_minute: int = 60
+    kpi_cache_ttl_seconds: int = 60
+    session_ttl_days: int = 30
+    api_base_url: str = "http://127.0.0.1:8000"
+
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(_DEFAULT_ENV_FILE, ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,

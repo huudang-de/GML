@@ -109,11 +109,12 @@ def create_guard_output_node() -> Callable[[ChatState], dict[str, Any]]:
             warnings.append("SYNTHETIC_DATA")
 
         answer["warnings"] = list(dict.fromkeys(warnings))
+        new_warnings = [w for w in warnings if w not in (state.get("warnings") or [])]
 
         return {
             "answer": answer,
             "explanation": explanation,
-            "warnings": warnings,
+            "warnings": new_warnings,
             "trace": [{"node": "guard_output", "status": "ok"}],
         }
 
