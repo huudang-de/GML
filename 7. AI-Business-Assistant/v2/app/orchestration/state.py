@@ -13,6 +13,7 @@ class ChatState(TypedDict, total=False):
     query: str  # câu hỏi gốc
     standalone_query: str  # câu hỏi độc lập sau follow-up
     intent: Intent
+    data_profile: str  # "real" | "synth"
     sql: dict  # {"sql", "columns", "rows", "row_count", "status", "confidence"}
     rag: dict  # {"chunks", "sources", "grounding_ok"}
     kpi_keys: list[str]
@@ -21,5 +22,6 @@ class ChatState(TypedDict, total=False):
     advice: list[dict]
     needs_clarification: bool
     answer: dict
+    warnings: Annotated[list[str], operator.add]  # Cảnh báo (vd: SYNTHETIC_DATA)
     errors: Annotated[list[str], operator.add]  # nhiều node cùng ghi được
     trace: Annotated[list[dict], operator.add]  # nhật ký thực thi các node

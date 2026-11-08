@@ -134,3 +134,13 @@ class Settings(BaseSettings):
 
         p = self._resolve_profile(profile)
         return self.postgres_uri_admin if p == "real" else self.postgres_uri_admin_synth
+
+
+from functools import lru_cache
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Return cached Settings instance."""
+    return Settings()
+

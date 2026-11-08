@@ -157,3 +157,27 @@ def build_graph(
     graph.add_edge("guard_output", END)
 
     return graph.compile()
+
+
+def build_sql_graph(
+    llm_client: Any = None,
+    settings: Any = None,
+    node_overrides: dict[str, Callable[[ChatState], dict[str, Any]]] | None = None,
+) -> CompiledStateGraph:
+    """Build LangGraph state graph wiring real/mock SQLAgent node and confidence gate node.
+
+    Args:
+        llm_client: Optional SqlLLMClient instance.
+        settings: Optional Settings instance.
+        node_overrides: Optional node overrides.
+    """
+    from app.agents.sql_agent import confidence_gate_node, create_sql_lookup_node
+
+    overrides: dict[str, Callable[[ChatState], dict[str, Any]]] = {
+        "sql_lookup": create_sql_lookup_node(llm_client=llm_client, settings=settings),
+        "confidence_gate": confidence_gate_node,
+    }
+    if node_overrides:
+        overrides.update(node_overrides)
+
+    return build_graph(node_overrides=overrides)
