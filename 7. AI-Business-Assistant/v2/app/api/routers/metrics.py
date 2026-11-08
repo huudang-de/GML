@@ -5,6 +5,7 @@ Specifications:
 - Access restricted to loopback/private hosts or roles {"ceo", "quan_tri_he_thong"}.
 """
 
+import ipaddress
 from typing import Any
 from fastapi import APIRouter, Depends, Header, Request
 
@@ -17,6 +18,17 @@ router = APIRouter(tags=["Metrics"])
 ALLOWED_LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost", "testclient"}
 
 
+def _is_private_or_local(client_host: str) -> bool:
+    """Check if client host is loopback, local test client, or private subnet (Docker 172.16.0.0/12, etc.)."""
+    if client_host in ALLOWED_LOCAL_HOSTS:
+        return True
+    try:
+        ip = ipaddress.ip_address(client_host)
+        return ip.is_private or ip.is_loopback
+    except ValueError:
+        return False
+
+
 @router.get("/metrics")
 def get_system_metrics(
     request: Request,
@@ -27,8 +39,8 @@ def get_system_metrics(
     """Retrieve runtime latency, SQL validity, cache hit ratio, and request count snapshot."""
     client_host = request.client.host if request.client else "unknown"
 
-    # Allow loopback/local test client
-    is_local = client_host in ALLOWED_LOCAL_HOSTS or client_host.startswith("192.168.") or client_host.startswith("10.")
+    # Allow loopback/local test client or private networks
+    is_local = _is_private_or_local(client_host)
 
     if not is_local:
         # Require admin or CEO role

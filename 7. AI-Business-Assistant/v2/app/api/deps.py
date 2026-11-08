@@ -42,6 +42,18 @@ _RATE_LIMITER: SlidingWindowRateLimiter | None = None
 _KPI_CACHE: ScopedTTLCache | None = None
 
 
+def reset_rate_limiter() -> None:
+    """Reset global rate limiter singleton (for test isolation)."""
+    global _RATE_LIMITER
+    _RATE_LIMITER = None
+
+
+def reset_kpi_cache() -> None:
+    """Reset global KPI cache singleton (for test isolation)."""
+    global _KPI_CACHE
+    _KPI_CACHE = None
+
+
 def get_token_verifier(settings: Settings = Depends(get_settings)) -> TokenAuthVerifier:
     """Return configured TokenAuthVerifier."""
     return TokenAuthVerifier(settings)
@@ -76,14 +88,21 @@ def get_metrics() -> MetricsRegistry:
 
 def get_ready_engine(settings: Settings = Depends(get_settings)) -> Engine:
     """Return database engine for health/readiness check."""
-    return sa.create_engine(settings.get_app_uri(), pool_pre_ping=True)
+    return get_app_engine(app_uri=settings.get_app_uri())
 
 
 def get_request_id(request: Request) -> str:
     """Extract or generate unique request_id and update contextvar."""
-    req_id = request.headers.get("x-request-id")
-    if not req_id:
-        req_id = str(uuid.uuid4())
+    if hasattr(request.state, "request_id") and request.state.request_id:
+        req_id = request.state.request_id
+    else:
+        req_id = request.headers.get("x-request-id")
+        if not req_id or not req_id.strip():
+            req_id = f"req-{uuid.uuid4().hex[:12]}"
+        else:
+            req_id = req_id.strip()
+        request.state.request_id = req_id
+
     request_id_ctx.set(req_id)
     return req_id
 

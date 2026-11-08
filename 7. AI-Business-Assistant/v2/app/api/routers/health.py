@@ -38,7 +38,7 @@ def readiness_check(
     try:
         target_engine = engine
         if profile and profile.strip().lower() != settings.data_profile.strip().lower():
-            target_engine = sa.create_engine(settings.get_app_uri(profile=target_profile), pool_pre_ping=True)
+            target_engine = get_app_engine(profile=target_profile)
 
         with target_engine.connect() as conn:
             conn.execute(sa.text("SELECT 1;"))

@@ -1,0 +1,297 @@
+[
+  {
+    "id": 85,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "DELETE /v1/history (session_id=sess-9d6ad61b3037)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-4f1a6fe9d8dc",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:14:42.596805"
+  },
+  {
+    "id": 86,
+    "user_id": "usr_kho",
+    "role": "quan_ly_kho",
+    "query": "GET /v1/kpi/du_no_ngan_han",
+    "sql_executed": null,
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-audit-test-403",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:16.000010"
+  },
+  {
+    "id": 87,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/history (session_id=None, limit=50)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-11b7ab54d9ac",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:16.402419"
+  },
+  {
+    "id": 88,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/history (session_id=None, limit=50)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-12d190b4cc3b",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:16.516092"
+  },
+  {
+    "id": 89,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/kpi/du_no_ngan_han",
+    "sql_executed": "SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND rn = 1 LIMIT 1000",
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-9e6d917559d6",
+    "execution_time_ms": 143.2,
+    "created_at": "2026-11-08T16:15:17.016056"
+  },
+  {
+    "id": 90,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "Dư nợ ngắn hạn hiện tại là bao nhiêu?",
+    "sql_executed": "SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND rn = 1 LIMIT 1000",
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-chat-valid-001",
+    "execution_time_ms": 8631.21,
+    "created_at": "2026-11-08T16:15:30.210287"
+  },
+  {
+    "id": 91,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "Xoá bảng nợ vay",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-chat-blocked-002",
+    "execution_time_ms": 149.87,
+    "created_at": "2026-11-08T16:15:30.398043"
+  },
+  {
+    "id": 92,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "Tỷ lệ sử dụng hạn mức?",
+    "sql_executed": "SELECT SUM(principal_balance) / NULLIF(SUM(granted_limit), 0) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit' LIMIT 1000",
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-a26f9ff72e0b",
+    "execution_time_ms": 7435.41,
+    "created_at": "2026-11-08T16:15:38.188541"
+  },
+  {
+    "id": 93,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/kpi/du_no_ngan_han",
+    "sql_executed": "SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND rn = 1 LIMIT 1000",
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-cd74882e0a12",
+    "execution_time_ms": 134.48,
+    "created_at": "2026-11-08T16:15:38.461505"
+  },
+  {
+    "id": 94,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/alerts",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-bf656902f5f1",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:39.401922"
+  },
+  {
+    "id": 95,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "POST /v1/feedback (rating=up, target_request_id=req-fb-contract)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-4162af0fa663",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:39.574620"
+  },
+  {
+    "id": 96,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/history (session_id=sess-224dad9e89dc, limit=50)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-8be8bdb80e34",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:39.658731"
+  },
+  {
+    "id": 97,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "DELETE /v1/history (session_id=sess-224dad9e89dc)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-97aed7ef6bb2",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:39.732719"
+  },
+  {
+    "id": 98,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/kpi/du_no_ngan_han",
+    "sql_executed": "SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND rn = 1 LIMIT 1000",
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-61b854d8827b",
+    "execution_time_ms": 145.57,
+    "created_at": "2026-11-08T16:15:40.170464"
+  },
+  {
+    "id": 99,
+    "user_id": "usr_kho",
+    "role": "quan_ly_kho",
+    "query": "GET /v1/kpi/du_no_ngan_han",
+    "sql_executed": null,
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-f338eadc835b",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:40.360290"
+  },
+  {
+    "id": 100,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/kpi/du_no_ngan_han",
+    "sql_executed": "[CACHE_HIT]",
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-4d539a8b966e",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:40.994214"
+  },
+  {
+    "id": 101,
+    "user_id": "usr_kho",
+    "role": "quan_ly_kho",
+    "query": "GET /v1/kpi/du_no_ngan_han",
+    "sql_executed": null,
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-9a20a606a25a",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:41.207198"
+  },
+  {
+    "id": 102,
+    "user_id": "usr_kho",
+    "role": "quan_ly_kho",
+    "query": "GET /v1/alerts",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-811028debff1",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:42.623711"
+  },
+  {
+    "id": 103,
+    "user_id": "usr_kho",
+    "role": "quan_ly_kho",
+    "query": "POST /v1/alerts/15/ack",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-bed122de2c19",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:42.940472"
+  },
+  {
+    "id": 104,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "POST /v1/alerts/15/ack",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-59072438613d",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:43.450158"
+  },
+  {
+    "id": 105,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "SELECT * FROM ai_v_no_vay WHERE [REDACTED_DATABASE_URI]",
+    "sql_executed": "SELECT principal_balance FROM ai_v_no_vay LIMIT 10",
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "test-audit-req-12345",
+    "execution_time_ms": 12.5,
+    "created_at": "2026-11-08T16:15:47.722445"
+  },
+  {
+    "id": 106,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "POST /v1/feedback (rating=up, target_request_id=req-feedback-test-1)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-41df7497e664",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:47.867539"
+  },
+  {
+    "id": 107,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/history (session_id=shared-session-test, limit=50)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-781133741824",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:48.056873"
+  },
+  {
+    "id": 108,
+    "user_id": "usr_kho",
+    "role": "quan_ly_kho",
+    "query": "DELETE /v1/history (session_id=shared-session-test)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-ee45a2aae51f",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:48.134635"
+  },
+  {
+    "id": 109,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/history (session_id=shared-session-test, limit=50)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-afc81606671d",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-08T16:15:48.201294"
+  }
+]

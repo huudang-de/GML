@@ -39,7 +39,7 @@ def get_user_history(
     """Retrieve conversation history strictly isolated by caller's user_id."""
     req_id = get_request_id(request)
     target_profile = (profile or settings.data_profile).strip().lower()
-    app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
+    app_engine = get_app_engine(profile=target_profile)
     store = SessionStore(engine=app_engine, data_profile=target_profile, ttl_days=settings.session_ttl_days)
     records = store.list_user_turns(user_id=user.user_id, session_id=session_id, limit=limit)
 
@@ -61,7 +61,6 @@ def get_user_history(
             )
         )
 
-    app_engine = get_app_engine(profile=target_profile)
     write_audit_log(
         engine=app_engine,
         user_id=user.user_id,
@@ -84,11 +83,10 @@ def delete_user_history(
     """Delete conversation history strictly scoped to caller's user_id."""
     req_id = get_request_id(request)
     target_profile = (profile or settings.data_profile).strip().lower()
-    app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
+    app_engine = get_app_engine(profile=target_profile)
     store = SessionStore(engine=app_engine, data_profile=target_profile, ttl_days=settings.session_ttl_days)
     deleted_cnt = store.delete_user_history(user_id=user.user_id, session_id=session_id)
 
-    app_engine = get_app_engine(profile=target_profile)
     write_audit_log(
         engine=app_engine,
         user_id=user.user_id,

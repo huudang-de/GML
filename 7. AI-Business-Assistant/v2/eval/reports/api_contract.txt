@@ -1,0 +1,29 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.7, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\admin\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: D:\Công việc\1. Dự án Gỗ Minh Long\7. AI-Business-Assistant\v2
+configfile: pytest.ini
+plugins: anyio-4.12.1, Faker-40.40.0, langsmith-0.14.5
+collecting ... collected 19 items
+
+tests/integration/test_api_contract_t5.py::test_tc_t5_01_missing_or_invalid_token_returns_401_unified_envelope PASSED [  5%]
+tests/integration/test_api_contract_t5.py::test_tc_t5_02_wrong_role_kpi_returns_403_and_audits PASSED [ 10%]
+tests/integration/test_api_contract_t5.py::test_tc_t5_03_and_review_focus_4_invalid_schema_returns_422_unified_envelope PASSED [ 15%]
+tests/integration/test_api_contract_t5.py::test_tc_t5_04_rate_limit_exceeded_returns_429 PASSED [ 21%]
+tests/integration/test_api_contract_t5.py::test_tc_t5_05_kpi_endpoint_without_llm_returns_exact_g01 PASSED [ 26%]
+tests/integration/test_api_contract_t5.py::test_tc_t5_06_ready_reflects_db_down_503 PASSED [ 31%]
+tests/integration/test_api_contract_t5.py::test_tc_t5_07_and_m14_chat_and_blocked_requests_write_clean_audit_log PASSED [ 36%]
+tests/integration/test_api_contract_t5.py::test_m13_100_percent_endpoint_contract_coverage_and_tc_t5_08_openapi_snapshot PASSED [ 42%]
+tests/integration/test_api_contract_t5.py::test_tc_t5_09_create_app_blocks_unsafe_production_config PASSED [ 47%]
+tests/unit/test_api_core_and_resources_t5.py::test_token_auth_sha256_verification_expiry_and_prod_guard PASSED [ 52%]
+tests/unit/test_api_core_and_resources_t5.py::test_tc_t5_04_sliding_window_rate_limiter_blocks_burst PASSED [ 57%]
+tests/unit/test_api_core_and_resources_t5.py::test_tc_t5_02_and_tc_t5_05_kpi_endpoint_zero_llm_and_rbac PASSED [ 63%]
+tests/unit/test_api_core_and_resources_t5.py::test_review_focus_2_scoped_ttl_cache_isolates_real_synth_and_roles PASSED [ 68%]
+tests/unit/test_api_core_and_resources_t5.py::test_review_focus_5_alerts_rbac_filtering_and_ack_forbidden PASSED [ 73%]
+tests/unit/test_api_core_and_resources_t5.py::test_tc_t5_06_ready_returns_503_when_postgres_unreachable PASSED [ 78%]
+tests/unit/test_api_core_and_resources_t5.py::test_tc_t5_09_production_free_cloud_llm_refuses_startup PASSED [ 84%]
+tests/unit/test_api_core_and_resources_t5.py::test_review_focus_3_audit_trail_sanitizes_and_never_logs_result_values PASSED [ 89%]
+tests/unit/test_api_core_and_resources_t5.py::test_feedback_endpoint_records_rating_and_validates PASSED [ 94%]
+tests/unit/test_api_core_and_resources_t5.py::test_history_endpoint_strictly_isolated_by_user PASSED [100%]
+
+============================= 19 passed in 50.28s =============================
