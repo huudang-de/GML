@@ -35,7 +35,7 @@ class Settings(BaseSettings):
 
     # LLM Settings
     llm_provider: str = "gemini"  # gemini | ollama | mock
-    llm_model: str = "gemini-2.0-flash"
+    llm_model: str = "gemini-3.8-flash"
     llm_tier: str = "free"  # free | paid
     google_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434"

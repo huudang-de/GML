@@ -76,7 +76,7 @@ class GeminiTextLLMClient:
             from langchain_core.messages import HumanMessage, SystemMessage
 
             llm = ChatGoogleGenerativeAI(
-                model=self.settings.llm_model or "gemini-2.0-flash",
+                model=self.settings.llm_model or "gemini-3.8-flash",
                 google_api_key=self.settings.google_api_key,
                 temperature=0.0,
             )
