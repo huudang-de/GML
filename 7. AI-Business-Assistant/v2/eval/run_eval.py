@@ -534,7 +534,6 @@ def run_rag_evaluation(
             query=item.cau_hoi,
             role=item.role or "ceo",
             top_k=5,
-            dashboard=item.dashboard,
         )
         v2_first_hit = 0
         for r, c in enumerate(v2_chunks, start=1):
