@@ -1,0 +1,82 @@
+# ==============================================================================
+# GML AI Business Assistant v2.0 — CFO Playbooks (SOP-01..04) & Seasonality Rules
+# Specification: Spec §5 T3, Tai_lieu_Tri_thuc_Quan_tri_Tai_chinh_GML.md (§3.2, §4.2)
+# Mandatory Disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+# ==============================================================================
+
+playbooks:
+  SOP-01:
+    id: "SOP-01"
+    name: "Cash Crunch SOP"
+    kpi_key: "dong_tien_rong"
+    level: "nghiem_trong"
+    authority_role: "ceo"
+    title: "Thâm hụt Dòng tiền & Cạn kiệt Thanh khoản"
+    trigger_rule: "dong_tien_rong < 0 OR cash_runway < 1.5"
+    actions:
+      - "Kiểm tra ngay bc_tin_dung_2026.xlsx, rà soát hạn mức tín dụng khả dụng tại ngân hàng có lãi suất thấp nhất (ưu tiên giải ngân các khế ước có lãi suất < 6.5%)."
+      - "Kích hoạt chính sách chiết khấu thanh toán sớm 1.0 - 1.5% đối với các đại lý nợ lớn trong hạn để khuyến khích nộp tiền mặt ngay."
+      - "Đàm phán với 3 nhà cung cấp ván thô lớn nhất xin gia hạn thanh toán thêm 10-15 ngày; tạm dừng giải ngân mua sắm TSCĐ (Capex)."
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+  SOP-02:
+    id: "SOP-02"
+    name: "Excess Liquidity Optimization SOP"
+    kpi_key: "tien_va_tuong_duong_tien"
+    level: "canh_bao"
+    authority_role: "ke_toan_truong"
+    title: "Dôi dư Tiền mặt Ngắn hạn"
+    trigger_rule: "cash_runway > 3.5 AND tien_va_tuong_duong_tien > 20000000000"
+    actions:
+      - "Kiểm tra lịch trả nợ vay ngân hàng trong 30 ngày tới."
+      - "Trích xuất khoản tiền dôi dư gửi tiết kiệm có kỳ hạn 1 tháng hoặc 3 tháng tại ngân hàng có biểu lãi suất cao nhất (theo dữ liệu Hop_dong_tien_gui.xlsm) để tăng doanh thu tài chính (TK 515)."
+      - "Nếu lãi suất tiền gửi < lãi suất vay ngân hàng của khế ước đang chịu lãi cao (ví dụ 7.5%), đề xuất dùng tiền dôi dư trả bớt nợ gốc để giảm chi phí lãi vay (TK 635)."
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+  SOP-03:
+    id: "SOP-03"
+    name: "AR Overdue Crisis SOP"
+    kpi_key: "vong_quay_phai_thu_nam"
+    level: "nghiem_trong"
+    authority_role: "ceo"
+    title: "Rủi ro Công nợ Quá hạn Tăng cao"
+    trigger_rule: "dso > 60 OR ty_le_no_qua_han > 0.15 OR vong_quay_phai_thu_nam < 2.0 OR vong_quay_phai_thu_hien_tai < 1.0"
+    actions:
+      - "Truy vấn Top 5 khách hàng/đại lý có số dư nợ quá hạn lớn nhất từ Fact AR."
+      - "Đề xuất bộ phận Kinh doanh tự động dừng xuất kho các đơn hàng mới đối với khách hàng có nợ quá hạn > 60 ngày."
+      - "Đề xuất gửi công văn đối chiếu công nợ có xác nhận pháp lý; chuyển hồ sơ sang bộ phận pháp chế nếu quá hạn > 90 ngày."
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+  SOP-04:
+    id: "SOP-04"
+    name: "Slow-Moving Inventory SOP"
+    kpi_key: "vong_quay_hang_ton_kho"
+    level: "nghiem_trong"
+    authority_role: "ceo"
+    title: "Tồn kho Ứ đọng / Chậm Luân chuyển"
+    trigger_rule: "dio > 90 OR vong_quay_hang_ton_kho < 1.0 OR ty_le_ton_kho_tren_doanh_thu > 4.0 OR tang_ton_kho_melamine > 0.25"
+    actions:
+      - "Bóc tách danh sách các mã bề mặt melamine/ván cốt có vòng quay tồn kho < 1.0 lần/quý."
+      - "Đề xuất gói khuyến mãi chiết khấu 8-12% cho các nhà thầu thi công dự án trọn gói hoặc xưởng nội thất ngoại thành."
+      - "Cảnh báo nhà máy giảm nhập ván thô cho các mã cốt đang dư thừa; ưu tiên ép phủ theo đơn hàng thực tế (Make-to-Order)."
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+seasonality:
+  Q1:
+    months: [1, 2, 3]
+    phase: "Thấp điểm sau Tết Nguyên Đán"
+    market_context: "Công trình xây dựng mới khởi công, thị trường nội thất tiêu thụ chậm, doanh thu thấp."
+    financial_focus: "Dòng tiền thu về chậm, duy trì đệm tiền mặt an toàn để bù đắp thâm hụt hoạt động."
+    insight: "Chu kỳ Q1 ngành gỗ: Thấp điểm sau Tết Nguyên Đán, các công trình mới khởi công, dòng tiền chậm, cần duy trì đệm tiền mặt an toàn."
+  Q2_Q3:
+    months: [4, 5, 6, 7, 8]
+    phase: "Nhập nguyên liệu & sản xuất"
+    market_context: "Xưởng mộc và đại lý tích trữ ván thô/MDF để chuẩn bị cho mùa sản xuất cao điểm."
+    financial_focus: "DIO tăng cao, nhu cầu vốn lưu động lớn, tận dụng tối đa vốn vay nợ ngân hàng."
+    insight: "Chu kỳ Q2-Q3 ngành gỗ: Giai đoạn tích trữ nguyên liệu ván thô và sản xuất, DIO có xu hướng tăng cao, tận dụng vốn vay ngân hàng."
+  Q4:
+    months: [9, 10, 11, 12]
+    phase: "Cao điểm bàn giao nội thất đón Tết"
+    market_context: "Các dự án và công trình dân dụng gấp rút hoàn thiện bàn giao trước Tết, nhu cầu tiêu thụ ván phủ melamine đạt đỉnh."
+    financial_focus: "Doanh thu đạt đỉnh trong năm, siết chặt DSO và hạn mức tín dụng thương mại để thu hồi công nợ."
+    insight: "Chu kỳ Q4 ngành gỗ: Cao điểm bàn giao nội thất đón Tết, doanh thu đạt đỉnh, cần siết chặt thu hồi công nợ và kiểm soát DSO."
