@@ -35,24 +35,57 @@ def _get_settings() -> Settings:
     return Settings()
 
 
-def get_admin_engine(admin_uri: str | None = None) -> Engine:
+def ensure_database_exists(admin_uri: str) -> None:
+    """Ensure that the target database in admin_uri exists on PostgreSQL host.
+
+    Connects to 'postgres' administrative database with AUTOCOMMIT, creates the
+    target database if missing, and grants CONNECT to gml_ai_ro and gml_ai_app.
+    """
+    from sqlalchemy.engine import make_url
+
+    url = make_url(admin_uri)
+    target_db = url.database
+    if not target_db or target_db.lower() in ("postgres", "template0", "template1"):
+        return
+
+    maint_url = url.set(database="postgres")
+    maint_engine = sa.create_engine(maint_url, isolation_level="AUTOCOMMIT")
+    with maint_engine.connect() as conn:
+        db_exists = conn.execute(
+            sa.text("SELECT 1 FROM pg_database WHERE datname = :dbname"),
+            {"dbname": target_db},
+        ).scalar()
+        if not db_exists:
+            conn.execute(sa.text(f'CREATE DATABASE "{target_db}"'))
+
+        for role in ("gml_ai_ro", "gml_ai_app"):
+            role_exists = conn.execute(
+                sa.text("SELECT 1 FROM pg_roles WHERE rolname = :rolname"),
+                {"rolname": role},
+            ).scalar()
+            if role_exists:
+                conn.execute(sa.text(f'GRANT CONNECT ON DATABASE "{target_db}" TO {role}'))
+    maint_engine.dispose()
+
+
+def get_admin_engine(admin_uri: str | None = None, profile: str | None = None) -> Engine:
     """Return SQLAlchemy engine for administrative tasks (dev/admin)."""
     settings = _get_settings()
-    uri = admin_uri or settings.postgres_uri_admin
+    uri = admin_uri or settings.get_admin_uri(profile=profile)
     return sa.create_engine(uri, pool_pre_ping=True)
 
 
-def get_ro_engine(ro_uri: str | None = None) -> Engine:
+def get_ro_engine(ro_uri: str | None = None, profile: str | None = None) -> Engine:
     """Return SQLAlchemy engine for AI read-only queries (gml_ai_ro)."""
     settings = _get_settings()
-    uri = ro_uri or settings.postgres_uri_ro
+    uri = ro_uri or settings.get_ro_uri(profile=profile)
     return sa.create_engine(uri, pool_pre_ping=True)
 
 
-def get_app_engine(app_uri: str | None = None) -> Engine:
+def get_app_engine(app_uri: str | None = None, profile: str | None = None) -> Engine:
     """Return SQLAlchemy engine for application state logging (gml_ai_app)."""
     settings = _get_settings()
-    uri = app_uri or settings.postgres_uri_app
+    uri = app_uri or settings.get_app_uri(profile=profile)
     return sa.create_engine(uri, pool_pre_ping=True)
 
 

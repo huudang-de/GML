@@ -23,9 +23,18 @@ GRANT USAGE ON SCHEMA ai_views TO gml_ai_ro;
 GRANT SELECT ON ALL TABLES IN SCHEMA ai_views TO gml_ai_ro;
 ALTER DEFAULT PRIVILEGES IN SCHEMA ai_views GRANT SELECT ON TABLES TO gml_ai_ro;
 
--- Schema silver: Block gml_ai_ro completely (Layer 1 Defense)
-REVOKE ALL ON SCHEMA silver FROM gml_ai_ro;
-REVOKE ALL ON ALL TABLES IN SCHEMA silver FROM gml_ai_ro;
+-- Schema silver / synthetic: Block gml_ai_ro completely (Layer 1 Defense)
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM information_schema.schemata WHERE schema_name = 'silver') THEN
+    EXECUTE 'REVOKE ALL ON SCHEMA silver FROM gml_ai_ro';
+    EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA silver FROM gml_ai_ro';
+  END IF;
+  IF EXISTS (SELECT FROM information_schema.schemata WHERE schema_name = 'synthetic') THEN
+    EXECUTE 'REVOKE ALL ON SCHEMA synthetic FROM gml_ai_ro';
+    EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA synthetic FROM gml_ai_ro';
+  END IF;
+END $$;
 
 -- Prevent writing in public schema
 REVOKE CREATE ON SCHEMA public FROM gml_ai_ro;

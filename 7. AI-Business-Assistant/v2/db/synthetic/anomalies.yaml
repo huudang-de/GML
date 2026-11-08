@@ -1,0 +1,77 @@
+# ==============================================================================
+# GML AI Business Assistant v2.0 — Labeled Financial & Operational Anomalies
+# Specifications: Spec §3.1, §6.1, §6 Warning, Plan §Task 1 (T1-synth)
+# Target Database: gml_synth (ai_views.*)
+# ==============================================================================
+
+version: "2.0"
+
+anomalies:
+  - id: "ANOM-01"
+    kpi: "du_no_ngan_han"
+    period: "2026-07"
+    metric: "mom_growth_rate"
+    expected_value: -0.167889
+    tolerance: 0.0001
+    severity: "canh_bao"
+    description: "Dư nợ ngắn hạn tại 2026-07 giảm MoM -16.79% (từ 283.7 tỷ ở 2026-06 xuống 236.07 tỷ ở 2026-07); chuỗi 7 tháng giảm -24.99% so với 314.7 tỷ ở 2026-01."
+    verification_sql: |
+      SELECT (
+        (SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND posting_date = '2026-07-31'::date)
+        - (SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND posting_date = '2026-06-30'::date)
+      ) / (SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND posting_date = '2026-06-30'::date);
+
+  - id: "ANOM-02"
+    kpi: "ton_kho_sku"
+    period: "2026-03-31"
+    metric: "total_value"
+    expected_value: 18500000000.0
+    tolerance: 1.0
+    severity: "nghiem_trong"
+    description: "SKU SYNTH_SKU_MDF17 trong ai_v_ton_kho (record_type='balance') có total_value = 18.5 tỷ tại 2026-03-31, cao gấp > 3 MAD so với trung vị 12 tháng (~5 tỷ)."
+    verification_sql: |
+      SELECT total_value
+      FROM ai_views.ai_v_ton_kho
+      WHERE record_type = 'balance'
+        AND product_code = 'SYNTH_SKU_MDF17'
+        AND tx_date = '2026-03-31'::date;
+
+  - id: "ANOM-03"
+    kpi: "current_ratio"
+    period: "2025-11-30"
+    metric: "ratio"
+    expected_value: 1.08
+    tolerance: 0.01
+    severity: "canh_bao"
+    description: "current_ratio (B01-DN_100 / B01-DN_310 trên ai_v_bctc) tại 2025-11-30 sụt xuống 1.08 (< 1.2, ngưỡng cảnh báo AL-003), trong khi 11 tháng còn lại nằm trong [1.35, 1.55]."
+    verification_sql: |
+      SELECT 
+        (SELECT ending_balance FROM ai_views.ai_v_bctc WHERE report_type = 'B01-DN' AND item_code = 'B01-DN_100' AND reporting_date = '2025-11-30'::date) /
+        NULLIF((SELECT ending_balance FROM ai_views.ai_v_bctc WHERE report_type = 'B01-DN' AND item_code = 'B01-DN_310' AND reporting_date = '2025-11-30'::date), 0);
+
+  - id: "ANOM-04"
+    kpi: "ty_le_su_dung_han_muc"
+    period: "2026-07-31"
+    metric: "ratio"
+    expected_value: 0.80023729
+    tolerance: 0.0001
+    severity: "canh_bao"
+    description: "ty_le_su_dung_han_muc (SUM(principal_balance) / SUM(granted_limit) trên ai_v_no_vay WHERE record_type='credit_limit') tại 2026-07-31 bằng 236070000000 / 295000000000 = 0.80023729 (80.0%, kích hoạt mức canh_bao AL-001, hạn mức còn lại 58,930,000,000)."
+    verification_sql: |
+      SELECT (SELECT SUM(principal_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit') /
+             NULLIF((SELECT SUM(granted_limit) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit'), 0);
+
+  - id: "ANOM-05"
+    kpi: "dong_tien_rong"
+    period: "2026-02"
+    metric: "net_cashflow"
+    expected_value: -45000000000.0
+    tolerance: 1.0
+    severity: "nghiem_trong"
+    description: "dong_tien_rong (SUM(debit_amount - credit_amount) trên ai_v_dong_tien WHERE is_external_cashflow = TRUE) tháng 2026-02 âm đột biến -45 tỷ (thiếu hụt dòng tiền sau Tết)."
+    verification_sql: |
+      SELECT SUM(debit_amount - credit_amount)
+      FROM ai_views.ai_v_dong_tien
+      WHERE is_external_cashflow = TRUE
+        AND posting_date >= '2026-02-01'::date
+        AND posting_date <= '2026-02-28'::date;

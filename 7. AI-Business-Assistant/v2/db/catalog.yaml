@@ -68,6 +68,10 @@ views:
         type: "DATE"
         description: "Ngày chốt số liệu báo cáo"
         unit: ""
+      - name: "tx_id"
+        type: "BIGINT"
+        description: "ID định danh duy nhất của bản ghi giao dịch/hợp đồng/hạn mức"
+        unit: ""
 
   ai_v_dong_tien:
     description: "View dòng tiền chi tiết từ sổ cái kế toán, phân loại dòng tiền thực tế vào/ra doanh nghiệp."
@@ -115,6 +119,10 @@ views:
       - name: "description"
         type: "TEXT"
         description: "Diễn giải chi tiết nội dung bút toán"
+        unit: ""
+      - name: "tx_id"
+        type: "BIGINT"
+        description: "ID định danh duy nhất của bút toán dòng tiền"
         unit: ""
 
   ai_v_bctc:
@@ -210,6 +218,14 @@ views:
         type: "DATE"
         description: "Ngày giao dịch hoặc ngày chốt số dư tồn kho"
         unit: ""
+      - name: "product_category"
+        type: "TEXT"
+        description: "Nhóm / ngành hàng sản phẩm"
+        unit: ""
+      - name: "exchange_rate"
+        type: "NUMERIC"
+        description: "Tỷ giá quy đổi ngoại tệ của giao dịch nhập/xuất kho (1.0 đối với số dư tồn)"
+        unit: ""
 
   ai_v_cong_no:
     description: "View công nợ đối tác gồm công nợ phải thu khách hàng (AR) và phải trả người bán (AP)."
@@ -265,6 +281,18 @@ views:
       - name: "is_latest_partner_tx"
         type: "BOOLEAN"
         description: "Cờ xác định giao dịch gần nhất của đối tác đó"
+        unit: ""
+      - name: "partner_group"
+        type: "TEXT"
+        description: "Nhóm đối tác (Khách hàng, Nhà cung cấp, Khách hàng/ nhà cung cấp)"
+        unit: ""
+      - name: "invoice_date"
+        type: "DATE"
+        description: "Ngày phát hành hóa đơn tài chính"
+        unit: ""
+      - name: "tx_id"
+        type: "BIGINT"
+        description: "ID định danh duy nhất của chứng từ công nợ"
         unit: ""
 
   ai_v_tien_gui:

@@ -1,0 +1,25 @@
+================================================================================
+EVIDENCE EV-03: DETERMINISTIC SYNTHETIC WAREHOUSE CHECKSUM (SEED 42)
+Generated at: 2026-07-31T00:00:00Z | Seed: 42 | Database: gml_synth
+================================================================================
+
+synthetic.dim_account: ccbeda50951802a2fcfe7fb937f7b572755feaf85c0ff29729d6db2114e68dc6
+synthetic.dim_accountnumber: 5389ea3b0086047edd37069456108ba1fd9628a36606bc0e09bdbf40e5bfbccd
+synthetic.dim_bank: 309cad4fbbcf5317ee9966c090060034cd7ffda59dcf826063c5f4607d62af07
+synthetic.dim_partner: a320d3e9dfc146785a4469992a087382e2923a35aecd004d1d192f5709dc4cca
+synthetic.dim_product: 85a09cf46e6395da02b64ba9c7b1568a9fc06dd526a80fc9a56d692a773e630f
+synthetic.dim_reportitem: 8c447145611ce706cc1e5d592c480b9e6f295fbacf117775734e84a7a9aefa99
+synthetic.dim_warehouse: b32d3fa196eafcc888e57ef206587c29d5d6c9bb4b70d8807c706ab39d3ef32d
+synthetic.fact_accountspayable: ffc8663a49e194fa25bff875f0b33745a8039e902d86a11950b08737f325a1f1
+synthetic.fact_accountsreceivable: 5db9318d6dc037808bbe4083a95b43a35847d9fc1e97f2daf8027f6825fc2f40
+synthetic.fact_balancesheet: f7e80162db78a818123baee44dc61cae4ba21d78ace7c16afadd7c1c16f2da19
+synthetic.fact_businessplan: d15bc92eaeaf7f368103e517e2ee3ff8a51be6f8d003113fb7bdb05a65b47ec9
+synthetic.fact_cashflow: 45b3f18b599467ba332413a346dc17b31de0670d01354878eae9864ad6f2d831
+synthetic.fact_collateral: fdb1441634fe83336a6aa169bd24403abe73e777a91bcf95929d3f0f1ac56d81
+synthetic.fact_creditlimitsummary: 37171e1cf7ddc6bcb35352918ac7cacf139c6e62b3c6ba0f6a5e699838c995aa
+synthetic.fact_incomestatement: 0df8526cfc2b10cf4ed590840d4c44f621cf32822e7bed84edc1f9ad2705ee9f
+synthetic.fact_inventory_balance: 988c6e2c3e40157db548177c206d0b89a861c6cb09d5f729cc0651200031d9fc
+synthetic.fact_inventoryinward: 9d6000b05589f6841a4aa4f56368f5e85852f951b52136955737b616e892cb9b
+synthetic.fact_inventoryoutward: b20b36794a0404661cac0051fd09dc57494079298f0b155d2e6337a1d7817418
+synthetic.fact_loan: e87c55882a73e348863a6b73b21ba071750a53bc517eb955870801df6b7c5ee0
+synthetic.fact_termdeposit: 943ceaf4c93dddb206bdf4966ca5dae9cc4cced0ecffe4cdb0b75c1c75d4fdc5

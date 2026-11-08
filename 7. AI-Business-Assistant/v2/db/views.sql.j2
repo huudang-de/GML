@@ -41,7 +41,8 @@ SELECT
     NULL::numeric AS debit_balance,
     NULL::numeric AS credit_balance,
     1::bigint AS rn,
-    '{{ as_of_date }}'::date AS as_of_date
+    '{{ as_of_date }}'::date AS as_of_date,
+    cls.id::bigint AS tx_id
 FROM {{ source_schema }}.fact_creditlimitsummary cls
 LEFT JOIN {{ source_schema }}.dim_bank b 
     ON cls.bank_code = b.bank_code OR cls.bank_code = b.code1 OR cls.bank_code = b.code2
@@ -83,7 +84,8 @@ SELECT
     NULL::numeric AS debit_balance,
     NULL::numeric AS credit_balance,
     1::bigint AS rn,
-    '{{ as_of_date }}'::date AS as_of_date
+    '{{ as_of_date }}'::date AS as_of_date,
+    col.row_id::bigint AS tx_id
 FROM {{ source_schema }}.fact_collateral col
 LEFT JOIN {{ source_schema }}.dim_bank b 
     ON col.bank_code = b.bank_code OR col.bank_code = b.code1 OR col.bank_code = b.code2
@@ -125,7 +127,8 @@ SELECT
     NULL::numeric AS debit_balance,
     NULL::numeric AS credit_balance,
     1::bigint AS rn,
-    '{{ as_of_date }}'::date AS as_of_date
+    '{{ as_of_date }}'::date AS as_of_date,
+    fl.id::bigint AS tx_id
 FROM {{ source_schema }}.fact_loan fl
 LEFT JOIN {{ source_schema }}.dim_bank b 
     ON fl.bank_code = b.bank_code OR fl.bank_code = b.code1 OR fl.bank_code = b.code2
@@ -167,7 +170,8 @@ SELECT
     fc.debit_balance::numeric AS debit_balance,
     fc.credit_balance::numeric AS credit_balance,
     ROW_NUMBER() OVER (PARTITION BY fc.account_no ORDER BY fc.posting_date DESC, fc.id DESC)::bigint AS rn,
-    '{{ as_of_date }}'::date AS as_of_date
+    '{{ as_of_date }}'::date AS as_of_date,
+    fc.id::bigint AS tx_id
 FROM {{ source_schema }}.fact_cashflow fc
 WHERE (fc.account_no IN ('34111', '34112', '34113', '34114', '3412', '341') OR fc.account_no LIKE '341%')
   AND fc.posting_date <= '{{ as_of_date }}'::date;
@@ -206,7 +210,8 @@ SELECT
         AND (c.reciprocal_account IS NULL OR (c.reciprocal_account NOT LIKE '111%' AND c.reciprocal_account NOT LIKE '112%'))
     )::boolean AS is_external_cashflow,
     c.description::text AS description,
-    '{{ as_of_date }}'::date AS as_of_date
+    '{{ as_of_date }}'::date AS as_of_date,
+    c.id::bigint AS tx_id
 FROM {{ source_schema }}.fact_cashflow c
 JOIN {{ source_schema }}.dim_account a ON c.account_no = a.account_no
 LEFT JOIN {{ source_schema }}.dim_accountnumber b ON a.account_bank = b.account_bank
@@ -280,7 +285,9 @@ SELECT
     b.snapshot_date::date AS tx_date,
     NULL::text AS voucher_no,
     NULL::text AS partner_code,
-    '{{ as_of_date }}'::date AS as_of_date
+    '{{ as_of_date }}'::date AS as_of_date,
+    p.product_category::text AS product_category,
+    1.0::double precision AS exchange_rate
 FROM {{ source_schema }}.fact_inventory_balance b
 LEFT JOIN {{ source_schema }}.dim_product p ON b.product_code = p.product_code
 LEFT JOIN {{ source_schema }}.dim_warehouse w ON b.warehouse_code = w.warehouse_code
@@ -306,7 +313,9 @@ SELECT
     i.posting_date::date AS tx_date,
     i.voucher_no::text AS voucher_no,
     i.partner_code::text AS partner_code,
-    '{{ as_of_date }}'::date AS as_of_date
+    '{{ as_of_date }}'::date AS as_of_date,
+    p.product_category::text AS product_category,
+    i.exchange_rate::double precision AS exchange_rate
 FROM {{ source_schema }}.fact_inventoryinward i
 LEFT JOIN {{ source_schema }}.dim_product p ON i.product_code = p.product_code
 LEFT JOIN {{ source_schema }}.dim_warehouse w ON i.warehouse_code = w.warehouse_code
@@ -332,7 +341,9 @@ SELECT
     o.posting_date::date AS tx_date,
     o.voucher_no::text AS voucher_no,
     o.partner_code::text AS partner_code,
-    '{{ as_of_date }}'::date AS as_of_date
+    '{{ as_of_date }}'::date AS as_of_date,
+    p.product_category::text AS product_category,
+    o.exchange_rate::double precision AS exchange_rate
 FROM {{ source_schema }}.fact_inventoryoutward o
 LEFT JOIN {{ source_schema }}.dim_product p ON o.product_code = p.product_code
 LEFT JOIN {{ source_schema }}.dim_warehouse w ON o.warehouse_code = w.warehouse_code
@@ -363,7 +374,10 @@ SELECT
     ar.credit_amount::numeric AS credit_amount,
     ar.ending_debit_balance::numeric AS ending_debit_balance,
     ar.ending_credit_balance::numeric AS ending_credit_balance,
-    '{{ as_of_date }}'::date AS as_of_date
+    '{{ as_of_date }}'::date AS as_of_date,
+    p.partner_group::text AS partner_group,
+    ar.invoice_date::date AS invoice_date,
+    ar.id::bigint AS tx_id
 FROM {{ source_schema }}.fact_accountsreceivable ar
 LEFT JOIN {{ source_schema }}.dim_partner p ON ar.partner_code = p.partner_code
 WHERE ar.posting_date <= '{{ as_of_date }}'::date
@@ -392,7 +406,10 @@ SELECT
     ap.credit_amount::numeric AS credit_amount,
     ap.ending_debit_balance::numeric AS ending_debit_balance,
     ap.ending_credit_balance::numeric AS ending_credit_balance,
-    '{{ as_of_date }}'::date AS as_of_date
+    '{{ as_of_date }}'::date AS as_of_date,
+    p.partner_group::text AS partner_group,
+    ap.invoice_date::date AS invoice_date,
+    ap.id::bigint AS tx_id
 FROM {{ source_schema }}.fact_accountspayable ap
 LEFT JOIN {{ source_schema }}.dim_partner p ON ap.partner_code = p.partner_code
 WHERE ap.posting_date <= '{{ as_of_date }}'::date;
