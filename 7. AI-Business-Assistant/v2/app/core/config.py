@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434"
 
+    # RAG Settings
+    chroma_persist_dir: str = "data/chroma_db"
+    rag_manifest_path: str = "data/rag_manifest.json"
+    embedding_provider: str = "auto"
+    embedding_model: str = "nomic-embed-text"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
