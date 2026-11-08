@@ -1,0 +1,14 @@
+id,name,uat_expected,actual_views,relative_error,status,sql
+G-01,Dư nợ ngắn hạn,236065233815.000000,236065233815.000000,0.000000e+00,PASS,SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance'   AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%')   AND rn = 1;
+G-02,Dư nợ dài hạn,51174925843.000000,51174925843.000000,0.000000e+00,PASS,SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance'   AND account_no LIKE '34112%'   AND rn = 1;
+G-03,Hạn mức được phê duyệt,485000000000.000000,485000000000.000000,0.000000e+00,PASS,SELECT SUM(credit_limit) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit';
+G-04,Hạn mức được cấp,295000000000.000000,295000000000.000000,0.000000e+00,PASS,SELECT SUM(granted_limit) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit';
+G-05,Hạn mức còn lại,24135521634.000000,24135521634.000000,0.000000e+00,PASS,SELECT SUM(granted_limit) - SUM(principal_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit';
+G-06,LTV,0.712909,0.712909,0.000000e+00,PASS,"SELECT (SELECT SUM(granted_limit) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit') / NULLIF((SELECT SUM(appraised_value) FROM ai_views.ai_v_no_vay WHERE record_type = 'collateral'), 0);"
+G-07,Tiền và tương đương tiền,91976722608.000000,91975348608.000000,1.493856e-05,PASS,SELECT ending_balance FROM ai_views.ai_v_bctc WHERE item_code = 'B01-DN_110'   AND report_type = 'B01-DN'   AND reporting_date = (SELECT MAX(reporting_date) FROM ai_views.ai_v_bctc WHERE report_type = 'B01-DN');
+G-08,Tiền gửi còn hiệu lực,40514952541.000000,40514952541.000000,0.000000e+00,PASS,SELECT SUM(original_amount) FROM ai_views.ai_v_tien_gui WHERE is_active_at_cutoff = TRUE;
+G-09,Số hợp đồng tiền gửi còn hiệu lực,22.000000,22.000000,0.000000e+00,PASS,SELECT COUNT(DISTINCT passbook_no) FROM ai_views.ai_v_tien_gui WHERE is_active_at_cutoff = TRUE;
+G-10,Lãi suất tiền gửi bình quân,0.049897,0.049897,0.000000e+00,PASS,"SELECT SUM(original_amount * interest_rate) / NULLIF(SUM(original_amount), 0) FROM ai_views.ai_v_tien_gui WHERE is_active_at_cutoff = TRUE;"
+G-11,Thu nhập lãi TK 515,1482534625.000000,1482534625.000000,0.000000e+00,PASS,SELECT SUM(debit_amount) FROM ai_views.ai_v_dong_tien WHERE reciprocal_account LIKE '515%';
+G-12,Dư nợ gốc trên hạn mức,270864478366.000000,270864478366.000000,0.000000e+00,PASS,SELECT SUM(principal_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit';
+G-13,Tỷ lệ sử dụng hạn mức,0.918185,0.918185,0.000000e+00,PASS,SELECT (SELECT SUM(principal_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit') / (SELECT SUM(granted_limit) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit');

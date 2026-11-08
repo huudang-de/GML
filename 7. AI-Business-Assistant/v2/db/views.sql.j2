@@ -1,0 +1,446 @@
+-- ==============================================================================
+-- GML AI Business Assistant v2.0 — 7 Standardized AI Views
+-- Jinja2 Template: source_schema (default 'silver'), as_of_date (default '2026-07-31')
+-- Specification: Spec §3.1, §5 T1, §6, §11.9
+-- ==============================================================================
+
+-- 1. View: ai_v_no_vay (Nợ vay, hạn mức tín dụng, TSĐB, số dư sổ cái)
+CREATE OR REPLACE VIEW ai_views.ai_v_no_vay AS
+-- 1.1 Credit Limits (fact_creditlimitsummary)
+SELECT 
+    'credit_limit'::text AS record_type,
+    cls.bank_code::text AS bank_code,
+    COALESCE(b.bank_name, cls.bank_code)::text AS bank_name,
+    NULL::text AS contract_no,
+    NULL::text AS contract_number,
+    NULL::text AS account_no,
+    cls.credit_limit::numeric AS credit_limit,
+    cls.credit_limit::numeric AS approved_limit,
+    cls.granted_limit::numeric AS granted_limit,
+    cls.principal_balance::numeric AS principal_balance,
+    cls.remaining_disbursement::numeric AS remaining_disbursement,
+    cls.interest_rate::double precision AS interest_rate,
+    cls.limit_type::text AS limit_type,
+    cls.limit_type::text AS loan_type,
+    NULL::text AS collateral_type,
+    NULL::numeric AS appraised_value,
+    NULL::numeric AS collateral_value,
+    NULL::numeric AS loan_value,
+    NULL::numeric AS max_loan_amount,
+    NULL::text AS collateral_coefficient,
+    NULL::numeric AS total_credit_limit,
+    NULL::numeric AS remaining_principal,
+    NULL::date AS disbursement_date,
+    NULL::date AS start_date,
+    NULL::date AS maturity_date,
+    NULL::date AS posting_date,
+    NULL::text AS voucher_no,
+    NULL::text AS description,
+    NULL::numeric AS debit_amount,
+    NULL::numeric AS credit_amount,
+    NULL::numeric AS debit_balance,
+    NULL::numeric AS credit_balance,
+    1::bigint AS rn,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_creditlimitsummary cls
+LEFT JOIN {{ source_schema }}.dim_bank b 
+    ON cls.bank_code = b.bank_code OR cls.bank_code = b.code1 OR cls.bank_code = b.code2
+
+UNION ALL
+
+-- 1.2 Collateral (fact_collateral)
+SELECT 
+    'collateral'::text AS record_type,
+    col.bank_code::text AS bank_code,
+    COALESCE(b.bank_name, col.bank_code)::text AS bank_name,
+    NULL::text AS contract_no,
+    NULL::text AS contract_number,
+    NULL::text AS account_no,
+    NULL::numeric AS credit_limit,
+    NULL::numeric AS approved_limit,
+    NULL::numeric AS granted_limit,
+    NULL::numeric AS principal_balance,
+    NULL::numeric AS remaining_disbursement,
+    NULL::double precision AS interest_rate,
+    NULL::text AS limit_type,
+    NULL::text AS loan_type,
+    col.collateral_type::text AS collateral_type,
+    col.appraised_value::numeric AS appraised_value,
+    col.appraised_value::numeric AS collateral_value,
+    col.loan_value::numeric AS loan_value,
+    col.max_loan_amount::numeric AS max_loan_amount,
+    col.collateral_coefficient::text AS collateral_coefficient,
+    NULL::numeric AS total_credit_limit,
+    NULL::numeric AS remaining_principal,
+    NULL::date AS disbursement_date,
+    NULL::date AS start_date,
+    NULL::date AS maturity_date,
+    NULL::date AS posting_date,
+    NULL::text AS voucher_no,
+    NULL::text AS description,
+    NULL::numeric AS debit_amount,
+    NULL::numeric AS credit_amount,
+    NULL::numeric AS debit_balance,
+    NULL::numeric AS credit_balance,
+    1::bigint AS rn,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_collateral col
+LEFT JOIN {{ source_schema }}.dim_bank b 
+    ON col.bank_code = b.bank_code OR col.bank_code = b.code1 OR col.bank_code = b.code2
+
+UNION ALL
+
+-- 1.3 Loan Contracts (fact_loan)
+SELECT 
+    'loan_contract'::text AS record_type,
+    fl.bank_code::text AS bank_code,
+    COALESCE(b.bank_name, fl.bank_code)::text AS bank_name,
+    fl.contract_no::text AS contract_no,
+    fl.contract_no::text AS contract_number,
+    NULL::text AS account_no,
+    fl.total_credit_limit::numeric AS credit_limit,
+    fl.total_credit_limit::numeric AS approved_limit,
+    NULL::numeric AS granted_limit,
+    fl.remaining_principal::numeric AS principal_balance,
+    NULL::numeric AS remaining_disbursement,
+    fl.interest_rate::double precision AS interest_rate,
+    NULL::text AS limit_type,
+    NULL::text AS loan_type,
+    NULL::text AS collateral_type,
+    NULL::numeric AS appraised_value,
+    NULL::numeric AS collateral_value,
+    NULL::numeric AS loan_value,
+    NULL::numeric AS max_loan_amount,
+    NULL::text AS collateral_coefficient,
+    fl.total_credit_limit::numeric AS total_credit_limit,
+    fl.remaining_principal::numeric AS remaining_principal,
+    fl.disbursement_date::date AS disbursement_date,
+    fl.disbursement_date::date AS start_date,
+    fl.maturity_date::date AS maturity_date,
+    NULL::date AS posting_date,
+    NULL::text AS voucher_no,
+    NULL::text AS description,
+    NULL::numeric AS debit_amount,
+    NULL::numeric AS credit_amount,
+    NULL::numeric AS debit_balance,
+    NULL::numeric AS credit_balance,
+    1::bigint AS rn,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_loan fl
+LEFT JOIN {{ source_schema }}.dim_bank b 
+    ON fl.bank_code = b.bank_code OR fl.bank_code = b.code1 OR fl.bank_code = b.code2
+
+UNION ALL
+
+-- 1.4 General Ledger Balances (fact_cashflow loan accounts)
+SELECT 
+    'ledger_balance'::text AS record_type,
+    NULL::text AS bank_code,
+    NULL::text AS bank_name,
+    NULL::text AS contract_no,
+    NULL::text AS contract_number,
+    fc.account_no::text AS account_no,
+    NULL::numeric AS credit_limit,
+    NULL::numeric AS approved_limit,
+    NULL::numeric AS granted_limit,
+    NULL::numeric AS principal_balance,
+    NULL::numeric AS remaining_disbursement,
+    NULL::double precision AS interest_rate,
+    NULL::text AS limit_type,
+    NULL::text AS loan_type,
+    NULL::text AS collateral_type,
+    NULL::numeric AS appraised_value,
+    NULL::numeric AS collateral_value,
+    NULL::numeric AS loan_value,
+    NULL::numeric AS max_loan_amount,
+    NULL::text AS collateral_coefficient,
+    NULL::numeric AS total_credit_limit,
+    NULL::numeric AS remaining_principal,
+    NULL::date AS disbursement_date,
+    NULL::date AS start_date,
+    NULL::date AS maturity_date,
+    fc.posting_date::date AS posting_date,
+    fc.voucher_no::text AS voucher_no,
+    fc.description::text AS description,
+    fc.debit_amount::numeric AS debit_amount,
+    fc.credit_amount::numeric AS credit_amount,
+    fc.debit_balance::numeric AS debit_balance,
+    fc.credit_balance::numeric AS credit_balance,
+    ROW_NUMBER() OVER (PARTITION BY fc.account_no ORDER BY fc.posting_date DESC, fc.id DESC)::bigint AS rn,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_cashflow fc
+WHERE (fc.account_no IN ('34111', '34112', '34113', '34114', '3412', '341') OR fc.account_no LIKE '341%')
+  AND fc.posting_date <= '{{ as_of_date }}'::date;
+
+
+-- 2. View: ai_v_dong_tien (Dòng tiền chi tiết & phân loại thực tế)
+CREATE OR REPLACE VIEW ai_views.ai_v_dong_tien AS
+SELECT 
+    c.voucher_no::text AS transaction_id,
+    c.voucher_no::text AS voucher_no,
+    c.posting_date::date AS posting_date,
+    c.voucher_date::date AS voucher_date,
+    c.account_no::text AS account_code,
+    c.account_no::text AS account_no,
+    a.account_name::text AS account_name,
+    c.reciprocal_account::text AS contra_account_code,
+    c.reciprocal_account::text AS reciprocal_account,
+    a.account_bank::text AS bank_account_number,
+    b.bank_name::text AS bank_name,
+    b.bank_code::text AS bank_code,
+    c.partner_code::text AS partner_code,
+    CASE 
+        WHEN c.debit_amount > 0 THEN 'THU' 
+        WHEN c.credit_amount > 0 THEN 'CHI' 
+        ELSE 'KHAC' 
+    END::text AS cashflow_type,
+    COALESCE(c.debit_amount, 0)::numeric AS debit_amount,
+    COALESCE(c.credit_amount, 0)::numeric AS credit_amount,
+    (COALESCE(c.debit_amount, 0) - COALESCE(c.credit_amount, 0))::numeric AS amount,
+    c.debit_balance::numeric AS debit_balance,
+    c.credit_balance::numeric AS credit_balance,
+    (
+        (c.account_no LIKE '111%' OR c.account_no LIKE '112%')
+        AND c.voucher_no NOT LIKE 'CTNB%'
+        AND c.voucher_no NOT LIKE 'NTTK%'
+        AND (c.reciprocal_account IS NULL OR (c.reciprocal_account NOT LIKE '111%' AND c.reciprocal_account NOT LIKE '112%'))
+    )::boolean AS is_external_cashflow,
+    c.description::text AS description,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_cashflow c
+JOIN {{ source_schema }}.dim_account a ON c.account_no = a.account_no
+LEFT JOIN {{ source_schema }}.dim_accountnumber b ON a.account_bank = b.account_bank
+WHERE c.posting_date <= '{{ as_of_date }}'::date;
+
+
+-- 3. View: ai_v_bctc (Báo cáo tài chính B01-DN & B02-DN)
+CREATE OR REPLACE VIEW ai_views.ai_v_bctc AS
+-- 3.1 B01-DN (Bảng cân đối kế toán)
+SELECT 
+    'B01-DN'::text AS report_type,
+    ri.item_id::text AS item_code,
+    ri.item_code::text AS raw_item_code,
+    ri.item_name::text AS item_name,
+    to_char(bs.reporting_date, 'YYYY-MM')::text AS period,
+    bs.reporting_date::date AS reporting_date,
+    bs.reporting_date::date AS month,
+    bs.ending_balance::numeric AS ending_balance,
+    bs.ending_balance::numeric AS closing_balance,
+    bs.beginning_balance::numeric AS beginning_balance,
+    bs.beginning_balance::numeric AS opening_balance,
+    bs.ending_balance::numeric AS current_period_amount,
+    bs.beginning_balance::numeric AS previous_period_amount,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_balancesheet bs
+JOIN {{ source_schema }}.dim_reportitem ri ON bs.indicator_code = ri.item_id
+WHERE bs.reporting_date <= '{{ as_of_date }}'::date
+  AND ri.report_type = 'B01-DN'
+
+UNION ALL
+
+-- 3.2 B02-DN (Báo cáo kết quả hoạt động kinh doanh)
+SELECT 
+    'B02-DN'::text AS report_type,
+    ri.item_id::text AS item_code,
+    ri.item_code::text AS raw_item_code,
+    ri.item_name::text AS item_name,
+    to_char(is_.month, 'YYYY-MM')::text AS period,
+    is_.month::date AS reporting_date,
+    is_.month::date AS month,
+    is_.current_period_amount::numeric AS ending_balance,
+    is_.current_period_amount::numeric AS closing_balance,
+    is_.previous_period_amount::numeric AS beginning_balance,
+    is_.previous_period_amount::numeric AS opening_balance,
+    is_.current_period_amount::numeric AS current_period_amount,
+    is_.previous_period_amount::numeric AS previous_period_amount,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_incomestatement is_
+JOIN {{ source_schema }}.dim_reportitem ri ON is_.indicator_code = ri.item_id
+WHERE is_.month <= '{{ as_of_date }}'::date
+  AND ri.report_type = 'B02-DN';
+
+
+-- 4. View: ai_v_ton_kho (Tồn kho, nhập kho, xuất kho)
+CREATE OR REPLACE VIEW ai_views.ai_v_ton_kho AS
+-- 4.1 Balance
+SELECT 
+    'balance'::text AS record_type,
+    b.warehouse_code::text AS warehouse_code,
+    COALESCE(w.warehouse_name, b.warehouse_code)::text AS warehouse_name,
+    b.product_code::text AS product_code,
+    COALESCE(p.product_name, b.product_code)::text AS product_name,
+    p.unit_of_measure::text AS unit,
+    b.ending_quantity::numeric AS quantity,
+    CASE 
+        WHEN b.ending_quantity IS NOT NULL AND b.ending_quantity <> 0 
+        THEN (b.ending_value / b.ending_quantity)::numeric 
+        ELSE NULL 
+    END AS unit_price,
+    b.ending_value::numeric AS total_value,
+    b.snapshot_date::date AS tx_date,
+    NULL::text AS voucher_no,
+    NULL::text AS partner_code,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_inventory_balance b
+LEFT JOIN {{ source_schema }}.dim_product p ON b.product_code = p.product_code
+LEFT JOIN {{ source_schema }}.dim_warehouse w ON b.warehouse_code = w.warehouse_code
+WHERE b.snapshot_date <= '{{ as_of_date }}'::date
+
+UNION ALL
+
+-- 4.2 Inward
+SELECT 
+    'inward'::text AS record_type,
+    i.warehouse_code::text AS warehouse_code,
+    COALESCE(w.warehouse_name, i.warehouse_code)::text AS warehouse_name,
+    i.product_code::text AS product_code,
+    COALESCE(p.product_name, i.product_code)::text AS product_name,
+    p.unit_of_measure::text AS unit,
+    i.inward_quantity::numeric AS quantity,
+    CASE 
+        WHEN i.inward_quantity IS NOT NULL AND i.inward_quantity <> 0 
+        THEN (i.inward_value / i.inward_quantity)::numeric 
+        ELSE NULL 
+    END AS unit_price,
+    i.inward_value::numeric AS total_value,
+    i.posting_date::date AS tx_date,
+    i.voucher_no::text AS voucher_no,
+    i.partner_code::text AS partner_code,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_inventoryinward i
+LEFT JOIN {{ source_schema }}.dim_product p ON i.product_code = p.product_code
+LEFT JOIN {{ source_schema }}.dim_warehouse w ON i.warehouse_code = w.warehouse_code
+WHERE i.posting_date <= '{{ as_of_date }}'::date
+
+UNION ALL
+
+-- 4.3 Outward
+SELECT 
+    'outward'::text AS record_type,
+    o.warehouse_code::text AS warehouse_code,
+    COALESCE(w.warehouse_name, o.warehouse_code)::text AS warehouse_name,
+    o.product_code::text AS product_code,
+    COALESCE(p.product_name, o.product_code)::text AS product_name,
+    p.unit_of_measure::text AS unit,
+    o.outward_quantity::numeric AS quantity,
+    CASE 
+        WHEN o.outward_quantity IS NOT NULL AND o.outward_quantity <> 0 
+        THEN (o.outward_value / o.outward_quantity)::numeric 
+        ELSE NULL 
+    END AS unit_price,
+    o.outward_value::numeric AS total_value,
+    o.posting_date::date AS tx_date,
+    o.voucher_no::text AS voucher_no,
+    o.partner_code::text AS partner_code,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_inventoryoutward o
+LEFT JOIN {{ source_schema }}.dim_product p ON o.product_code = p.product_code
+LEFT JOIN {{ source_schema }}.dim_warehouse w ON o.warehouse_code = w.warehouse_code
+WHERE o.posting_date <= '{{ as_of_date }}'::date;
+
+
+-- 5. View: ai_v_cong_no (Công nợ phải thu AR và phải trả AP)
+CREATE OR REPLACE VIEW ai_views.ai_v_cong_no AS
+-- 5.1 Accounts Receivable (AR)
+SELECT 
+    'AR'::text AS ar_ap_type,
+    ar.partner_code::text AS partner_code,
+    COALESCE(p.partner_name, ar.partner_code)::text AS partner_name,
+    NULL::text AS contract_number,
+    ar.invoice_no::text AS invoice_number,
+    ar.invoice_no::text AS invoice_no,
+    ar.voucher_no::text AS voucher_no,
+    ar.posting_date::date AS posting_date,
+    COALESCE(ar.invoice_date, ar.posting_date)::date AS due_date,
+    ar.debit_amount::numeric AS original_amount,
+    ar.ending_debit_balance::numeric AS remaining_amount,
+    ar.ending_debit_balance::numeric AS ending_balance,
+    GREATEST(0, ('{{ as_of_date }}'::date - COALESCE(ar.invoice_date, ar.posting_date)::date))::integer AS overdue_days,
+    (ROW_NUMBER() OVER (PARTITION BY ar.partner_code ORDER BY ar.posting_date DESC, ar.id DESC) = 1)::boolean AS is_latest_partner_tx,
+    ROW_NUMBER() OVER (PARTITION BY ar.partner_code ORDER BY ar.posting_date DESC, ar.id DESC)::bigint AS rn,
+    ar.description::text AS description,
+    ar.debit_amount::numeric AS debit_amount,
+    ar.credit_amount::numeric AS credit_amount,
+    ar.ending_debit_balance::numeric AS ending_debit_balance,
+    ar.ending_credit_balance::numeric AS ending_credit_balance,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_accountsreceivable ar
+LEFT JOIN {{ source_schema }}.dim_partner p ON ar.partner_code = p.partner_code
+WHERE ar.posting_date <= '{{ as_of_date }}'::date
+
+UNION ALL
+
+-- 5.2 Accounts Payable (AP)
+SELECT 
+    'AP'::text AS ar_ap_type,
+    ap.partner_code::text AS partner_code,
+    COALESCE(p.partner_name, ap.partner_code)::text AS partner_name,
+    NULL::text AS contract_number,
+    ap.invoice_no::text AS invoice_number,
+    ap.invoice_no::text AS invoice_no,
+    ap.voucher_no::text AS voucher_no,
+    ap.posting_date::date AS posting_date,
+    COALESCE(ap.invoice_date, ap.posting_date)::date AS due_date,
+    ap.credit_amount::numeric AS original_amount,
+    ap.ending_credit_balance::numeric AS remaining_amount,
+    ap.ending_credit_balance::numeric AS ending_balance,
+    GREATEST(0, ('{{ as_of_date }}'::date - COALESCE(ap.invoice_date, ap.posting_date)::date))::integer AS overdue_days,
+    (ROW_NUMBER() OVER (PARTITION BY ap.partner_code ORDER BY ap.posting_date DESC, ap.id DESC) = 1)::boolean AS is_latest_partner_tx,
+    ROW_NUMBER() OVER (PARTITION BY ap.partner_code ORDER BY ap.posting_date DESC, ap.id DESC)::bigint AS rn,
+    ap.description::text AS description,
+    ap.debit_amount::numeric AS debit_amount,
+    ap.credit_amount::numeric AS credit_amount,
+    ap.ending_debit_balance::numeric AS ending_debit_balance,
+    ap.ending_credit_balance::numeric AS ending_credit_balance,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_accountspayable ap
+LEFT JOIN {{ source_schema }}.dim_partner p ON ap.partner_code = p.partner_code
+WHERE ap.posting_date <= '{{ as_of_date }}'::date;
+
+
+-- 6. View: ai_v_tien_gui (Hợp đồng tiền gửi có kỳ hạn)
+CREATE OR REPLACE VIEW ai_views.ai_v_tien_gui AS
+SELECT 
+    td.passbook_no::text AS contract_id,
+    td.passbook_no::text AS passbook_no,
+    td.bank_code::text AS bank_code,
+    COALESCE(b.bank_name, td.bank_code)::text AS bank_name,
+    td.original_amount::numeric AS deposit_amount,
+    td.original_amount::numeric AS original_amount,
+    td.remaining_value::numeric AS remaining_value,
+    td.interest_rate::double precision AS interest_rate,
+    td.deposit_date::date AS deposit_date,
+    td.maturity_date::date AS maturity_date,
+    td.settlement_date::date AS settlement_date,
+    td.term::integer AS term_months,
+    td.term::integer AS term,
+    (
+        td.deposit_date <= '{{ as_of_date }}'::date 
+        AND (td.settlement_date > '{{ as_of_date }}'::date OR td.settlement_date IS NULL)
+    )::boolean AS is_active_at_cutoff,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_termdeposit td
+LEFT JOIN {{ source_schema }}.dim_bank b 
+    ON td.bank_code = b.bank_code OR td.bank_code = b.code1 OR td.bank_code = b.code2
+WHERE td.deposit_date <= '{{ as_of_date }}'::date;
+
+
+-- 7. View: ai_v_ke_hoach (Kế hoạch kinh doanh & ngân sách)
+CREATE OR REPLACE VIEW ai_views.ai_v_ke_hoach AS
+SELECT 
+    'KH_2026'::text AS plan_code,
+    'Toàn công ty'::text AS department,
+    bp.indicator_code::text AS item_code,
+    ri.item_name::text AS item_name,
+    to_char(bp.month, 'YYYY-MM')::text AS period,
+    bp.month::date AS month,
+    bp.target_amount::numeric AS target_value,
+    bp.target_amount::numeric AS target_amount,
+    NULL::numeric AS actual_value,
+    NULL::numeric AS completion_rate,
+    '{{ as_of_date }}'::date AS as_of_date
+FROM {{ source_schema }}.fact_businessplan bp
+LEFT JOIN {{ source_schema }}.dim_reportitem ri ON bp.indicator_code = ri.item_id;
+
+-- Enforce read privileges on newly created views
+GRANT SELECT ON ALL TABLES IN SCHEMA ai_views TO gml_ai_ro;
