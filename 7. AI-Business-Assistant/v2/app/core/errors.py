@@ -35,8 +35,9 @@ _URI_CREDENTIALS_RE = re.compile(
 _SILVER_SCHEMA_RE = re.compile(r'silver\.', re.IGNORECASE)
 
 # Pattern to redact absolute Windows file paths (e.g. D:\path or D:\\path or D:/path)
+# Must not match URI schemes like postgresql:// or http://
 _WIN_PATH_RE = re.compile(
-    r'[a-zA-Z]:(?:\\{1,2}|/)[^\s"\'<>:;|\)\(\]\}\]]+',
+    r'(?<![a-zA-Z0-9])[a-zA-Z]:(?:\\{1,2}|/(?!/))[^\s"\'<>:;|\)\(\]\}\]]+',
 )
 
 # Pattern to redact absolute POSIX file paths (e.g. /var/app/..., /etc/..., /home/...)
