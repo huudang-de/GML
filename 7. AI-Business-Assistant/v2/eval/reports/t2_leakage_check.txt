@@ -1,0 +1,8 @@
+================================================================================
+EVIDENCE REPORT EV-05: T2 Benchmark Anti-Leakage Verification Report
+================================================================================
+Leakage Check Status: PASSED (ZERO LEAKAGE)
+Cosine Threshold: 0.92
+Leakage Violations: 0
+Dual check verified: 0 question cosine leaks (< 0.92) and 0 AST skeleton collisions.
+================================================================================

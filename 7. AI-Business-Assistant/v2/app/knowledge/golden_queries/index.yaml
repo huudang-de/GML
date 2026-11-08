@@ -1,0 +1,455 @@
+# ==============================================================================
+# GML AI Business Assistant v2.0 — Golden Query Bank Index
+# Specification: Spec §5 T2, §6 (Sổ đáp án chuẩn UAT: G-01..G-13, UAT_01..05)
+# Coverage: 28 KPIs + 3 Secondary Financial Ratios (Total 31 Golden Queries)
+# ==============================================================================
+
+queries:
+  # Dashboard 1: Quản trị Hoạt động Tài chính
+  - id: "GQ_01"
+    kpi_key: "du_no_ngan_han"
+    dashboard: "D1"
+    question_vi: "Dư nợ ngắn hạn hiện tại của công ty là bao nhiêu?"
+    paraphrases:
+      - "Dư nợ vay ngắn hạn ngân hàng"
+      - "du no ngan han hien tai la bao nhieu"
+      - "Cho tôi biết tổng dư nợ ngắn hạn"
+    sql_file: "GQ_01_du_no_ngan_han.sql"
+    views_used:
+      - "ai_v_no_vay"
+    split: "dev"
+    uat_expected: 236065233815.00
+    tolerance: 0.0001
+
+  - id: "GQ_02"
+    kpi_key: "du_no_dai_han"
+    dashboard: "D1"
+    question_vi: "Dư nợ dài hạn hiện tại của công ty là bao nhiêu?"
+    paraphrases:
+      - "Dư nợ vay dài hạn ngân hàng"
+      - "du no dai han hien tai"
+      - "Tổng nợ dài hạn là bao nhiêu"
+    sql_file: "GQ_02_du_no_dai_han.sql"
+    views_used:
+      - "ai_v_no_vay"
+    split: "dev"
+    uat_expected: 51174925843.00
+    tolerance: 0.0001
+
+  - id: "GQ_03"
+    kpi_key: "han_muc_phe_duyet"
+    dashboard: "D1"
+    question_vi: "Tổng hạn mức tín dụng được phê duyệt là bao nhiêu?"
+    paraphrases:
+      - "Hạn mức được phê duyệt của các ngân hàng"
+      - "han muc phe duyet"
+    sql_file: "GQ_03_han_muc_phe_duyet.sql"
+    views_used:
+      - "ai_v_no_vay"
+    split: "dev"
+    uat_expected: 485000000000.00
+    tolerance: 0.0001
+
+  - id: "GQ_04"
+    kpi_key: "han_muc_duoc_cap"
+    dashboard: "D1"
+    question_vi: "Tổng hạn mức tín dụng được cấp là bao nhiêu?"
+    paraphrases:
+      - "Hạn mức được cấp thực tế"
+      - "han muc duoc cap"
+    sql_file: "GQ_04_han_muc_duoc_cap.sql"
+    views_used:
+      - "ai_v_no_vay"
+    split: "dev"
+    uat_expected: 295000000000.00
+    tolerance: 0.0001
+
+  - id: "GQ_05"
+    kpi_key: "han_muc_con_lai"
+    dashboard: "D1"
+    question_vi: "Hạn mức tín dụng còn lại chưa sử dụng là bao nhiêu?"
+    paraphrases:
+      - "Hạn mức tín dụng còn khả dụng"
+      - "han muc con lai"
+    sql_file: "GQ_05_han_muc_con_lai.sql"
+    views_used:
+      - "ai_v_no_vay"
+    split: "dev"
+    uat_expected: 24135521634.00
+    tolerance: 0.0001
+
+  - id: "GQ_13"
+    kpi_key: "ty_le_su_dung_han_muc"
+    dashboard: "D1"
+    question_vi: "Tỷ lệ sử dụng hạn mức tín dụng hiện tại là bao nhiêu?"
+    paraphrases:
+      - "Tỷ lệ sử dụng hạn mức ngân hàng"
+      - "ty le su dung han muc"
+    sql_file: "GQ_13_ty_le_su_dung_han_muc.sql"
+    views_used:
+      - "ai_v_no_vay"
+    split: "dev"
+    uat_expected: 0.9181846724271186
+    tolerance: 0.0001
+
+  - id: "GQ_06"
+    kpi_key: "ltv_ratio"
+    dashboard: "D1"
+    question_vi: "Tỷ lệ vay trên giá trị tài sản bảo đảm LTV là bao nhiêu?"
+    paraphrases:
+      - "Hệ số LTV hiện tại"
+      - "ty le ltv"
+      - "Loan to value"
+    sql_file: "GQ_06_ltv_ratio.sql"
+    views_used:
+      - "ai_v_no_vay"
+    split: "dev"
+    uat_expected: 0.7129086354934684
+    tolerance: 0.0001
+
+  - id: "GQ_08_DE"
+    kpi_key: "ty_le_no_tren_tong_nguon_von"
+    dashboard: "D1"
+    question_vi: "Tỷ lệ nợ trên vốn chủ sở hữu D/E là bao nhiêu?"
+    paraphrases:
+      - "Hệ số Debt to Equity"
+      - "ty le no tren tong nguon von"
+      - "He so no tren von chu so huu"
+    sql_file: "GQ_08_DE_debt_equity_ratio.sql"
+    views_used:
+      - "ai_v_bctc"
+    split: "dev"
+    uat_expected: 0.6358037638279108
+    tolerance: 0.0001
+
+  # Dashboard 2: Quản trị Hàng tồn kho
+  - id: "GQ_09_INV_QTY"
+    kpi_key: "so_luong_hang_ton_kho"
+    dashboard: "D2"
+    question_vi: "Tổng số lượng hàng tồn kho hiện tại là bao nhiêu?"
+    paraphrases:
+      - "Tổng số lượng tồn kho"
+      - "so luong hang ton kho"
+    sql_file: "GQ_09_so_luong_hang_ton_kho.sql"
+    views_used:
+      - "ai_v_ton_kho"
+    split: "dev"
+    uat_expected: 673125.42
+    tolerance: 0.0001
+
+  - id: "GQ_10_INV_VAL"
+    kpi_key: "gia_tri_hang_ton_kho"
+    dashboard: "D2"
+    question_vi: "Tổng giá trị hàng tồn kho hiện tại là bao nhiêu?"
+    paraphrases:
+      - "Tổng giá trị tồn kho quy đổi VND"
+      - "gia tri hang ton kho"
+    sql_file: "GQ_10_gia_tri_hang_ton_kho.sql"
+    views_used:
+      - "ai_v_ton_kho"
+    split: "dev"
+    uat_expected: 341692285766.00
+    tolerance: 0.0001
+
+  - id: "GQ_11_INV_TURN"
+    kpi_key: "vong_quay_hang_ton_kho"
+    dashboard: "D2"
+    question_vi: "Vòng quay hàng tồn kho là bao nhiêu?"
+    paraphrases:
+      - "Hệ số vòng quay tồn kho"
+      - "vong quay hang ton kho"
+    sql_file: "GQ_11_vong_quay_hang_ton_kho.sql"
+    views_used:
+      - "ai_v_ton_kho"
+      - "ai_v_bctc"
+    split: "dev"
+    uat_expected: 0.0
+    tolerance: 0.0001
+
+  - id: "GQ_12_INV_REV"
+    kpi_key: "ty_le_ton_kho_tren_doanh_thu"
+    dashboard: "D2"
+    question_vi: "Tỷ lệ tồn kho trên doanh thu là bao nhiêu?"
+    paraphrases:
+      - "Hệ số tồn kho so với doanh thu"
+      - "ty le ton kho tren doanh thu"
+    sql_file: "GQ_12_ty_le_ton_kho_tren_doanh_thu.sql"
+    views_used:
+      - "ai_v_ton_kho"
+      - "ai_v_bctc"
+    split: "dev"
+    uat_expected: 4.5564288294601285
+    tolerance: 0.0001
+
+  - id: "GQ_13_SKU_CNT"
+    kpi_key: "tong_ma_san_pham"
+    dashboard: "D2"
+    question_vi: "Tổng số mã sản phẩm SKU còn tồn kho là bao nhiêu?"
+    paraphrases:
+      - "Có bao nhiêu mã sản phẩm đang tồn kho"
+      - "tong ma san pham"
+      - "tong so sku"
+    sql_file: "GQ_13_tong_ma_san_pham.sql"
+    views_used:
+      - "ai_v_ton_kho"
+    split: "dev"
+    uat_expected: 1246.0
+    tolerance: 0.0001
+
+  - id: "GQ_14_IMPORT_VAL"
+    kpi_key: "gia_tri_hang_nhap_khau"
+    dashboard: "D2"
+    question_vi: "Tổng giá trị hàng nhập khẩu là bao nhiêu?"
+    paraphrases:
+      - "Giá trị nhập khẩu hàng hóa ngoại tệ"
+      - "gia tri hang nhap khau"
+    sql_file: "GQ_14_gia_tri_hang_nhap_khau.sql"
+    views_used:
+      - "ai_v_ton_kho"
+    split: "dev"
+    uat_expected: 163157504466.00
+    tolerance: 0.0001
+
+  # Dashboard 3: Quản trị Phải thu - Phải trả
+  - id: "GQ_15_AR_VAL"
+    kpi_key: "gia_tri_phai_thu"
+    dashboard: "D3"
+    question_vi: "Tổng giá trị phải thu khách hàng là bao nhiêu?"
+    paraphrases:
+      - "Công nợ phải thu khách hàng"
+      - "gia tri phai thu"
+    sql_file: "GQ_15_gia_tri_phai_thu.sql"
+    views_used:
+      - "ai_v_cong_no"
+    split: "dev"
+    uat_expected: 36326095573.00
+    tolerance: 0.0001
+
+  - id: "GQ_16_AP_VAL"
+    kpi_key: "gia_tri_phai_tra"
+    dashboard: "D3"
+    question_vi: "Tổng giá trị phải trả nhà cung cấp là bao nhiêu?"
+    paraphrases:
+      - "Công nợ phải trả nhà cung cấp"
+      - "gia tri phai tra"
+    sql_file: "GQ_16_gia_tri_phai_tra.sql"
+    views_used:
+      - "ai_v_cong_no"
+    split: "dev"
+    uat_expected: 60452900187.23
+    tolerance: 0.0001
+
+  - id: "GQ_17_AR_TURN_YR"
+    kpi_key: "vong_quay_phai_thu_nam"
+    dashboard: "D3"
+    question_vi: "Vòng quay các khoản phải thu cả năm là bao nhiêu?"
+    paraphrases:
+      - "Vòng quay phải thu năm"
+      - "vong quay phai thu nam"
+    sql_file: "GQ_17_vong_quay_phai_thu_nam.sql"
+    views_used:
+      - "ai_v_cong_no"
+      - "ai_v_bctc"
+    split: "dev"
+    uat_expected: 2277.0227733920187
+    tolerance: 0.0001
+
+  - id: "GQ_18_AR_TURN_CUR"
+    kpi_key: "vong_quay_phai_thu_hien_tai"
+    dashboard: "D3"
+    question_vi: "Vòng quay phải thu hiện tại của tháng mới nhất là bao nhiêu?"
+    paraphrases:
+      - "Hệ số vòng quay phải thu hiện tại"
+      - "vong quay phai thu hien tai"
+    sql_file: "GQ_18_vong_quay_phai_thu_hien_tai.sql"
+    views_used:
+      - "ai_v_cong_no"
+      - "ai_v_bctc"
+    split: "dev"
+    uat_expected: 2.064390547046255
+    tolerance: 0.0001
+
+  - id: "GQ_19_AR_INV_CNT"
+    kpi_key: "tong_so_hoa_don"
+    dashboard: "D3"
+    question_vi: "Tổng số hóa đơn phải thu chưa thanh toán hết là bao nhiêu?"
+    paraphrases:
+      - "Có bao nhiêu hóa đơn còn dư nợ"
+      - "tong so hoa don"
+    sql_file: "GQ_19_tong_so_hoa_don.sql"
+    views_used:
+      - "ai_v_cong_no"
+    split: "dev"
+    uat_expected: 2803.0
+    tolerance: 0.0001
+
+  - id: "GQ_20_AR_CUST_CNT"
+    kpi_key: "tong_so_khach_hang"
+    dashboard: "D3"
+    question_vi: "Tổng số khách hàng hiện đang còn dư nợ là bao nhiêu?"
+    paraphrases:
+      - "Số lượng khách hàng nợ tiền"
+      - "tong so khach hang"
+    sql_file: "GQ_20_tong_so_khach_hang.sql"
+    views_used:
+      - "ai_v_cong_no"
+    split: "dev"
+    uat_expected: 694.0
+    tolerance: 0.0001
+
+  # Dashboard 4: Quản trị Tiền gửi & Thanh khoản
+  - id: "GQ_07"
+    kpi_key: "tien_va_tuong_duong_tien"
+    dashboard: "D4"
+    question_vi: "Tổng tiền và tương đương tiền hiện tại là bao nhiêu?"
+    paraphrases:
+      - "Tiền và các khoản tương đương tiền chốt sổ"
+      - "tien va tuong duong tien"
+    sql_file: "GQ_07_tien_va_tuong_duong_tien.sql"
+    views_used:
+      - "ai_v_bctc"
+    split: "dev"
+    uat_expected: 91975348608.00
+    tolerance: 0.0001
+
+  - id: "GQ_08_TD"
+    kpi_key: "tien_gui_co_ky_han"
+    dashboard: "D4"
+    question_vi: "Tổng số dư tiền gửi có kỳ hạn còn hiệu lực là bao nhiêu?"
+    paraphrases:
+      - "Giá trị tiền gửi có kỳ hạn"
+      - "tien gui co ky han"
+    sql_file: "GQ_08_tien_gui_co_ky_han.sql"
+    views_used:
+      - "ai_v_tien_gui"
+    split: "dev"
+    uat_expected: 40514952541.00
+    tolerance: 0.0001
+
+  - id: "GQ_09_TD_CNT"
+    kpi_key: "so_luong_hop_dong_tien_gui"
+    dashboard: "D4"
+    question_vi: "Có bao nhiêu hợp đồng tiền gửi có kỳ hạn còn hiệu lực?"
+    paraphrases:
+      - "Số lượng sổ tiền gửi còn hiệu lực"
+      - "so luong hop dong tien gui"
+    sql_file: "GQ_09_so_luong_hop_dong_tien_gui.sql"
+    views_used:
+      - "ai_v_tien_gui"
+    split: "dev"
+    uat_expected: 22.0
+    tolerance: 0.0001
+
+  - id: "GQ_10_TD_RATE"
+    kpi_key: "lai_suat_tien_gui_binh_quan"
+    dashboard: "D4"
+    question_vi: "Lãi suất tiền gửi bình quân hiện tại là bao nhiêu?"
+    paraphrases:
+      - "Lãi suất bình quân danh mục tiền gửi"
+      - "lai suat tien gui binh quan"
+    sql_file: "GQ_10_lai_suat_tien_gui_binh_quan.sql"
+    views_used:
+      - "ai_v_tien_gui"
+    split: "dev"
+    uat_expected: 0.049896752996198945
+    tolerance: 0.0001
+
+  - id: "GQ_11_TD_INC"
+    kpi_key: "thu_nhap_lai_tien_gui"
+    dashboard: "D4"
+    question_vi: "Tổng thu nhập lãi tiền gửi TK 515 là bao nhiêu?"
+    paraphrases:
+      - "Thu nhập lãi từ tiền gửi"
+      - "thu nhap lai tien gui"
+    sql_file: "GQ_11_thu_nhap_lai_tien_gui.sql"
+    views_used:
+      - "ai_v_dong_tien"
+    split: "dev"
+    uat_expected: 1482534625.00
+    tolerance: 0.0001
+
+  # Dashboard 5: Quản trị Dòng tiền
+  - id: "GQ_26_CASH_OUT"
+    kpi_key: "dong_tien_ra"
+    dashboard: "D5"
+    question_vi: "Tổng dòng tiền chi ra ngoài doanh nghiệp là bao nhiêu?"
+    paraphrases:
+      - "Tổng tiền chi ra ngoài"
+      - "dong tien ra"
+    sql_file: "GQ_26_dong_tien_ra.sql"
+    views_used:
+      - "ai_v_dong_tien"
+    split: "dev"
+    uat_expected: 2302632987134.00
+    tolerance: 0.0001
+
+  - id: "GQ_27_CASH_IN"
+    kpi_key: "dong_tien_vao"
+    dashboard: "D5"
+    question_vi: "Tổng dòng tiền thu vào ngoài doanh nghiệp là bao nhiêu?"
+    paraphrases:
+      - "Tổng tiền thu vào ngoài"
+      - "dong tien vao"
+    sql_file: "GQ_27_dong_tien_vao.sql"
+    views_used:
+      - "ai_v_dong_tien"
+    split: "dev"
+    uat_expected: 2377257851093.00
+    tolerance: 0.0001
+
+  - id: "GQ_28_NET_CASH"
+    kpi_key: "dong_tien_rong"
+    dashboard: "D5"
+    question_vi: "Dòng tiền thuần thực tế của công ty là bao nhiêu?"
+    paraphrases:
+      - "Dòng tiền ròng Net Cash Flow"
+      - "dong tien rong"
+    sql_file: "GQ_28_dong_tien_rong.sql"
+    views_used:
+      - "ai_v_dong_tien"
+    split: "dev"
+    uat_expected: 74624863959.00
+    tolerance: 0.0001
+
+  # Secondary Financial Indicators
+  - id: "GQ_SEC_CURRENT_RATIO"
+    kpi_key: null
+    dashboard: "D1"
+    question_vi: "Hệ số thanh toán hiện hành Current Ratio là bao nhiêu?"
+    paraphrases:
+      - "Tỷ số thanh toán ngắn hạn"
+      - "current ratio"
+    sql_file: "GQ_SEC_current_ratio.sql"
+    views_used:
+      - "ai_v_bctc"
+    split: "dev"
+    uat_expected: 1.3861467792621684
+    tolerance: 0.0001
+
+  - id: "GQ_SEC_QUICK_RATIO"
+    kpi_key: null
+    dashboard: "D1"
+    question_vi: "Hệ số thanh toán nhanh Quick Ratio là bao nhiêu?"
+    paraphrases:
+      - "Tỷ số thanh toán nhanh"
+      - "quick ratio"
+    sql_file: "GQ_SEC_quick_ratio.sql"
+    views_used:
+      - "ai_v_bctc"
+    split: "dev"
+    uat_expected: 0.8633480786821738
+    tolerance: 0.0001
+
+  - id: "GQ_SEC_NET_WORKING_CAPITAL"
+    kpi_key: null
+    dashboard: "D1"
+    question_vi: "Vốn lưu động ròng của công ty là bao nhiêu?"
+    paraphrases:
+      - "Net working capital"
+      - "von luu dong rong"
+    sql_file: "GQ_SEC_von_luu_dong_rong.sql"
+    views_used:
+      - "ai_v_bctc"
+    split: "dev"
+    uat_expected: 248352741076.00
+    tolerance: 0.0001

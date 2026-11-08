@@ -1,0 +1,511 @@
+# ==============================================================================
+# GML AI Business Assistant v2.0 — 28 Standard Business KPIs Specification
+# Specification: Spec §5 T2, ISO - BRD_Final.xlsx (5 Dashboards D1..D5)
+# Coverage Gate: M-05 = 28/28 (100.0%)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Dashboard 1: Quản trị Hoạt động Tài chính (8 KPIs)
+# ------------------------------------------------------------------------------
+du_no_ngan_han:
+  key: du_no_ngan_han
+  ten: "Dư nợ ngắn hạn"
+  dashboard: "D1"
+  don_vi: "VND"
+  cong_thuc: "SUM(credit_balance) WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND rn = 1"
+  nguon_view:
+    - ai_v_no_vay
+  golden_ref: "GQ_01"
+  thanh_phan:
+    - credit_balance
+    - account_no
+  y_nghia: "Tổng dư nợ các khoản vay ngắn hạn tại ngân hàng tính theo số dư sổ cái chốt sổ mới nhất"
+  plausible_range: [0.0, 1000000000000.0]
+  nguong: {}
+  data_caveat: null
+
+du_no_dai_han:
+  key: du_no_dai_han
+  ten: "Dư nợ dài hạn"
+  dashboard: "D1"
+  don_vi: "VND"
+  cong_thuc: "SUM(credit_balance) WHERE record_type = 'ledger_balance' AND account_no LIKE '34112%' AND rn = 1"
+  nguon_view:
+    - ai_v_no_vay
+  golden_ref: "GQ_02"
+  thanh_phan:
+    - credit_balance
+    - account_no
+  y_nghia: "Tổng dư nợ các khoản vay dài hạn tại ngân hàng tính theo số dư sổ cái chốt sổ mới nhất"
+  plausible_range: [0.0, 500000000000.0]
+  nguong: {}
+  data_caveat: null
+
+han_muc_phe_duyet:
+  key: han_muc_phe_duyet
+  ten: "Hạn mức được phê duyệt"
+  dashboard: "D1"
+  don_vi: "VND"
+  cong_thuc: "SUM(credit_limit) WHERE record_type = 'credit_limit'"
+  nguon_view:
+    - ai_v_no_vay
+  golden_ref: "GQ_03"
+  thanh_phan:
+    - credit_limit
+  y_nghia: "Tổng hạn mức tín dụng được ngân hàng phê duyệt trong hợp đồng nguyên tắc"
+  plausible_range: [0.0, 1000000000000.0]
+  nguong: {}
+  data_caveat: null
+
+han_muc_duoc_cap:
+  key: han_muc_duoc_cap
+  ten: "Hạn mức được cấp"
+  dashboard: "D1"
+  don_vi: "VND"
+  cong_thuc: "SUM(granted_limit) WHERE record_type = 'credit_limit'"
+  nguon_view:
+    - ai_v_no_vay
+  golden_ref: "GQ_04"
+  thanh_phan:
+    - granted_limit
+  y_nghia: "Tổng hạn mức tín dụng thực tế được ngân hàng cấp phép giải ngân"
+  plausible_range: [0.0, 1000000000000.0]
+  nguong: {}
+  data_caveat: null
+
+han_muc_con_lai:
+  key: han_muc_con_lai
+  ten: "Hạn mức còn lại"
+  dashboard: "D1"
+  don_vi: "VND"
+  cong_thuc: "SUM(granted_limit) - SUM(principal_balance) WHERE record_type = 'credit_limit'"
+  nguon_view:
+    - ai_v_no_vay
+  golden_ref: "GQ_05"
+  thanh_phan:
+    - granted_limit
+    - principal_balance
+  y_nghia: "Hạn mức tín dụng còn khả dụng để doanh nghiệp giải ngân bổ sung"
+  plausible_range: [0.0, 500000000000.0]
+  nguong: {}
+  data_caveat: null
+
+ty_le_su_dung_han_muc:
+  key: ty_le_su_dung_han_muc
+  ten: "Tỷ lệ sử dụng hạn mức"
+  dashboard: "D1"
+  don_vi: "%"
+  cong_thuc: "SUM(principal_balance) / SUM(granted_limit) WHERE record_type = 'credit_limit'"
+  nguon_view:
+    - ai_v_no_vay
+  golden_ref: "GQ_13"
+  thanh_phan:
+    - principal_balance
+    - granted_limit
+  y_nghia: "Tỷ lệ dư nợ thực tế trên tổng hạn mức tín dụng được cấp phép giải ngân"
+  plausible_range: [0.0, 2.0]
+  nguong:
+    canh_bao: ">= 0.70"
+    nghiem_trong: ">= 0.90"
+  data_caveat: null
+
+ltv_ratio:
+  key: ltv_ratio
+  ten: "Tỷ lệ vay trên tài sản bảo đảm (LTV)"
+  dashboard: "D1"
+  don_vi: "%"
+  cong_thuc: "SUM(granted_limit) / NULLIF(SUM(appraised_value), 0)"
+  nguon_view:
+    - ai_v_no_vay
+  golden_ref: "GQ_06"
+  thanh_phan:
+    - granted_limit
+    - appraised_value
+  y_nghia: "Tỷ lệ tổng hạn mức tín dụng trên tổng giá trị định giá tài sản bảo đảm (Loan to Value)"
+  plausible_range: [0.0, 2.0]
+  nguong:
+    canh_bao: ">= 0.75"
+    nghiem_trong: "> 0.80"
+  data_caveat: null
+
+ty_le_no_tren_tong_nguon_von:
+  key: ty_le_no_tren_tong_nguon_von
+  ten: "Tỷ lệ nợ trên vốn chủ sở hữu (Debt to Equity)"
+  dashboard: "D1"
+  don_vi: "%"
+  cong_thuc: "B01-DN_300 / B01-DN_440"
+  nguon_view:
+    - ai_v_bctc
+  golden_ref: "GQ_08_DE"
+  thanh_phan:
+    - B01-DN_300
+    - B01-DN_440
+  y_nghia: "Tỷ số nợ phải trả trên tổng vốn chủ sở hữu phản ánh đòn bẩy tài chính doanh nghiệp"
+  plausible_range: [0.0, 5.0]
+  nguong:
+    canh_bao: ">= 0.60"
+    nghiem_trong: "> 0.70"
+  data_caveat: null
+
+# ------------------------------------------------------------------------------
+# Dashboard 2: Quản trị Hàng tồn kho (6 KPIs)
+# ------------------------------------------------------------------------------
+so_luong_hang_ton_kho:
+  key: so_luong_hang_ton_kho
+  ten: "Số lượng hàng tồn kho"
+  dashboard: "D2"
+  don_vi: "Đơn vị SP"
+  cong_thuc: "SUM(quantity) WHERE record_type = 'balance'"
+  nguon_view:
+    - ai_v_ton_kho
+  golden_ref: "GQ_09_INV_QTY"
+  thanh_phan:
+    - quantity
+  y_nghia: "Tổng số lượng vật tư, hàng hóa và thành phẩm đang lưu kho tại ngày chốt số liệu"
+  plausible_range: [0.0, 10000000.0]
+  nguong: {}
+  data_caveat: null
+
+gia_tri_hang_ton_kho:
+  key: gia_tri_hang_ton_kho
+  ten: "Giá trị hàng tồn kho"
+  dashboard: "D2"
+  don_vi: "VND"
+  cong_thuc: "SUM(total_value) WHERE record_type = 'balance'"
+  nguon_view:
+    - ai_v_ton_kho
+  golden_ref: "GQ_10_INV_VAL"
+  thanh_phan:
+    - total_value
+  y_nghia: "Tổng giá trị quy đổi thành tiền của hàng tồn kho tại ngày chốt số liệu"
+  plausible_range: [0.0, 1000000000000.0]
+  nguong: {}
+  data_caveat: null
+
+vong_quay_hang_ton_kho:
+  key: vong_quay_hang_ton_kho
+  ten: "Vòng quay hàng tồn kho"
+  dashboard: "D2"
+  don_vi: "Vòng"
+  cong_thuc: "COGS / Average Inventory = B02-DN_11 / SUM(total_value)"
+  nguon_view:
+    - ai_v_ton_kho
+    - ai_v_bctc
+  golden_ref: "GQ_11_INV_TURN"
+  thanh_phan:
+    - B02-DN_11
+    - total_value
+  y_nghia: "Số lần hàng tồn kho được luân chuyển và bán hết trong kỳ"
+  plausible_range: [0.0, 50.0]
+  nguong:
+    canh_bao: "< 2.0"
+    nghiem_trong: "< 1.0"
+  data_caveat: "Trên profile real, B02-DN_11 = 0 nên trả no_data hoặc 0; tính toán đầy đủ trên profile synth."
+
+ty_le_ton_kho_tren_doanh_thu:
+  key: ty_le_ton_kho_tren_doanh_thu
+  ten: "Tỷ lệ tồn kho trên doanh thu"
+  dashboard: "D2"
+  don_vi: "Hệ số"
+  cong_thuc: "SUM(total_value) / B02-DN_10"
+  nguon_view:
+    - ai_v_ton_kho
+    - ai_v_bctc
+  golden_ref: "GQ_12_INV_REV"
+  thanh_phan:
+    - total_value
+    - B02-DN_10
+  y_nghia: "Tỷ lệ giá trị tồn kho so với doanh thu thuần kỳ báo cáo"
+  plausible_range: [0.0, 20.0]
+  nguong:
+    canh_bao: ">= 3.0"
+    nghiem_trong: "> 4.0"
+  data_caveat: null
+
+tong_ma_san_pham:
+  key: tong_ma_san_pham
+  ten: "Tổng mã sản phẩm tồn kho"
+  dashboard: "D2"
+  don_vi: "SKU"
+  cong_thuc: "COUNT(DISTINCT product_code) WHERE record_type = 'balance' AND tx_date = MAX(tx_date) AND quantity > 0"
+  nguon_view:
+    - ai_v_ton_kho
+  golden_ref: "GQ_13_SKU_CNT"
+  thanh_phan:
+    - product_code
+  y_nghia: "Số lượng mã SKU mặt hàng gỗ và phụ liệu còn số lượng tồn kho dương"
+  plausible_range: [0.0, 10000.0]
+  nguong: {}
+  data_caveat: null
+
+gia_tri_hang_nhap_khau:
+  key: gia_tri_hang_nhap_khau
+  ten: "Giá trị hàng nhập khẩu"
+  dashboard: "D2"
+  don_vi: "VND"
+  cong_thuc: "SUM(total_value) WHERE record_type = 'inward' AND exchange_rate > 1"
+  nguon_view:
+    - ai_v_ton_kho
+  golden_ref: "GQ_14_IMPORT_VAL"
+  thanh_phan:
+    - total_value
+    - exchange_rate
+  y_nghia: "Tổng giá trị nhập kho của các lô hàng ngoại tệ nhập khẩu"
+  plausible_range: [0.0, 500000000000.0]
+  nguong: {}
+  data_caveat: null
+
+# ------------------------------------------------------------------------------
+# Dashboard 3: Quản trị Phải thu - Phải trả (6 KPIs)
+# ------------------------------------------------------------------------------
+gia_tri_phai_thu:
+  key: gia_tri_phai_thu
+  ten: "Giá trị phải thu khách hàng"
+  dashboard: "D3"
+  don_vi: "VND"
+  cong_thuc: "SUM(ending_debit_balance) WHERE ar_ap_type = 'AR' AND partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp') AND rn = 1"
+  nguon_view:
+    - ai_v_cong_no
+  golden_ref: "GQ_15_AR_VAL"
+  thanh_phan:
+    - ending_debit_balance
+    - partner_group
+  y_nghia: "Tổng công nợ phải thu từ khách hàng thương mại chốt sổ kỳ hiện tại"
+  plausible_range: [0.0, 500000000000.0]
+  nguong: {}
+  data_caveat: null
+
+gia_tri_phai_tra:
+  key: gia_tri_phai_tra
+  ten: "Giá trị phải trả nhà cung cấp"
+  dashboard: "D3"
+  don_vi: "VND"
+  cong_thuc: "SUM(ending_credit_balance) WHERE ar_ap_type = 'AP' AND partner_group IN ('Nhà cung cấp', 'Khách hàng/ nhà cung cấp') AND rn = 1"
+  nguon_view:
+    - ai_v_cong_no
+  golden_ref: "GQ_16_AP_VAL"
+  thanh_phan:
+    - ending_credit_balance
+    - partner_group
+  y_nghia: "Tổng công nợ phải trả cho nhà cung cấp chốt sổ kỳ hiện tại"
+  plausible_range: [0.0, 500000000000.0]
+  nguong: {}
+  data_caveat: null
+
+vong_quay_phai_thu_nam:
+  key: vong_quay_phai_thu_nam
+  ten: "Vòng quay phải thu năm"
+  dashboard: "D3"
+  don_vi: "Vòng"
+  cong_thuc: "Doanh thu năm / AR bình quân = B02-DN_10 / Average AR"
+  nguon_view:
+    - ai_v_cong_no
+    - ai_v_bctc
+  golden_ref: "GQ_17_AR_TURN_YR"
+  thanh_phan:
+    - B02-DN_10
+    - ending_debit_balance
+  y_nghia: "Số vòng quay các khoản phải thu tính theo lũy kế năm"
+  plausible_range: [0.0, 10000.0]
+  nguong:
+    canh_bao: "< 4.0"
+    nghiem_trong: "< 2.0"
+  data_caveat: "Trên profile real, dữ liệu B02-DN thiếu số bình quân 12 tháng nên mang tính tham khảo; tính đầy đủ trên synth."
+
+vong_quay_phai_thu_hien_tai:
+  key: vong_quay_phai_thu_hien_tai
+  ten: "Vòng quay phải thu hiện tại"
+  dashboard: "D3"
+  don_vi: "Vòng"
+  cong_thuc: "B02-DN_10 (tháng mới nhất) / AR hiện tại"
+  nguon_view:
+    - ai_v_cong_no
+    - ai_v_bctc
+  golden_ref: "GQ_18_AR_TURN_CUR"
+  thanh_phan:
+    - B02-DN_10
+    - ending_debit_balance
+  y_nghia: "Hiệu quả thu hồi nợ ngắn hạn tính trên doanh thu tháng gần nhất"
+  plausible_range: [0.0, 20.0]
+  nguong:
+    canh_bao: "< 1.5"
+    nghiem_trong: "< 1.0"
+  data_caveat: null
+
+tong_so_hoa_don:
+  key: tong_so_hoa_don
+  ten: "Tổng số hóa đơn phải thu chưa tất toán"
+  dashboard: "D3"
+  don_vi: "Hóa đơn"
+  cong_thuc: "COUNT(*) FROM (SELECT invoice_no FROM ai_v_cong_no WHERE ar_ap_type = 'AR' AND partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp') AND invoice_no IS NOT NULL AND invoice_no != '' GROUP BY invoice_no HAVING SUM(debit_amount - credit_amount) > 0) t"
+  nguon_view:
+    - ai_v_cong_no
+  golden_ref: "GQ_19_AR_INV_CNT"
+  thanh_phan:
+    - invoice_no
+    - debit_amount
+    - credit_amount
+  y_nghia: "Số lượng hóa đơn bán hàng còn dư nợ chưa thanh toán hết"
+  plausible_range: [0.0, 50000.0]
+  nguong: {}
+  data_caveat: null
+
+tong_so_khach_hang:
+  key: tong_so_khach_hang
+  ten: "Tổng số khách hàng có dư nợ"
+  dashboard: "D3"
+  don_vi: "Khách hàng"
+  cong_thuc: "COUNT(*) FROM ai_v_cong_no WHERE ar_ap_type = 'AR' AND partner_group IN ('Khách hàng', 'Khách hàng/ nhà cung cấp') AND rn = 1 AND ending_debit_balance > 0"
+  nguon_view:
+    - ai_v_cong_no
+  golden_ref: "GQ_20_AR_CUST_CNT"
+  thanh_phan:
+    - partner_code
+    - ending_debit_balance
+  y_nghia: "Số lượng khách hàng hiện đang còn dư nợ phải thu dương"
+  plausible_range: [0.0, 10000.0]
+  nguong: {}
+  data_caveat: null
+
+# ------------------------------------------------------------------------------
+# Dashboard 4: Quản trị Tiền gửi & Thanh khoản (5 KPIs)
+# ------------------------------------------------------------------------------
+tien_va_tuong_duong_tien:
+  key: tien_va_tuong_duong_tien
+  ten: "Tiền và tương đương tiền"
+  dashboard: "D4"
+  don_vi: "VND"
+  cong_thuc: "SELECT ending_balance FROM ai_v_bctc WHERE item_code = 'B01-DN_110' AND report_type = 'B01-DN' AND reporting_date = MAX(reporting_date)"
+  nguon_view:
+    - ai_v_bctc
+  golden_ref: "GQ_07"
+  thanh_phan:
+    - B01-DN_110
+  y_nghia: "Tổng quỹ tiền mặt, tiền gửi ngân hàng thanh toán và các khoản tương đương tiền chốt sổ"
+  plausible_range: [0.0, 500000000000.0]
+  nguong:
+    canh_bao: "< 30000000000.0"
+    nghiem_trong: "< 15000000000.0"
+  data_caveat: null
+
+tien_gui_co_ky_han:
+  key: tien_gui_co_ky_han
+  ten: "Tiền gửi có kỳ hạn"
+  dashboard: "D4"
+  don_vi: "VND"
+  cong_thuc: "SUM(original_amount) FROM ai_v_tien_gui WHERE is_active_at_cutoff = TRUE"
+  nguon_view:
+    - ai_v_tien_gui
+  golden_ref: "GQ_08_TD"
+  thanh_phan:
+    - original_amount
+  y_nghia: "Tổng giá trị gốc của các hợp đồng/sổ tiền gửi có kỳ hạn đang còn hiệu lực"
+  plausible_range: [0.0, 200000000000.0]
+  nguong: {}
+  data_caveat: null
+
+so_luong_hop_dong_tien_gui:
+  key: so_luong_hop_dong_tien_gui
+  ten: "Số lượng sổ tiền gửi có kỳ hạn"
+  dashboard: "D4"
+  don_vi: "Sổ/Hợp đồng"
+  cong_thuc: "COUNT(DISTINCT passbook_no) FROM ai_v_tien_gui WHERE is_active_at_cutoff = TRUE"
+  nguon_view:
+    - ai_v_tien_gui
+  golden_ref: "GQ_09_TD_CNT"
+  thanh_phan:
+    - passbook_no
+  y_nghia: "Số lượng sổ hoặc hợp đồng tiền gửi có kỳ hạn đang hoạt động tại các ngân hàng"
+  plausible_range: [0.0, 500.0]
+  nguong: {}
+  data_caveat: null
+
+lai_suat_tien_gui_binh_quan:
+  key: lai_suat_tien_gui_binh_quan
+  ten: "Lãi suất tiền gửi bình quân"
+  dashboard: "D4"
+  don_vi: "%"
+  cong_thuc: "SUM(original_amount * interest_rate) / NULLIF(SUM(original_amount), 0) FROM ai_v_tien_gui WHERE is_active_at_cutoff = TRUE"
+  nguon_view:
+    - ai_v_tien_gui
+  golden_ref: "GQ_10_TD_RATE"
+  thanh_phan:
+    - original_amount
+    - interest_rate
+  y_nghia: "Lãi suất bình quân gia quyền theo số dư của danh mục tiền gửi có kỳ hạn"
+  plausible_range: [0.0, 0.2]
+  nguong:
+    canh_bao: "< 0.04"
+    nghiem_trong: "< 0.03"
+  data_caveat: null
+
+thu_nhap_lai_tien_gui:
+  key: thu_nhap_lai_tien_gui
+  ten: "Thu nhập lãi tiền gửi"
+  dashboard: "D4"
+  don_vi: "VND"
+  cong_thuc: "SUM(debit_amount) FROM ai_v_dong_tien WHERE reciprocal_account LIKE '515%'"
+  nguon_view:
+    - ai_v_dong_tien
+  golden_ref: "GQ_11_TD_INC"
+  thanh_phan:
+    - debit_amount
+    - reciprocal_account
+  y_nghia: "Tổng thu nhập từ lãi tiền gửi phát sinh lũy kế được ghi nhận vào tài khoản doanh thu tài chính 515"
+  plausible_range: [0.0, 50000000000.0]
+  nguong: {}
+  data_caveat: null
+
+# ------------------------------------------------------------------------------
+# Dashboard 5: Quản trị Dòng tiền (3 KPIs)
+# ------------------------------------------------------------------------------
+dong_tien_ra:
+  key: dong_tien_ra
+  ten: "Tổng dòng tiền chi ra ngoài"
+  dashboard: "D5"
+  don_vi: "VND"
+  cong_thuc: "SUM(credit_amount) FROM ai_v_dong_tien WHERE is_external_cashflow = TRUE"
+  nguon_view:
+    - ai_v_dong_tien
+  golden_ref: "GQ_26_CASH_OUT"
+  thanh_phan:
+    - credit_amount
+  y_nghia: "Tổng dòng tiền thực tế chi ra ngoài doanh nghiệp (đã loại trừ chuyển tiền nội bộ)"
+  plausible_range: [0.0, 5000000000000.0]
+  nguong: {}
+  data_caveat: null
+
+dong_tien_vao:
+  key: dong_tien_vao
+  ten: "Tổng dòng tiền thu vào ngoài"
+  dashboard: "D5"
+  don_vi: "VND"
+  cong_thuc: "SUM(debit_amount) FROM ai_v_dong_tien WHERE is_external_cashflow = TRUE"
+  nguon_view:
+    - ai_v_dong_tien
+  golden_ref: "GQ_27_CASH_IN"
+  thanh_phan:
+    - debit_amount
+  y_nghia: "Tổng dòng tiền thực tế thu vào doanh nghiệp từ khách hàng và đối tác"
+  plausible_range: [0.0, 5000000000000.0]
+  nguong: {}
+  data_caveat: null
+
+dong_tien_rong:
+  key: dong_tien_rong
+  ten: "Dòng tiền thuần (Net Cash Flow)"
+  dashboard: "D5"
+  don_vi: "VND"
+  cong_thuc: "SUM(debit_amount - credit_amount) FROM ai_v_dong_tien WHERE is_external_cashflow = TRUE"
+  nguon_view:
+    - ai_v_dong_tien
+  golden_ref: "GQ_28_NET_CASH"
+  thanh_phan:
+    - debit_amount
+    - credit_amount
+  y_nghia: "Chênh lệch giữa tổng dòng tiền vào và tổng dòng tiền ra thực tế trong kỳ"
+  plausible_range: [-1000000000000.0, 1000000000000.0]
+  nguong:
+    canh_bao: "< 0"
+    nghiem_trong: "< -20000000000.0"
+  data_caveat: null

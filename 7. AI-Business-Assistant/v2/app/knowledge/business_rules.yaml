@@ -1,0 +1,150 @@
+# ==============================================================================
+# GML AI Business Assistant v2.0 — Business Rules & Action Recommendations
+# Specification: Spec §5 T2, ISO - BRD_Final.xlsx
+# Mandatory Disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+# ==============================================================================
+
+ty_le_su_dung_han_muc:
+  canh_bao:
+    actions:
+      - "Tạm dừng giải ngân mới từ các ngân hàng có tỷ lệ sử dụng trên 80%."
+      - "Rà soát tiến độ thu hồi công nợ để ưu tiên trả bớt nợ gốc ngắn hạn."
+      - "Lập tờ trình gửi Kế toán trưởng rà soát hạn mức tín dụng dự phòng."
+    authority_role: "ke_toan_truong"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+  nghiem_trong:
+    actions:
+      - "Kích hoạt phương án khẩn cấp: ngừng toàn bộ các khoản giải ngân mới chưa cấp thiết."
+      - "Báo cáo ngay Tổng Giám Đốc (CEO) để xin phê duyệt phương án tái cấu trúc hạn mức hoặc đàm phán cấp thêm hạn mức tín dụng."
+      - "Thu hồi khẩn cấp các khoản phải thu quá hạn để thanh toán ngay nợ vay ngắn hạn đến hạn."
+    authority_role: "ceo"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+ltv_ratio:
+  canh_bao:
+    actions:
+      - "Đánh giá lại danh mục tài sản bảo đảm đang thế chấp tại các ngân hàng tài trợ."
+      - "Chuẩn bị hồ sơ bổ sung tài sản bảo đảm (quyền sử dụng đất/nhà xưởng/kho bãi) nếu ngân hàng yêu cầu định giá lại."
+    authority_role: "ke_toan_truong"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+  nghiem_trong:
+    actions:
+      - "Lập tức báo cáo CEO và HĐQT về nguy cơ bị ngân hàng phong tỏa hạn mức giải ngân do vi phạm cam kết LTV."
+      - "Làm việc với tổ chức thẩm định giá độc lập để đánh giá lại giá trị thị trường tài sản bảo đảm."
+      - "Thương lượng chuyển bớt dư nợ sang ngân hàng có dư địa LTV thấp hơn."
+    authority_role: "ceo"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+ty_le_no_tren_tong_nguon_von:
+  canh_bao:
+    actions:
+      - "Theo dõi sát sao tỷ lệ đòn bẩy D/E theo từng tháng trong báo cáo tài chính."
+      - "Kiểm soát tốc độ tăng trưởng nợ phải trả thương mại và nợ vay ngân hàng."
+    authority_role: "ke_toan_truong"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+  nghiem_trong:
+    actions:
+      - "Cảnh báo rủi ro an toàn tài chính mức cao tới Tổng Giám Đốc và Ban Kiểm soát."
+      - "Thắt chặt chính sách mua hàng trả chậm, tăng cường thanh toán dứt điểm công nợ tồn đọng."
+      - "Lập kế hoạch tái cơ cấu nguồn vốn, cân nhắc bổ sung vốn chủ sở hữu."
+    authority_role: "ceo"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+vong_quay_hang_ton_kho:
+  canh_bao:
+    actions:
+      - "Rà soát các nhóm SKU hàng tồn kho có thời gian lưu kho trên 90 ngày."
+      - "Phối hợp Quản lý kho và Phòng Kinh doanh xây dựng chính sách khuyến mãi đẩy hàng chậm luân chuyển."
+    authority_role: "ke_toan_truong"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+  nghiem_trong:
+    actions:
+      - "Báo cáo Ban Giám Đốc tổ chức kiểm kê toàn diện kho hàng để phân loại hàng lỗi thời, suy giảm giá trị."
+      - "Tạm dừng kế hoạch nhập khẩu các mặt hàng tồn kho đang vượt định mức 3 tháng tiêu thụ."
+      - "Trích lập dự phòng giảm giá hàng tồn kho theo đúng quy định kế toán."
+    authority_role: "ceo"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+ty_le_ton_kho_tren_doanh_thu:
+  canh_bao:
+    actions:
+      - "Kiểm tra mức độ tồn kho của từng dòng sản phẩm (ván MDF, nẹp, chỉ, keo)."
+      - "Điều chỉnh giảm lượng đặt hàng mua nguyên vật liệu cho các kỳ tiếp theo."
+    authority_role: "ke_toan_truong"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+  nghiem_trong:
+    actions:
+      - "Báo cáo CEO áp dụng cơ chế phê duyệt đơn mua hàng đặc biệt (chỉ duyệt đơn hàng có PO đầu ra)."
+      - "Xây dựng chiến dịch thanh lý hàng lưu kho lâu ngày để giải phóng vốn lưu động."
+    authority_role: "ceo"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+vong_quay_phai_thu_nam:
+  canh_bao:
+    actions:
+      - "Gửi công văn nhắc nợ đối với các khách hàng có số ngày thu tiền bình quân vượt chính sách tín dụng."
+      - "Đánh giá lại hạn mức công nợ cấp cho các đại lý có dấu hiệu chậm trả."
+    authority_role: "ke_toan_truong"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+  nghiem_trong:
+    actions:
+      - "Báo cáo CEO dừng giao hàng mới cho các khách hàng có công nợ quá hạn nghiêm trọng."
+      - "Chuyển hồ sơ các khoản nợ khó đòi sang bộ phận pháp chế xử lý thu hồi."
+    authority_role: "ceo"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+vong_quay_phai_thu_hien_tai:
+  canh_bao:
+    actions:
+      - "Tăng cường đốc thúc thu hồi các khoản nợ đến hạn trong tuần."
+      - "Rà soát lại danh sách hoá đơn bán hàng chưa thanh toán trong tháng."
+    authority_role: "ke_toan_truong"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+  nghiem_trong:
+    actions:
+      - "Họp khẩn giữa Bộ phận Thu hồi nợ và Khối Kinh doanh để chốt lịch cam kết trả nợ của Top 10 khách hàng lớn."
+      - "Áp dụng điều khoản phạt chậm thanh toán và tạm ngưng chiết khấu thương mại."
+    authority_role: "ceo"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+tien_va_tuong_duong_tien:
+  canh_bao:
+    actions:
+      - "Dự báo dòng tiền thu-chi chi tiết cho 14 ngày tới để tránh thiếu hụt thanh khoản ngắn hạn."
+      - "Tạm hoãn các khoản chi mua sắm tài sản cố định hoặc chi phí chưa thực sự khẩn cấp."
+    authority_role: "ke_toan_truong"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+  nghiem_trong:
+    actions:
+      - "Báo cáo khẩn cấp CEO kích hoạt hạn mức thấu chi hoặc tất toán trước hạn một phần sổ tiền gửi."
+      - "Tập trung tối đa nguồn thu nợ khách hàng để bổ sung quỹ tiền mặt ngay lập tức."
+    authority_role: "ceo"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+lai_suat_tien_gui_binh_quan:
+  canh_bao:
+    actions:
+      - "Khảo sát biểu lãi suất tiền gửi có kỳ hạn của các ngân hàng thương mại đối tác."
+      - "Cân nhắc tái cơ cấu kỳ hạn tiền gửi (chuyển từ kỳ ngắn 1-3 tháng sang 6-12 tháng) để tối ưu lợi tức."
+    authority_role: "ke_toan_truong"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+  nghiem_trong:
+    actions:
+      - "Lập đề xuất trình CEO điều chuyển dòng tiền nhàn rỗi sang ngân hàng có chính sách lãi suất cạnh tranh hơn."
+      - "Đàm phán mức lãi suất thoả thuận đặc biệt dành cho khách hàng doanh nghiệp quy mô lớn."
+    authority_role: "ceo"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+
+dong_tien_rong:
+  canh_bao:
+    actions:
+      - "Kiểm tra cơ cấu các khoản chi tiền lớn trong tháng để xác định nguyên nhân dòng tiền thuần âm."
+      - "Điều phối tiến độ thanh toán cho các nhà cung cấp phù hợp với dòng tiền thu vào."
+    authority_role: "ke_toan_truong"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+  nghiem_trong:
+    actions:
+      - "Báo cáo CEO tình trạng thâm hụt dòng tiền nghiêm trọng, đề xuất giải pháp huy động vốn khẩn cấp."
+      - "Ngừng ngay các khoản thanh toán nằm ngoài kế hoạch ngân sách đã duyệt."
+    authority_role: "ceo"
+    disclaimer: "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
