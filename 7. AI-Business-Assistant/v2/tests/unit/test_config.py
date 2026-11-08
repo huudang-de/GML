@@ -29,6 +29,22 @@ def test_default_settings_and_as_of_date():
     assert s.data_profile in ("real", "synth")
     assert s.as_of_date == date(2026, 7, 31)
     assert "postgresql" in s.postgres_uri_ro
+    assert "gml_synth" in s.postgres_uri_admin_synth
+    assert "dev:Inda1234" not in s.postgres_uri_admin_synth
+
+
+def test_cross_profile_collision_set_disjointness():
+    """Any overlap between real and synth database sets must raise ValueError."""
+    with pytest.raises(ValueError, match="Cross-profile database collision detected"):
+        Settings(
+            postgres_uri_ro="postgresql+psycopg2://u:p@localhost:5432/shared_db",
+            postgres_uri_admin="postgresql+psycopg2://u:p@localhost:5432/real_admin",
+            postgres_uri_app="postgresql+psycopg2://u:p@localhost:5432/real_app",
+            postgres_uri_ro_synth="postgresql+psycopg2://u:p@localhost:5432/synth_ro",
+            postgres_uri_admin_synth="postgresql+psycopg2://u:p@localhost:5432/shared_db",  # Collides with postgres_uri_ro
+            postgres_uri_app_synth="postgresql+psycopg2://u:p@localhost:5432/synth_app",
+        )
+
 
 
 def test_rbac_allowed_views_match_spec_section_11_9():

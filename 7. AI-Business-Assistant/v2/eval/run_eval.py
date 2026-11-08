@@ -12,7 +12,13 @@ from datetime import datetime, timezone
 import os
 from pathlib import Path
 import subprocess
+import sys
 from typing import Any
+
+# Ensure v2 root is in sys.path when script is executed directly
+V2_ROOT = Path(__file__).resolve().parent.parent
+if str(V2_ROOT) not in sys.path:
+    sys.path.insert(0, str(V2_ROOT))
 
 import matplotlib
 matplotlib.use("Agg")

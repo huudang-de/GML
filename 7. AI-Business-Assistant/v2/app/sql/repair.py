@@ -80,8 +80,22 @@ def run_validate_execute_with_repair(
                 latency_ms=0.0,
             )
             if attempt_no < max_attempts and repair_fn is not None:
-                current_sql = repair_fn(current_sql, sanitized_err)
-                continue
+                try:
+                    current_sql = repair_fn(current_sql, sanitized_err)
+                    continue
+                except Exception as exc:
+                    # LLM provider / network failure during repair attempt
+                    # Record attempt and stop further repair, returning last_result
+                    attempts.append(
+                        RepairAttempt(
+                            attempt_no=attempt_no,
+                            stage="repair_fn",
+                            status="execution_error",
+                            sql=current_sql,
+                            sanitized_error=f"Repair function failed: {sanitize_db_error(exc)}",
+                        )
+                    )
+                    break
             else:
                 break
         except Exception as err:
@@ -105,8 +119,20 @@ def run_validate_execute_with_repair(
                 latency_ms=0.0,
             )
             if attempt_no < max_attempts and repair_fn is not None:
-                current_sql = repair_fn(current_sql, sanitized_err)
-                continue
+                try:
+                    current_sql = repair_fn(current_sql, sanitized_err)
+                    continue
+                except Exception as exc:
+                    attempts.append(
+                        RepairAttempt(
+                            attempt_no=attempt_no,
+                            stage="repair_fn",
+                            status="execution_error",
+                            sql=current_sql,
+                            sanitized_error=f"Repair function failed: {sanitize_db_error(exc)}",
+                        )
+                    )
+                    break
             else:
                 break
 
@@ -127,11 +153,23 @@ def run_validate_execute_with_repair(
             )
             last_result = exec_res.model_copy(update={"error": sanitized_exec_err})
             if attempt_no < max_attempts and repair_fn is not None:
-                current_sql = repair_fn(
-                    validated_sql,
-                    sanitized_exec_err or "Unknown execution error",
-                )
-                continue
+                try:
+                    current_sql = repair_fn(
+                        validated_sql,
+                        sanitized_exec_err or "Unknown execution error",
+                    )
+                    continue
+                except Exception as exc:
+                    attempts.append(
+                        RepairAttempt(
+                            attempt_no=attempt_no,
+                            stage="repair_fn",
+                            status="execution_error",
+                            sql=validated_sql,
+                            sanitized_error=f"Repair function failed: {sanitize_db_error(exc)}",
+                        )
+                    )
+                    break
             else:
                 break
         elif exec_res.status == "rejected":
@@ -146,11 +184,23 @@ def run_validate_execute_with_repair(
             )
             last_result = exec_res.model_copy(update={"error": sanitized_exec_err})
             if attempt_no < max_attempts and repair_fn is not None:
-                current_sql = repair_fn(
-                    validated_sql,
-                    sanitized_exec_err or "Unknown rejection error",
-                )
-                continue
+                try:
+                    current_sql = repair_fn(
+                        validated_sql,
+                        sanitized_exec_err or "Unknown rejection error",
+                    )
+                    continue
+                except Exception as exc:
+                    attempts.append(
+                        RepairAttempt(
+                            attempt_no=attempt_no,
+                            stage="repair_fn",
+                            status="execution_error",
+                            sql=validated_sql,
+                            sanitized_error=f"Repair function failed: {sanitize_db_error(exc)}",
+                        )
+                    )
+                    break
             else:
                 break
         else:

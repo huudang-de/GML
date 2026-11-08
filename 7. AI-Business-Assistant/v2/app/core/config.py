@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # Database Connection URIs - Synthetic Profile
     postgres_uri_ro_synth: str = "postgresql+psycopg2://gml_ai_ro:ro_secret@localhost:5432/gml_synth"
     postgres_uri_app_synth: str = "postgresql+psycopg2://gml_ai_app:app_secret@localhost:5432/gml_synth"
-    postgres_uri_admin_synth: str = "postgresql+psycopg2://dev:Inda1234@localhost:5432/gml_synth"
+    postgres_uri_admin_synth: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/gml_synth"
 
     # LLM Settings
     llm_provider: str = "gemini"  # gemini | ollama | mock
@@ -74,27 +74,20 @@ class Settings(BaseSettings):
             except Exception:
                 return ""
 
-        ro_real_db = _get_db(self.postgres_uri_ro)
-        ro_synth_db = _get_db(self.postgres_uri_ro_synth)
-        if ro_real_db and ro_synth_db and ro_real_db == ro_synth_db:
-            raise ValueError(
-                f"Review Focus #4: postgres_uri_ro and postgres_uri_ro_synth point to the same database ('{ro_real_db}'). "
-                "Real and synthetic profiles must use isolated databases to prevent cross-contamination."
-            )
+        real_dbs = {
+            db
+            for uri in [self.postgres_uri_ro, self.postgres_uri_admin, self.postgres_uri_app]
+            if (db := _get_db(uri))
+        }
+        synth_dbs = {
+            db
+            for uri in [self.postgres_uri_ro_synth, self.postgres_uri_admin_synth, self.postgres_uri_app_synth]
+            if (db := _get_db(uri))
+        }
 
-        admin_real_db = _get_db(self.postgres_uri_admin)
-        admin_synth_db = _get_db(self.postgres_uri_admin_synth)
-        if admin_real_db and admin_synth_db and admin_real_db == admin_synth_db:
+        if collision := real_dbs.intersection(synth_dbs):
             raise ValueError(
-                f"Review Focus #4: postgres_uri_admin and postgres_uri_admin_synth point to the same database ('{admin_real_db}'). "
-                "Real and synthetic profiles must use isolated databases to prevent cross-contamination."
-            )
-
-        app_real_db = _get_db(self.postgres_uri_app)
-        app_synth_db = _get_db(self.postgres_uri_app_synth)
-        if app_real_db and app_synth_db and app_real_db == app_synth_db:
-            raise ValueError(
-                f"Review Focus #4: postgres_uri_app and postgres_uri_app_synth point to the same database ('{app_real_db}'). "
+                f"Cross-profile database collision detected: {collision}. "
                 "Real and synthetic profiles must use isolated databases to prevent cross-contamination."
             )
 

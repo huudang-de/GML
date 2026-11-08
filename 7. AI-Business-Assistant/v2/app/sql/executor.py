@@ -11,6 +11,7 @@ from datetime import date, datetime
 from decimal import Decimal
 import time
 from typing import Any
+import uuid
 
 import sqlalchemy as sa
 from sqlalchemy.engine import Engine
@@ -28,6 +29,8 @@ def _serialize_value(val: Any) -> Any:
         return float(val)
     if isinstance(val, (datetime, date)):
         return val.isoformat()
+    if isinstance(val, uuid.UUID):
+        return str(val)
     return val
 
 

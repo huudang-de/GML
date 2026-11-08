@@ -174,3 +174,20 @@ def test_leakage_detector_catches_identical_ast_with_rewritten_question():
     )
     assert not ok, "Expected check_benchmark_leakage to fail for identical AST skeleton"
     assert any("AST_SKELETON_LEAK" in msg for msg in messages), f"Expected AST_SKELETON_LEAK in messages: {messages}"
+
+
+def test_normalize_sql_ast_skeleton_table_alias_and_qualifiers():
+    """Verify AST skeleton normalization strips table aliases and column qualifiers.
+
+    Queries differing only by table alias or table qualifier
+    (e.g. `FROM ai_views.ai_v_ton_kho t WHERE t.x = 1` vs `FROM ai_views.ai_v_ton_kho WHERE x = 1`)
+    must produce identical normalized skeletons.
+    """
+    q1 = "FROM ai_views.ai_v_ton_kho t WHERE t.x = 1"
+    q2 = "FROM ai_views.ai_v_ton_kho WHERE x = 1"
+    assert normalize_sql_ast_skeleton(q1) == normalize_sql_ast_skeleton(q2)
+
+    q3 = "SELECT t.ton_cuoi_ky AS ton FROM ai_views.ai_v_ton_kho t WHERE t.ma_kho = 'KHO1'"
+    q4 = "SELECT ton_cuoi_ky FROM ai_views.ai_v_ton_kho WHERE ma_kho = 'KHO2'"
+    assert normalize_sql_ast_skeleton(q3) == normalize_sql_ast_skeleton(q4)
+

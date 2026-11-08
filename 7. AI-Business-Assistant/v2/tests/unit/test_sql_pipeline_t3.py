@@ -86,16 +86,20 @@ def test_executor_all_null_aggregate_row_returns_no_data():
 
 
 def test_executor_normal_rows_serialization():
-    """Normal query returns Decimal, date, float, str -> converted cleanly, status == 'ok'."""
+    """Normal query returns Decimal, date, float, str, uuid -> converted cleanly, status == 'ok'."""
+    import uuid
+    test_uuid = uuid.UUID("12345678-1234-5678-1234-567812345678")
+
     mock_engine = MagicMock(spec=Engine)
     mock_conn = MagicMock()
     mock_engine.connect.return_value.__enter__.return_value = mock_conn
 
     mock_cursor = MagicMock()
     mock_cursor.returns_rows = True
-    mock_cursor.keys.return_value = ["bank_name", "credit_limit", "effective_date"]
+    mock_cursor.keys.return_value = ["row_id", "bank_name", "credit_limit", "effective_date"]
     mock_cursor.fetchmany.return_value = [
         {
+            "row_id": test_uuid,
             "bank_name": "Vietcombank",
             "credit_limit": Decimal("295000000000.00"),
             "effective_date": date(2026, 7, 31),
@@ -103,12 +107,13 @@ def test_executor_normal_rows_serialization():
     ]
     mock_conn.execute.return_value = mock_cursor
 
-    sql = "SELECT bank_name, credit_limit, effective_date FROM ai_views.ai_v_no_vay LIMIT 10"
+    sql = "SELECT row_id, bank_name, credit_limit, effective_date FROM ai_views.ai_v_no_vay LIMIT 10"
     res = execute_validated_sql(sql, engine=mock_engine)
 
     assert res.status == "ok"
     assert res.row_count == 1
     assert len(res.rows) == 1
+    assert res.rows[0]["row_id"] == "12345678-1234-5678-1234-567812345678"
     assert res.rows[0]["bank_name"] == "Vietcombank"
     assert isinstance(res.rows[0]["credit_limit"], float)
     assert res.rows[0]["credit_limit"] == 295000000000.0
@@ -275,6 +280,38 @@ def test_repair_sanitizes_db_error_before_llm_prompt_and_log():
     assert "silver." not in attempts[0].sanitized_error
     assert "[REDACTED_SCHEMA]." in attempts[0].sanitized_error
     assert "[REDACTED_PATH]" in attempts[0].sanitized_error
+
+
+def test_repair_fn_exception_is_cleanly_caught():
+    """Verify that an unexpected exception in repair_fn does not crash the loop.
+
+    Instead, records a RepairAttempt with stage='repair_fn', status='execution_error',
+    and gracefully returns last_result and the recorded attempts.
+    """
+    allowed_views = {"ai_v_no_vay"}
+    broken_sql = "SELECT * FROM invalid_table"
+
+    def crashing_repair(sql: str, err: str) -> str:
+        raise RuntimeError("Ollama connection failed: connection refused to 127.0.0.1:11434")
+
+    res, attempts = run_validate_execute_with_repair(
+        initial_sql=broken_sql,
+        allowed_views=allowed_views,
+        execute_fn=MagicMock(),
+        repair_fn=crashing_repair,
+        max_attempts=3,
+    )
+
+    assert res.status == "rejected"
+    assert len(attempts) == 2
+    # Attempt 1: AST validation rejected
+    assert attempts[0].stage == "ast"
+    assert attempts[0].status == "rejected"
+    # Attempt 2: repair_fn failure cleanly captured
+    assert attempts[1].stage == "repair_fn"
+    assert attempts[1].status == "execution_error"
+    assert "Repair function failed" in attempts[1].sanitized_error
+
 
 
 # ==============================================================================

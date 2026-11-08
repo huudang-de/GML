@@ -1,8 +1,8 @@
 # Báo cáo Đánh giá Độ chính xác Text-to-SQL (EV-07)
 
 - **Tập dữ liệu (Split):** `dev`
-- **Thời gian chạy (UTC):** `2026-11-08T11:42:28Z`
-- **Git Commit Hash:** `d0d1452`
+- **Thời gian chạy (UTC):** `2026-11-08T11:59:37Z`
+- **Git Commit Hash:** `2bee2d0`
 - **Configured Provider:** `auto`
 - **Effective Provider:** `heuristic`
 - **Hồ sơ dữ liệu:** `real` (PostgreSQL `data_warehouse`)

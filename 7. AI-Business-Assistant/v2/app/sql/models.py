@@ -37,7 +37,7 @@ class RepairAttempt(BaseModel):
 
     attempt_no: int
     sql: str
-    stage: Literal["ast", "exec", "ok"]
+    stage: Literal["ast", "exec", "ok", "repair_fn"]
     status: SqlStatus
     sanitized_error: str | None = None
 

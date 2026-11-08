@@ -1,6 +1,6 @@
 ================================================================================
 EVIDENCE EV-01: T1 DATABASE PERMISSIONS & TIMEOUT VERIFICATION REPORT
-Generated at: 2026-11-08T10:34:17.765226+00:00
+Generated at: 2026-11-08T12:02:13.860069+00:00
 Role: gml_ai_ro | Host: localhost:5432 | DB: data_warehouse
 ================================================================================
 
@@ -12,29 +12,29 @@ Role: gml_ai_ro | Host: localhost:5432 | DB: data_warehouse
   PASS: CREATE TABLE blocked. Reason: (psycopg2.errors.ReadOnlySqlTransaction) cannot execute CREATE TABLE in a read-only transaction
 
 [SQL: CREATE TABLE ai_views.hack_test (id int);]
-(Background on this error at: http[REDACTED_PATH])
+(Background on this error at: https://sqlalche.me/e/20/2j85)
   PASS: DROP VIEW blocked. Reason: (psycopg2.errors.ReadOnlySqlTransaction) cannot execute DROP VIEW in a read-only transaction
 
 [SQL: DROP VIEW ai_views.ai_v_no_vay;]
-(Background on this error at: http[REDACTED_PATH])
+(Background on this error at: https://sqlalche.me/e/20/2j85)
   PASS: DELETE blocked. Reason: (psycopg2.errors.ObjectNotInPrerequisiteState) cannot delete from view "ai_v_no_vay"
 DETAIL:  Views containing UNION, INTERSECT, or EXCEPT are not automatically updatable.
 HINT:  To enable deleting from the view, provide an INSTEAD OF DELETE trigger or an unconditional ON DELETE DO INSTEAD rule.
 
 [SQL: DELETE FROM ai_views.ai_v_no_vay WHERE 1=1;]
-(Background on this error at: http[REDACTED_PATH])
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
   PASS: UPDATE blocked. Reason: (psycopg2.errors.ObjectNotInPrerequisiteState) cannot update view "ai_v_no_vay"
 DETAIL:  Views containing UNION, INTERSECT, or EXCEPT are not automatically updatable.
 HINT:  To enable updating the view, provide an INSTEAD OF UPDATE trigger or an unconditional ON UPDATE DO INSTEAD rule.
 
 [SQL: UPDATE ai_views.ai_v_no_vay SET principal_balance = 0;]
-(Background on this error at: http[REDACTED_PATH])
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
   PASS: INSERT blocked. Reason: (psycopg2.errors.ObjectNotInPrerequisiteState) cannot insert into view "ai_v_no_vay"
 DETAIL:  Views containing UNION, INTERSECT, or EXCEPT are not automatically updatable.
 HINT:  To enable inserting into the view, provide an INSTEAD OF INSERT trigger or an unconditional ON INSERT DO INSTEAD rule.
 
 [SQL: INSERT INTO ai_views.ai_v_no_vay (record_type) VALUES ('hack');]
-(Background on this error at: http[REDACTED_PATH])
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
   Metric M-02 (Leaked write commands): 0 (Target: 0)
 
 [TC-T1-02: RAW SILVER SCHEMA ISOLATION]
@@ -43,25 +43,25 @@ LINE 1: SELECT * FROM [REDACTED_SCHEMA].fact_cashflow LIMIT 1;
                       ^
 
 [SQL: SELECT * FROM [REDACTED_SCHEMA].fact_cashflow LIMIT 1;]
-(Background on this error at: http[REDACTED_PATH])
+(Background on this error at: https://sqlalche.me/e/20/f405)
   PASS: silver access denied. Reason: (psycopg2.errors.InsufficientPrivilege) permission denied for schema silver
 LINE 1: SELECT * FROM [REDACTED_SCHEMA].fact_creditlimitsummary LIMIT 1;
                       ^
 
 [SQL: SELECT * FROM [REDACTED_SCHEMA].fact_creditlimitsummary LIMIT 1;]
-(Background on this error at: http[REDACTED_PATH])
+(Background on this error at: https://sqlalche.me/e/20/f405)
   PASS: silver access denied. Reason: (psycopg2.errors.InsufficientPrivilege) permission denied for schema silver
 LINE 1: SELECT * FROM [REDACTED_SCHEMA].dim_account LIMIT 1;
                       ^
 
 [SQL: SELECT * FROM [REDACTED_SCHEMA].dim_account LIMIT 1;]
-(Background on this error at: http[REDACTED_PATH])
+(Background on this error at: https://sqlalche.me/e/20/f405)
 
 [TC-T1-03: STATEMENT TIMEOUT CANCELLATION ENFORCEMENT]
   PASS: Long query successfully canceled by statement_timeout. Reason: (psycopg2.errors.QueryCanceled) canceling statement due to statement timeout
 
 [SQL: SELECT pg_sleep(2)]
-(Background on this error at: http[REDACTED_PATH])
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
 
 ================================================================================
 OVERALL EV-01 STATUS: PASS (Zero privileges leaked to gml_ai_ro)

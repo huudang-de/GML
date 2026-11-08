@@ -251,12 +251,13 @@ class OllamaSqlLLMClient:
             ]
 
         url = f"{self.settings.ollama_base_url.rstrip('/')}/api/generate"
+        model = self.settings.llm_model or "qwen2.5-coder:7b"
         prompt = (
             f"Tạo câu SQL PostgreSQL schema ai_views cho câu hỏi: {ctx.question}\n"
             f"Views:\n{ctx.catalog_markdown}\n"
             "Chỉ trả về JSON format: [{\"sql\": \"...\", \"explanation_short\": \"...\"}]"
         )
-        payload = json.dumps({"model": "qwen2.5-coder:7b", "prompt": prompt, "stream": False}).encode("utf-8")
+        payload = json.dumps({"model": model, "prompt": prompt, "stream": False}).encode("utf-8")
         req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
 
         try:
@@ -273,6 +274,29 @@ class OllamaSqlLLMClient:
         return HeuristicGoldenSqlClient().generate_candidates(ctx, n=n)
 
     def repair_sql(self, ctx: SqlPromptContext, broken_sql: str, sanitized_error: str) -> str:
+        model = self.settings.llm_model or "qwen2.5-coder:7b"
+        url = f"{self.settings.ollama_base_url.rstrip('/')}/api/generate"
+        prompt = (
+            "Bạn là chuyên gia sửa lỗi SQL PostgreSQL cho schema ai_views.\n"
+            f"Schema danh mục:\n{ctx.catalog_markdown}\n\n"
+            f"SQL bị lỗi:\n```sql\n{broken_sql}\n```\n"
+            f"Thông báo lỗi đã làm sạch:\n{sanitized_error}\n\n"
+            "Hãy sửa lỗi và chỉ trả về duy nhất câu lệnh SQL đã sửa chữa trong khối ```sql ... ```."
+        )
+        payload = json.dumps({"model": model, "prompt": prompt, "stream": False}).encode("utf-8")
+        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                response_text = data.get("response", "")
+                match = re.search(r"```(?:sql)?(.*?)```", response_text, re.DOTALL | re.IGNORECASE)
+                if match:
+                    return match.group(1).strip()
+                if response_text.strip():
+                    return response_text.strip()
+        except Exception as e:
+            logger.warning("Ollama repair failed (%s), falling back to heuristic", e)
+
         return HeuristicGoldenSqlClient().repair_sql(ctx, broken_sql, sanitized_error)
 
 

@@ -39,23 +39,31 @@ EV05_PATH = REPORTS_DIR / "t2_leakage_check.txt"
 def normalize_sql_ast_skeleton(sql: str) -> str:
     """Normalize SQL AST into a canonical skeleton representation.
 
-    Removes LIMIT clauses, strips column/table aliases, transforms all literal
-    values (strings, numbers, booleans, dates) into placeholder ':lit',
+    Removes LIMIT clauses, strips column/table aliases, strips table qualifiers,
+    transforms all literal values (strings, numbers, booleans, dates) into placeholder ':lit',
     and canonicalizes keywords and identifiers.
     """
     if not sql or not sql.strip():
         return ""
     expr = sqlglot.parse_one(sql.strip(), read="postgres")
 
-    def _transform(node: exp.Expression) -> exp.Expression:
+    def _transform(node: exp.Expression) -> exp.Expression | None:
         if isinstance(node, exp.Select):
             if node.args.get("limit"):
                 node.set("limit", None)
             return node
         if isinstance(node, exp.Literal):
             return exp.var(":lit")
+        if isinstance(node, exp.Table):
+            node.set("alias", None)
+            return node
+        if isinstance(node, exp.Column):
+            node.set("table", None)
+            return node
+        if isinstance(node, exp.TableAlias):
+            return None
         if isinstance(node, exp.Alias):
-            return node.this
+            return node.this.transform(_transform, copy=False)
         return node
 
     transformed = expr.transform(_transform)
