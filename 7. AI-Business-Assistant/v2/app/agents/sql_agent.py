@@ -314,6 +314,8 @@ def confidence_gate_node(state: ChatState, min_confidence: float = 0.45) -> dict
     - Retains needs_clarification=True if already set.
     - If sql exists in state and (status != 'ok' or confidence < min_confidence),
       sets needs_clarification = True.
+    - If intent == 'rag_only' and not sql and rag.grounding_ok is False,
+      sets needs_clarification = True.
     """
     needs_clarification = state.get("needs_clarification", False)
     sql_state = state.get("sql")
@@ -321,6 +323,10 @@ def confidence_gate_node(state: ChatState, min_confidence: float = 0.45) -> dict
         status = sql_state.get("status")
         confidence = float(sql_state.get("confidence", 0.0))
         if status != "ok" or confidence < min_confidence:
+            needs_clarification = True
+    elif state.get("intent") == "rag_only":
+        rag_state = state.get("rag") or {}
+        if not rag_state.get("grounding_ok", False):
             needs_clarification = True
 
     return {"needs_clarification": needs_clarification}

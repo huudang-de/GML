@@ -59,7 +59,8 @@ class HybridRagRetriever:
         query: str,
         role: str = "ceo",
         top_k: int = 5,
-        candidate_k: int = 20,
+        candidate_k: int = 100,
+        dashboard: str | None = None,
     ) -> list[RetrievedChunk]:
         """Retrieve top_k chunks using hybrid Vector + BM25 search with RBAC filtering and RRF ranking."""
         role_filter = {f"role_{role}": True}
@@ -80,6 +81,10 @@ class HybridRagRetriever:
         allowed_docs: list[str] = allowed.get("documents", [])
         allowed_metas: list[dict[str, Any]] = allowed.get("metadatas", [])
         total_allowed = len(allowed_ids)
+
+        q_norm = prepare_search_text(query).lower()
+        is_cam_nang = "cam nang" in q_norm or "toan thu" in q_norm
+        is_story = "story telling" in q_norm or "kich ban" in q_norm or "co cau no" in q_norm
 
         # Step 2: Keyword ranking via BM25Okapi over allowed documents
         bm25_rank_map: dict[str, int] = {}
@@ -113,7 +118,7 @@ class HybridRagRetriever:
         except Exception:
             vector_rank_map = {}
 
-        # Step 4: Reciprocal Rank Fusion (RRF)
+        # Step 4: Reciprocal Rank Fusion (RRF) with semantic target weighting
         # score(d) = 1 / (rrf_k + rank_vec(d)) + 1 / (rrf_k + rank_bm25(d))
         candidate_ids = set(bm25_rank_map.keys()) | set(vector_rank_map.keys())
         if not candidate_ids:
@@ -128,6 +133,7 @@ class HybridRagRetriever:
         for chunk_id in candidate_ids:
             if chunk_id not in meta_by_id:
                 continue
+            doc_text, meta = meta_by_id[chunk_id]
             v_rank = vector_rank_map.get(chunk_id)
             b_rank = bm25_rank_map.get(chunk_id)
             score = 0.0
@@ -135,6 +141,18 @@ class HybridRagRetriever:
                 score += 1.0 / (self.rrf_k + v_rank)
             if b_rank is not None:
                 score += 1.0 / (self.rrf_k + b_rank)
+
+            # Apply semantic target weighting
+            if is_cam_nang and "Cam_nang" in meta.get("source", ""):
+                score *= 2.5
+            elif is_story and "Story Telling" in meta.get("source", ""):
+                score *= 2.5
+            elif dashboard:
+                if meta.get("dashboard") == dashboard:
+                    score *= 2.0
+                elif meta.get("doc_type") == "dashboard_guide":
+                    score *= 1.3
+
             scored_candidates.append((score, v_rank, b_rank, chunk_id))
 
         # Sort descending by RRF score, secondary by chunk_id

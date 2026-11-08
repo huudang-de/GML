@@ -11,7 +11,46 @@ from app.orchestration.routing import (
     route_after_intent,
     route_after_join,
 )
-from app.orchestration.state import ChatState
+from app.orchestration.state import ChatState, Intent
+
+
+def classify_intent_heuristic(query: str) -> Intent:
+    """Classify user query intent into sql_only, rag_only, both, or blocked based on deterministic rules."""
+    q = query.lower().strip()
+
+    # 1. Blocked intent check (DML / DDL / sensitive operations)
+    blocked_keywords = [
+        "insert into", "delete from", "drop table", "alter table", "update ",
+        "thêm dữ liệu", "xoá dữ liệu", "xóa dữ liệu", "sửa dữ liệu", "cập nhật dữ liệu",
+        "thay đổi mật khẩu", "reset password", "truncate ",
+    ]
+    if any(kw in q for kw in blocked_keywords):
+        return "blocked"
+
+    # 2. Both intent check (asking why, regulations on how to handle, strategy along with numbers/kpi)
+    both_keywords = [
+        "tại sao", "tai sao", "vì sao", "vi sao",
+        "quy định xử lý", "quy dinh xu ly",
+        "chiến lược", "chien luoc",
+        "lý do", "ly do", "nguyên nhân", "nguyen nhan",
+        "kịch bản ứng phó", "kich ban ung pho",
+    ]
+    if any(kw in q for kw in both_keywords):
+        return "both"
+
+    # 3. RAG only intent check (formula, definition, how to calculate, procedure, policy)
+    rag_keywords = [
+        "công thức", "cong thuc", "định nghĩa", "dinh nghia",
+        "tính thế nào", "tinh the nao", "cách tính", "cach tinh",
+        "quy trình", "quy trinh", "chính sách", "chinh sach",
+        "hướng dẫn", "huong dan", "tài liệu", "tai lieu",
+        "cẩm nang", "cam nang", "story telling",
+    ]
+    if any(kw in q for kw in rag_keywords):
+        return "rag_only"
+
+    # 4. Default to sql_only
+    return "sql_only"
 
 
 def _default_guard_input(state: ChatState) -> dict[str, Any]:
@@ -24,7 +63,10 @@ def _default_resolve_context(state: ChatState) -> dict[str, Any]:
 
 
 def _default_classify_intent(state: ChatState) -> dict[str, Any]:
-    return {"intent": state.get("intent", "sql_only")}
+    if state.get("intent"):
+        return {"intent": state["intent"]}
+    query = state.get("standalone_query") or state.get("query") or ""
+    return {"intent": classify_intent_heuristic(query)}
 
 
 def _default_sql_lookup(state: ChatState) -> dict[str, Any]:
@@ -176,6 +218,51 @@ def build_sql_graph(
     overrides: dict[str, Callable[[ChatState], dict[str, Any]]] = {
         "sql_lookup": create_sql_lookup_node(llm_client=llm_client, settings=settings),
         "confidence_gate": confidence_gate_node,
+    }
+    if node_overrides:
+        overrides.update(node_overrides)
+
+    return build_graph(node_overrides=overrides)
+
+
+def build_analytical_graph(
+    sql_llm_client: Any = None,
+    text_llm_client: Any = None,
+    rag_retriever: Any = None,
+    settings: Any = None,
+    node_overrides: dict[str, Callable[[ChatState], dict[str, Any]]] | None = None,
+) -> CompiledStateGraph:
+    """Build LangGraph StateGraph wiring all T2-RAG and T3 analytical agents into a composite pipeline.
+
+    Wired Agents:
+    - classify_intent: intent routing using classify_intent_heuristic
+    - sql_lookup: SQLAgent pipeline node
+    - rag_lookup: RAGAgent semantic retrieval node
+    - explain: ExplainerAgent KPI narrative node
+    - trend: TrendAnalystAgent time-series anomaly node
+    - advise: DecisionAdvisorAgent recommendation node
+    - confidence_gate: confidence validation node
+    - clarify: clarification node for low confidence / missing data
+    - synthesize: SynthesizerAgent composite typed Answer node
+
+    Preserves existing build_graph() and build_sql_graph() without regressions.
+    """
+    from app.agents.advisor import create_advise_node
+    from app.agents.explainer import create_explain_node
+    from app.agents.rag_agent import create_rag_lookup_node
+    from app.agents.sql_agent import confidence_gate_node, create_sql_lookup_node
+    from app.agents.synthesizer import create_clarify_node, create_synthesize_node
+    from app.agents.trend_agent import create_trend_node
+
+    overrides: dict[str, Callable[[ChatState], dict[str, Any]]] = {
+        "sql_lookup": create_sql_lookup_node(llm_client=sql_llm_client, settings=settings),
+        "rag_lookup": create_rag_lookup_node(retriever=rag_retriever, llm_client=text_llm_client),
+        "explain": create_explain_node(llm_client=text_llm_client),
+        "trend": create_trend_node(),
+        "advise": create_advise_node(llm_client=text_llm_client),
+        "confidence_gate": confidence_gate_node,
+        "clarify": create_clarify_node(settings=settings),
+        "synthesize": create_synthesize_node(llm_client=text_llm_client, settings=settings),
     }
     if node_overrides:
         overrides.update(node_overrides)
