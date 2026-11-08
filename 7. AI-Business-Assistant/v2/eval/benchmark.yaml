@@ -60,7 +60,7 @@ benchmark:
   profile: real
   role: ceo
   cau_hoi: Tỷ lệ sử dụng hạn mức tín dụng hiện tại đạt bao nhiêu phần trăm?
-  reference_sql: SELECT SUM(principal_balance) / SUM(granted_limit) FROM ai_views.ai_v_no_vay
+  reference_sql: SELECT SUM(principal_balance) / NULLIF(SUM(granted_limit), 0) FROM ai_views.ai_v_no_vay
     WHERE record_type = 'credit_limit';
   expected_status: ok
   ky_vong:
@@ -598,7 +598,7 @@ benchmark:
   role: ceo
   cau_hoi: Tỷ lệ sử dụng hạn mức hiện tại là bao nhiêu và vượt ngưỡng an toàn thì
     quy định xử lý thế nào?
-  reference_sql: SELECT SUM(principal_balance) / SUM(granted_limit) FROM ai_views.ai_v_no_vay
+  reference_sql: SELECT SUM(principal_balance) / NULLIF(SUM(granted_limit), 0) FROM ai_views.ai_v_no_vay
     WHERE record_type = 'credit_limit';
   expected_status: ok
   ky_vong:

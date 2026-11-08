@@ -95,7 +95,7 @@ ty_le_su_dung_han_muc:
   ten: "Tỷ lệ sử dụng hạn mức"
   dashboard: "D1"
   don_vi: "%"
-  cong_thuc: "SUM(principal_balance) / SUM(granted_limit) WHERE record_type = 'credit_limit'"
+  cong_thuc: "SUM(principal_balance) / NULLIF(SUM(granted_limit), 0) WHERE record_type = 'credit_limit'"
   nguon_view:
     - ai_v_no_vay
   golden_ref: "GQ_13"
