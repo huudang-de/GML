@@ -1015,14 +1015,14 @@ Sổ tay liệt kê fine-tuning LLM cho lĩnh vực cụ thể trong các ví d�
 
 | Thành phần (v2.0) | LLM đề xuất | Model cụ thể | Lý do |
 | --- | --- | --- | --- |
-| Orchestrator / Intent Classifier | Cloud API | `gemini-2.0-flash` | Cần structured output (enum), nhanh, rẻ |
-| SQL Agent (sinh + sửa SQL) | Cloud API | `gemini-2.0-flash` | Schema 25+ bảng, context window lớn, tự sửa lỗi x3 |
+| Orchestrator / Intent Classifier | Cloud API | `gemini-3.8-flash` | Cần structured output (enum), nhanh, rẻ |
+| SQL Agent (sinh + sửa SQL) | Cloud API | `gemini-3.8-flash` | Schema 25+ bảng, context window lớn, tự sửa lỗi x3 |
 | RAG Embedding (ChromaDB) | **Local Ollama** ⭐ | `nomic-embed-text` | Dữ liệu tài chính không ra ngoài, miễn phí, độ trễ thấp |
-| Explainer Agent | Cloud API | `gemini-2.0-flash` | Chỉ diễn đạt lại YAML công thức thành văn |
-| Trend Analyst | Cloud API | `gemini-2.0-flash` | Diễn đạt kết quả tính toán bằng SQL |
-| Decision Advisor | Cloud API | `gemini-2.0-flash` | Format lại rule từ `business_rules.yaml` |
+| Explainer Agent | Cloud API | `gemini-3.8-flash` | Chỉ diễn đạt lại YAML công thức thành văn |
+| Trend Analyst | Cloud API | `gemini-3.8-flash` | Diễn đạt kết quả tính toán bằng SQL |
+| Decision Advisor | Cloud API | `gemini-3.8-flash` | Format lại rule từ `business_rules.yaml` |
 | Alert Engine (cron hàng ngày) | **Không dùng LLM** | SQL mẫu kiểm chứng | Theo Nguyên tắc 1 & 7: số tài chính chỉ từ SQL đã verify |
-| Bản tin tuần (synthesize) | Cloud API | `gemini-2.0-flash` | Tóm tắt ngắn 5 KPI — volume thấp, chất lượng cao |
+| Bản tin tuần (synthesize) | Cloud API | `gemini-3.8-flash` | Tóm tắt ngắn 5 KPI — volume thấp, chất lượng cao |
 | Phát triển / Viết ADR / Tài liệu | Cloud API | Claude Sonnet (Thinking) | Lý luận dài, chất lượng văn bản kiến trúc cao |
 | Offline fallback / Test local | **Local Ollama** | `qwen2.5-coder:7b` (Q4_K_M, ~5GB RAM) | ~8 t/s trên CPU, test không cần internet |
 

@@ -79,7 +79,7 @@ Hệ thống được thiết kế theo kiến trúc phân tầng hướng dịc
 | | **Pydantic-Settings** | `^2.2.0` | Quản lý biến môi trường tập trung từ file `.env` một cách an toàn và có kiểm soát kiểu. |
 | **[T4] Orchestrator** | **LangGraph** | `^0.1.0` | Khung điều phối máy trạng thái đồ thị (`StateGraph`), quản lý rẽ nhánh điều kiện (`conditional_edges`) và chạy song song SQL + RAG. |
 | | **LangChain Core** | `^0.2.0` | Quản lý Prompt Template, Output Parser, Chat Model abstractions. |
-| **[T3] Agents & LLM** | **Google Gemini API** *(Cloud)* | `gemini-2.0-flash` / `gemini-3.8-flash` | Mô hình ngôn ngữ lớn đám mây xử lý phân loại ý định, sinh câu lệnh SQL và biên tập báo cáo tổng hợp. |
+| **[T3] Agents & LLM** | **Google Gemini API** *(Cloud)* | `gemini-3.8-flash` | Mô hình ngôn ngữ lớn đám mây xử lý phân loại ý định, sinh câu lệnh SQL và biên tập báo cáo tổng hợp. |
 | | **Ollama** *(Local Host)* | `v0.1.x+` | Nền tảng chạy mô hình AI cục bộ trên máy trạm (không cần mạng, bảo mật nội bộ). |
 | | **Qwen2.5-Coder:7b** *(Local LLM)* | GGUF (Q4_K_M) | Mô hình cục bộ dùng để kiểm thử offline và fallback dự phòng khi mất kết nối đám mây. |
 | | **Nomic-embed-text** *(Local Embedding)* | Model 137M param | Mô hình tạo vector nhúng chạy qua Ollama trên CPU máy trạm để dữ liệu tài chính không bị lộ ra ngoài. |
