@@ -790,10 +790,214 @@ def run_trend_evaluation(
     }
 
 
+def run_intent_evaluation(
+    split: str = "dev",
+    final: bool = False,
+    output_dir: Path | None = None,
+) -> dict[str, Any]:
+    """Execute Intent Routing Evaluation (EV-11, EV-12) and Node Latency Profiling (M-11, M-12).
+
+    Specifications:
+    - TC-T8-02: Protect locked test set
+    - M-11: Intent Routing Accuracy target >= 95%
+    - M-12: Full pipeline node latencies (P50/P95)
+    - EV-11: v2/eval/reports/routing_matrix.md
+    - EV-12: v2/eval/reports/trace_both_sample.json (from BM_BOTH_DEV_01)
+    """
+    from collections import defaultdict
+    import json
+    from app.agents.intent import classify_intent_heuristic
+    from app.orchestration.graph import build_v2_graph
+    from app.orchestration.state import ChatState
+
+    # TC-T8-02: Protect locked test set
+    if split == "test" and not final:
+        raise PermissionError(
+            "TC-T8-02: Test split is locked. Pass --final to record an official test run."
+        )
+
+    if split not in ("dev", "test"):
+        raise ValueError(f"Invalid split '{split}'. Must be 'dev' or 'test'.")
+
+    target_dir = Path(output_dir) if output_dir else DEFAULT_OUTPUT_DIR
+    target_dir.mkdir(parents=True, exist_ok=True)
+    report_path = target_dir / "routing_matrix.md"
+    trace_sample_path = target_dir / "trace_both_sample.json"
+
+    all_benchmark = load_benchmark()
+    eval_items = [item for item in all_benchmark if item.split == split]
+
+    expected_map = {
+        "sql": "sql_only",
+        "rag": "rag_only",
+        "both": "both",
+        "an_toan": "blocked",
+        "ngoai_pham_vi": "sql_only",
+    }
+
+    intent_classes = ["sql_only", "rag_only", "both", "alert", "blocked"]
+    confusion_matrix: dict[str, dict[str, int]] = {
+        exp: {pred: 0 for pred in intent_classes} for exp in intent_classes
+    }
+
+    node_latencies: dict[str, list[float]] = defaultdict(list)
+    results: list[dict[str, Any]] = []
+    correct_count = 0
+
+    graph = build_v2_graph()
+    both_sample_trace: dict[str, Any] | None = None
+
+    for item in eval_items:
+        if item.loai == "follow_up":
+            expected_intent = "both" if "tại sao" in item.cau_hoi.lower() else "sql_only"
+        else:
+            expected_intent = expected_map.get(item.loai, "sql_only")
+
+        predicted_intent = classify_intent_heuristic(item.cau_hoi, role=item.role)
+        is_correct = (predicted_intent == expected_intent)
+        if is_correct:
+            correct_count += 1
+
+        if expected_intent in confusion_matrix and predicted_intent in confusion_matrix[expected_intent]:
+            confusion_matrix[expected_intent][predicted_intent] += 1
+
+        # Execute build_v2_graph to collect execution path and node latencies (M-12)
+        initial_state: ChatState = {
+            "request_id": f"eval-{item.id}",
+            "user": {"id": f"u-eval-{item.role}", "role": item.role},
+            "session_id": f"sess-eval-{item.id}",
+            "query": item.cau_hoi,
+            "data_profile": item.profile,
+        }
+
+        try:
+            executed_state = graph.invoke(initial_state)
+            executed_trace = executed_state.get("trace", [])
+            executed_path = [t.get("node") for t in executed_trace if isinstance(t, dict) and t.get("node")]
+
+            for tr in executed_trace:
+                if isinstance(tr, dict) and tr.get("node") and "latency_ms" in tr:
+                    node_latencies[tr["node"]].append(float(tr["latency_ms"]))
+
+            if item.id == "BM_BOTH_DEV_01":
+                both_sample_trace = {
+                    "item_id": item.id,
+                    "query": item.cau_hoi,
+                    "role": item.role,
+                    "intent": executed_state.get("intent"),
+                    "sql": executed_state.get("sql"),
+                    "rag": executed_state.get("rag"),
+                    "answer": executed_state.get("answer"),
+                    "trace": executed_trace,
+                }
+        except Exception as e:
+            executed_path = [f"ERROR: {e}"]
+
+        results.append({
+            "id": item.id,
+            "loai": item.loai,
+            "role": item.role,
+            "question": item.cau_hoi,
+            "expected": expected_intent,
+            "predicted": predicted_intent,
+            "correct": is_correct,
+            "path": " -> ".join(executed_path),
+        })
+
+    total_evaluated = len(eval_items)
+    accuracy = (correct_count / total_evaluated) if total_evaluated > 0 else 0.0
+
+    # Write EV-12 sample trace
+    if both_sample_trace is None and results:
+        # Fallback to first item if BM_BOTH_DEV_01 not found
+        both_sample_trace = {"error": "BM_BOTH_DEV_01 not executed"}
+
+    trace_sample_path.write_text(
+        json.dumps(both_sample_trace, default=str, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    # Compute node latency stats (P50, P95, Max)
+    def calc_stats(vals: list[float]) -> tuple[float, float, float]:
+        if not vals:
+            return 0.0, 0.0, 0.0
+        s = sorted(vals)
+        n = len(s)
+        p50 = s[int(n * 0.5)]
+        p95 = s[min(int(n * 0.95), n - 1)]
+        return round(p50, 2), round(p95, 2), round(max(s), 2)
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    commit = get_git_commit_hash()
+
+    lines = [
+        "# Phase 4 Gate Evidence EV-11: Intent Routing Matrix & Latency Report",
+        "",
+        f"- **Generated At**: `{timestamp}`",
+        f"- **Git Commit**: `{commit}`",
+        f"- **Dataset Split**: `{split}` ({'OFFICIAL TEST SET' if final else 'DEV SET ONLY'})",
+        f"- **Total Evaluated**: `{total_evaluated}`",
+        f"- **M-11 (Routing Accuracy Target >= 95%)**: `{accuracy * 100:.2f}%` ({correct_count}/{total_evaluated})",
+        f"- **Gate Status**: `{'PASSED' if accuracy >= 0.95 else 'FAILED'}`",
+        f"- **EV-12 Trace Sample**: `{trace_sample_path.name}`",
+        "",
+        "## 5×5 Intent Confusion Matrix",
+        "",
+        "| Expected \\ Predicted | sql_only | rag_only | both | alert | blocked | Accuracy |",
+        "|---|---|---|---|---|---|---|",
+    ]
+
+    for exp in intent_classes:
+        row_counts = [confusion_matrix[exp][pred] for pred in intent_classes]
+        row_total = sum(row_counts)
+        exp_correct = confusion_matrix[exp][exp]
+        acc_str = f"{exp_correct / row_total * 100:.1f}%" if row_total > 0 else "N/A"
+        row_strs = [str(c) for c in row_counts]
+        lines.append(f"| **`{exp}`** | {' | '.join(row_strs)} | **{acc_str}** |")
+
+    lines.extend([
+        "",
+        "## M-12 Node Latency Profile (P50 / P95 / Max)",
+        "",
+        "| Node Name | Executions | P50 Latency (ms) | P95 Latency (ms) | Max Latency (ms) |",
+        "|---|---|---|---|---|",
+    ])
+
+    sorted_nodes = sorted(node_latencies.keys())
+    for node in sorted_nodes:
+        vals = node_latencies[node]
+        p50, p95, max_val = calc_stats(vals)
+        lines.append(f"| `{node}` | {len(vals)} | {p50} ms | {p95} ms | {max_val} ms |")
+
+    lines.extend([
+        "",
+        "## Benchmark Items Classification Details",
+        "",
+        "| ID | Role | Expected Intent | Predicted Intent | Match | Execution Path |",
+        "|---|---|---|---|---|---|",
+    ])
+
+    for r in results:
+        match_icon = "✅" if r["correct"] else "❌"
+        lines.append(
+            f"| `{r['id']}` | `{r['role']}` | `{r['expected']}` | `{r['predicted']}` | {match_icon} | `{r['path']}` |"
+        )
+
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    return {
+        "total_evaluated": total_evaluated,
+        "correct_count": correct_count,
+        "m11_intent_accuracy": accuracy,
+        "matrix_report_path": str(report_path),
+        "trace_sample_path": str(trace_sample_path),
+    }
+
+
 def main() -> None:
     """CLI entrypoint for running evaluation harness."""
     parser = argparse.ArgumentParser(description="GML AI Assistant Evaluation Harness")
-    parser.add_argument("--group", default="sql", choices=["sql", "rag", "trend", "all"], help="Evaluation group")
+    parser.add_argument("--group", default="sql", choices=["sql", "rag", "trend", "intent", "all"], help="Evaluation group")
     parser.add_argument("--split", default="dev", choices=["dev", "test"], help="Dataset split")
     parser.add_argument("--final", action="store_true", help="Unlock official test split run")
     parser.add_argument("--provider", default="auto", choices=["auto", "heuristic", "gemini", "ollama", "mock"], help="LLM Provider")
@@ -843,6 +1047,19 @@ def main() -> None:
         print(f"- M-10 (Max FP Alarms / KPI): {trend_res['m10_max_fp_per_kpi']}")
         print(f"- TC-T3-10 (Honest Coverage): {'PASSED' if trend_res['tc_t3_10_passed'] else 'FAILED'}")
         print(f"- Report (EV-09):            {trend_res['report_path']}")
+
+    if args.group in ("intent", "all"):
+        print(f"\n🚀 Running Intent Routing & Node Latency evaluation on split='{args.split}'...")
+        intent_res = run_intent_evaluation(
+            split=args.split,
+            final=args.final,
+            output_dir=out_dir,
+        )
+        print("\n✅ Intent Evaluation Completed Successfully!")
+        print(f"- Total Evaluated:           {intent_res['total_evaluated']}")
+        print(f"- M-11 (Intent Accuracy):    {intent_res['m11_intent_accuracy'] * 100:.2f}% ({intent_res['correct_count']}/{intent_res['total_evaluated']})")
+        print(f"- Report (EV-11):            {intent_res['matrix_report_path']}")
+        print(f"- Trace Sample (EV-12):      {intent_res['trace_sample_path']}")
 
 
 if __name__ == "__main__":

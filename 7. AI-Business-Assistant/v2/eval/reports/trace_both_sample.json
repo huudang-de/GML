@@ -1,0 +1,313 @@
+{
+  "item_id": "BM_BOTH_DEV_01",
+  "query": "Tỷ lệ sử dụng hạn mức hiện tại là bao nhiêu và vượt ngưỡng an toàn thì quy định xử lý thế nào?",
+  "role": "ceo",
+  "intent": "both",
+  "sql": {
+    "sql": "SELECT SUM(principal_balance) / NULLIF(SUM(granted_limit), 0) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit' LIMIT 1000",
+    "columns": [
+      "?column?"
+    ],
+    "rows": [
+      {
+        "?column?": 0.9181846724271187
+      }
+    ],
+    "row_count": 1,
+    "status": "ok",
+    "confidence": 0.8727516459586369,
+    "confidence_breakdown": {
+      "total": 0.8727516459586369,
+      "passed_mandatory_gate": true,
+      "golden_similarity": 0.5758388198621229,
+      "consistency": 1.0,
+      "plausibility": 1.0
+    },
+    "source_query_id": "sql-a51f9616",
+    "latency_ms": 2901.45
+  },
+  "rag": {
+    "chunks": [
+      {
+        "chunk_id": "Cam_nang_Nghiep_vu_Toan_thu_GML.md#c0017",
+        "source": "Cam_nang_Nghiep_vu_Toan_thu_GML.md",
+        "heading_path": "📘 CẨM NANG NGHIỆP VỤ TOÀN THƯ DỰ ÁN GỖ MINH LONG > 4. CÁC QUY TẮC NGHIỆP VỤ ĐẶC THÙ & ĐỐI SOÁT DỮ LIỆU > 4.2. Xử lý thuộc tính Bán cộng dồn (Semi-Additive) của Bảng cân đối kế toán & Kho",
+        "content": "- **Vấn đề:** Tiền mặt, Hàng tồn kho, Nợ phải thu/phải trả là các đại lượng **Thời điểm (Point-in-time / Snapshot)**. Chúng không được phép cộng dồn qua thời gian. Nếu người dùng chọn bộ lọc \"Quý 1\" hoặc \"Cả năm\", hành vi SUM bình thường sẽ cộng dồn số dư Tháng 1 + Tháng 2 + Tháng 3, dẫn đến con số sai lệch phi lý (gấp 3-12 lần thực tế).\n- **Quy tắc xử lý:** Sử dụng kỹ thuật **Closing Balance at Max Date**:\n  $$\\text{Số dư chỉ tiêu} = \\text{CALCULATE}(\\text{SUM}(Balance), \\text{Date} = \\text{MAX}(Date))$$\n  Hệ thống luôn tự động lấy số dư tại ngày giao dịch cuối cùng của khoảng thời gian được lọc.",
+        "dashboard": "ALL",
+        "doc_type": "handbook",
+        "score": 0.08203870967741936,
+        "vector_rank": 65,
+        "bm25_rank": 2
+      },
+      {
+        "chunk_id": "Cam_nang_Nghiep_vu_Toan_thu_GML.md#c0030",
+        "source": "Cam_nang_Nghiep_vu_Toan_thu_GML.md",
+        "heading_path": "📘 CẨM NANG NGHIỆP VỤ TOÀN THƯ DỰ ÁN GỖ MINH LONG > 6. HỆ THỐNG TRÍ TUỆ NHÂN TẠO & TỐI ƯU HÓA TÀI CHÍNH (AI FINANCIAL BRAIN) > 6.3. Phân loại Rủi ro & Chấm điểm Tín dụng Công nợ (AR Risk Classification)",
+        "content": "- **Thuật toán:** Phân loại đa lớp (Multi-class Classification) bằng XGBoost / Random Forest Classifier.\n- **Đầu vào:** Lịch sử thanh toán quá khứ, doanh số trung bình, tỷ lệ nợ quá hạn lịch sử, loại hình khách hàng (đại lý cấp 1, xưởng nội thất, nhà thầu dự án).\n- **Đầu ra:** Gán nhãn rủi ro (Low / Medium / High Risk) và dự báo xác suất khách hàng thanh toán trễ hạn trên 30 ngày. Cho phép bộ phận kế toán tự động khóa đơn hàng mới hoặc hạ hạn mức tín dụng trước khi nợ xấu xảy ra.\n\n---",
+        "dashboard": "ALL",
+        "doc_type": "handbook",
+        "score": 0.06907349419782649,
+        "vector_rank": 29,
+        "bm25_rank": 1
+      },
+      {
+        "chunk_id": "Story Telling báo cáo quản trị tài chính – Gỗ Minh Long.md#c0012",
+        "source": "Story Telling báo cáo quản trị tài chính – Gỗ Minh Long.md",
+        "heading_path": "Story Telling báo cáo quản trị tài chính – Công ty Gỗ Minh Long > 4. Dashboard 1 – Quản trị hoạt động tài chính: “Vốn đến từ đâu, giá bao nhiêu, còn dư địa không?” > 4.3 Bối cảnh pháp lý – kế toán Việt Nam",
+        "content": "- **Chế độ kế toán**: Thông tư 200/2014/TT-BTC quy định TK 341 phản ánh vay và nợ thuê tài chính; chi phí lãi vay ghi vào chi phí tài chính (TK 635) và lên Báo cáo B02-DN ở mã 23. Báo cáo B01-DN dùng các mã 100 (tài sản ngắn hạn), 140 (hàng tồn kho), 300/310/330 (nợ phải trả, ngắn hạn, dài hạn), 400 (vốn chủ sở hữu), 440 (tổng nguồn vốn). Các tiểu khoản 34111–34114 là danh mục riêng của Minh Long (BRD: 34111, 34113, 34114 là ngắn hạn; 34112 là dài hạn).\n- **Thuế**: Nghị định 132/2020/NĐ-CP khống chế chi phí lãi vay được trừ khi tính thuế ở mức 30% EBITDA đối với đối tượng thuộc phạm vi áp dụng (doanh nghiệp có giao dịch liên kết). Nếu Minh Long thuộc diện này, cần thêm chỉ tiêu “Chi phí lãi vay ÷ EBITDA” với ngưỡng 30%; phần lãi vượt trần bị loại khỏi chi phí được trừ, làm tăng thuế phải nộp.\n- **Bảo đảm tín dụng**: Bộ luật Dân sự 2015 và Nghị định 21/2021/NĐ-CP cho phép bảo đảm nghĩa vụ bằng bất động sản, động sản, tiền gửi, hàng tồn kho…; bảng TSĐB (BĐS, MMTB, PTVT, HTK, hợp đồng tiền gửi) phản ánh đúng các loại tài sản này, kèm hệ số tài sản bảo đảm từ 0,5 đến 1,0.",
+        "dashboard": "ALL",
+        "doc_type": "storytelling",
+        "score": 0.06890139466601419,
+        "vector_rank": 1,
+        "bm25_rank": 7
+      },
+      {
+        "chunk_id": "Cam_nang_Nghiep_vu_Toan_thu_GML.md#c0033",
+        "source": "Cam_nang_Nghiep_vu_Toan_thu_GML.md",
+        "heading_path": "📘 CẨM NANG NGHIỆP VỤ TOÀN THƯ DỰ ÁN GỖ MINH LONG > 6. HỆ THỐNG TRÍ TUỆ NHÂN TẠO & TỐI ƯU HÓA TÀI CHÍNH (AI FINANCIAL BRAIN) > 6.6. Trợ lý Doanh nghiệp Thông minh (AI Business Assistant)",
+        "content": "- **Công nghệ:** Large Language Model (LLM) kết hợp RAG (Retrieval-Augmented Generation) và Text-to-SQL.\n- **Chức năng:** Cho phép Ban Giám đốc và CFO trò chuyện bằng ngôn ngữ tự nhiên:\n  - *\"Hôm nay công ty còn bao nhiêu tiền mặt khả dụng?\"*\n  - *\"Tuần tới có khế ước vay nào đến hạn không và ngân hàng nào còn room tín dụng?\"*\n  - *\"Top 5 khách hàng có nguy cơ chậm nợ cao nhất tháng này là ai?\"*\n  Hệ thống tự động sinh câu truy vấn SQL an toàn vào PostgreSQL Silver Warehouse, kiểm chứng số liệu và trả về câu trả lời súc tích kèm biểu đồ gợi ý.\n\n---",
+        "dashboard": "ALL",
+        "doc_type": "handbook",
+        "score": 0.06663837011884549,
+        "vector_rank": 2,
+        "bm25_rank": 35
+      },
+      {
+        "chunk_id": "Cam_nang_Nghiep_vu_Toan_thu_GML.md#c0018",
+        "source": "Cam_nang_Nghiep_vu_Toan_thu_GML.md",
+        "heading_path": "📘 CẨM NANG NGHIỆP VỤ TOÀN THƯ DỰ ÁN GỖ MINH LONG > 4. CÁC QUY TẮC NGHIỆP VỤ ĐẶC THÙ & ĐỐI SOÁT DỮ LIỆU > 4.3. Loại bỏ bảng nhập tay `fact_loan` & Nguồn sự thật duy nhất (Single Source of Truth)",
+        "content": "- **Vấn đề:** Ban đầu doanh nghiệp duy trì file Excel khế ước vay (`fact_loan`) nhập tay độc lập. Dữ liệu này thường xuyên vênh lệch với sao kê ngân hàng do con người quên cập nhật hoặc hạch toán trễ.\n- **Quy tắc xử lý:** Chuẩn hóa nghiệp vụ dư nợ ngân hàng trực tiếp từ **Sổ cái tiền mặt/ngân hàng (`fact_cashflow`)** tại các tiểu khoản TK 341. Áp dụng logic cửa sổ SQL:\n  ```sql\n  ROW_NUMBER() OVER (PARTITION BY account_no ORDER BY posting_date DESC, id DESC)\n  ```\n  Lấy số dư tín dụng (`credit_balance`) mới nhất. Kết quả kiểm thử UAT khớp 100% số liệu thực tế tại mọi thời điểm.\n\n---",
+        "dashboard": "ALL",
+        "doc_type": "handbook",
+        "score": 0.060741687979539646,
+        "vector_rank": 42,
+        "bm25_rank": 9
+      }
+    ],
+    "sources": [
+      {
+        "citation_id": 1,
+        "source": "Cam_nang_Nghiep_vu_Toan_thu_GML.md",
+        "heading_path": "📘 CẨM NANG NGHIỆP VỤ TOÀN THƯ DỰ ÁN GỖ MINH LONG > 4. CÁC QUY TẮC NGHIỆP VỤ ĐẶC THÙ & ĐỐI SOÁT DỮ LIỆU > 4.2. Xử lý thuộc tính Bán cộng dồn (Semi-Additive) của Bảng cân đối kế toán & Kho",
+        "snippet": "- **Vấn đề:** Tiền mặt, Hàng tồn kho, Nợ phải thu/phải trả là các đại lượng **Thời điểm (Point-in-time / Snapshot)**. Chúng không được phép cộng dồn qua thời gian. Nếu người dùng chọn bộ lọc \"Quý 1\" h",
+        "score": 0.082
+      },
+      {
+        "citation_id": 2,
+        "source": "Cam_nang_Nghiep_vu_Toan_thu_GML.md",
+        "heading_path": "📘 CẨM NANG NGHIỆP VỤ TOÀN THƯ DỰ ÁN GỖ MINH LONG > 6. HỆ THỐNG TRÍ TUỆ NHÂN TẠO & TỐI ƯU HÓA TÀI CHÍNH (AI FINANCIAL BRAIN) > 6.3. Phân loại Rủi ro & Chấm điểm Tín dụng Công nợ (AR Risk Classification)",
+        "snippet": "- **Thuật toán:** Phân loại đa lớp (Multi-class Classification) bằng XGBoost / Random Forest Classifier.\n- **Đầu vào:** Lịch sử thanh toán quá khứ, doanh số trung bình, tỷ lệ nợ quá hạn lịch sử, loại ",
+        "score": 0.0691
+      },
+      {
+        "citation_id": 3,
+        "source": "Story Telling báo cáo quản trị tài chính – Gỗ Minh Long.md",
+        "heading_path": "Story Telling báo cáo quản trị tài chính – Công ty Gỗ Minh Long > 4. Dashboard 1 – Quản trị hoạt động tài chính: “Vốn đến từ đâu, giá bao nhiêu, còn dư địa không?” > 4.3 Bối cảnh pháp lý – kế toán Việt Nam",
+        "snippet": "- **Chế độ kế toán**: Thông tư 200/2014/TT-BTC quy định TK 341 phản ánh vay và nợ thuê tài chính; chi phí lãi vay ghi vào chi phí tài chính (TK 635) và lên Báo cáo B02-DN ở mã 23. Báo cáo B01-DN dùng ",
+        "score": 0.0689
+      },
+      {
+        "citation_id": 4,
+        "source": "Cam_nang_Nghiep_vu_Toan_thu_GML.md",
+        "heading_path": "📘 CẨM NANG NGHIỆP VỤ TOÀN THƯ DỰ ÁN GỖ MINH LONG > 6. HỆ THỐNG TRÍ TUỆ NHÂN TẠO & TỐI ƯU HÓA TÀI CHÍNH (AI FINANCIAL BRAIN) > 6.6. Trợ lý Doanh nghiệp Thông minh (AI Business Assistant)",
+        "snippet": "- **Công nghệ:** Large Language Model (LLM) kết hợp RAG (Retrieval-Augmented Generation) và Text-to-SQL.\n- **Chức năng:** Cho phép Ban Giám đốc và CFO trò chuyện bằng ngôn ngữ tự nhiên:\n  - *\"Hôm nay ",
+        "score": 0.0666
+      },
+      {
+        "citation_id": 5,
+        "source": "Cam_nang_Nghiep_vu_Toan_thu_GML.md",
+        "heading_path": "📘 CẨM NANG NGHIỆP VỤ TOÀN THƯ DỰ ÁN GỖ MINH LONG > 4. CÁC QUY TẮC NGHIỆP VỤ ĐẶC THÙ & ĐỐI SOÁT DỮ LIỆU > 4.3. Loại bỏ bảng nhập tay `fact_loan` & Nguồn sự thật duy nhất (Single Source of Truth)",
+        "snippet": "- **Vấn đề:** Ban đầu doanh nghiệp duy trì file Excel khế ước vay (`fact_loan`) nhập tay độc lập. Dữ liệu này thường xuyên vênh lệch với sao kê ngân hàng do con người quên cập nhật hoặc hạch toán trễ.",
+        "score": 0.0607
+      }
+    ],
+    "grounding_ok": true,
+    "answer_text": "Theo tài liệu tham khảo [1], các quy định và số liệu đã được đối chiếu đầy đủ.",
+    "latency_ms": 2498.79
+  },
+  "answer": {
+    "summary": "Theo số liệu từ hệ thống (chốt ngày 31/07/2026), Tỷ lệ sử dụng hạn mức: 91.82%.\n\nTheo tài liệu tham khảo [1], các quy định và số liệu đã được đối chiếu đầy đủ.",
+    "figures": [
+      {
+        "name": "Tỷ lệ sử dụng hạn mức",
+        "value": 0.9181846724271187,
+        "unit": "%",
+        "as_of": "2026-07-31",
+        "source_query_id": "sql-a51f9616"
+      }
+    ],
+    "explanation": {
+      "kpi_key": "ty_le_su_dung_han_muc",
+      "ten": "Tỷ lệ sử dụng hạn mức",
+      "cong_thuc": "SUM(principal_balance) / NULLIF(SUM(granted_limit), 0) WHERE record_type = 'credit_limit'",
+      "thanh_phan": [
+        "principal_balance",
+        "granted_limit"
+      ],
+      "y_nghia": "Tỷ lệ dư nợ thực tế trên tổng hạn mức tín dụng được cấp phép giải ngân",
+      "narrative": "Nội dung phản hồi được tạo tự động từ quy tắc nghiệp vụ.",
+      "grounded_values": [
+        0.9181846724271187,
+        0.7,
+        70.0,
+        0.9,
+        90.0
+      ],
+      "source_query_id": "sql-a51f9616"
+    },
+    "trend": {
+      "kpi_key": "ty_le_su_dung_han_muc",
+      "data_coverage": 1,
+      "series": [
+        {
+          "period": "2026-07",
+          "value": 0.9181846724271187
+        }
+      ],
+      "mom_growth": null,
+      "yoy_growth": null,
+      "anomalies": [
+        {
+          "period": "2026-07",
+          "value": 0.9181846724271187,
+          "severity": "nghiem_trong",
+          "reason": "Vi phạm ngưỡng nghiêm trọng (>= 0.90)",
+          "mom_growth": null
+        }
+      ],
+      "summary_text": "Phân tích xu hướng Tỷ lệ sử dụng hạn mức (ty_le_su_dung_han_muc) qua 1 kỳ dữ liệu (kỳ mới nhất: 2026-07). Chu kỳ Q2-Q3 ngành gỗ: Giai đoạn tích trữ nguyên liệu ván thô và sản xuất, DIO có xu hướng tăng cao, tận dụng vốn vay ngân hàng. Phát hiện 1 kỳ có biến động bất thường.",
+      "source_query_id": "trend-92437ab4"
+    },
+    "advice": [
+      {
+        "kpi_key": "ty_le_su_dung_han_muc",
+        "level": "nghiem_trong",
+        "actions": [
+          "Kích hoạt phương án khẩn cấp: ngừng toàn bộ các khoản giải ngân mới chưa cấp thiết.",
+          "Báo cáo ngay Tổng Giám Đốc (CEO) để xin phê duyệt phương án tái cấu trúc hạn mức hoặc đàm phán cấp thêm hạn mức tín dụng.",
+          "Thu hồi khẩn cấp các khoản phải thu quá hạn để thanh toán ngay nợ vay ngắn hạn đến hạn."
+        ],
+        "authority_role": "ceo",
+        "disclaimer": "Gợi ý tham khảo từ quy tắc nghiệp vụ, cần người có thẩm quyền quyết định"
+      }
+    ],
+    "sql": "SELECT SUM(principal_balance) / NULLIF(SUM(granted_limit), 0) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit' LIMIT 1000",
+    "sources": [
+      {
+        "citation_id": 1,
+        "source": "Cam_nang_Nghiep_vu_Toan_thu_GML.md",
+        "heading_path": "📘 CẨM NANG NGHIỆP VỤ TOÀN THƯ DỰ ÁN GỖ MINH LONG > 4. CÁC QUY TẮC NGHIỆP VỤ ĐẶC THÙ & ĐỐI SOÁT DỮ LIỆU > 4.2. Xử lý thuộc tính Bán cộng dồn (Semi-Additive) của Bảng cân đối kế toán & Kho",
+        "snippet": "- **Vấn đề:** Tiền mặt, Hàng tồn kho, Nợ phải thu/phải trả là các đại lượng **Thời điểm (Point-in-time / Snapshot)**. Chúng không được phép cộng dồn qua thời gian. Nếu người dùng chọn bộ lọc \"Quý 1\" h",
+        "score": 0.082
+      },
+      {
+        "citation_id": 2,
+        "source": "Cam_nang_Nghiep_vu_Toan_thu_GML.md",
+        "heading_path": "📘 CẨM NANG NGHIỆP VỤ TOÀN THƯ DỰ ÁN GỖ MINH LONG > 6. HỆ THỐNG TRÍ TUỆ NHÂN TẠO & TỐI ƯU HÓA TÀI CHÍNH (AI FINANCIAL BRAIN) > 6.3. Phân loại Rủi ro & Chấm điểm Tín dụng Công nợ (AR Risk Classification)",
+        "snippet": "- **Thuật toán:** Phân loại đa lớp (Multi-class Classification) bằng XGBoost / Random Forest Classifier.\n- **Đầu vào:** Lịch sử thanh toán quá khứ, doanh số trung bình, tỷ lệ nợ quá hạn lịch sử, loại ",
+        "score": 0.0691
+      },
+      {
+        "citation_id": 3,
+        "source": "Story Telling báo cáo quản trị tài chính – Gỗ Minh Long.md",
+        "heading_path": "Story Telling báo cáo quản trị tài chính – Công ty Gỗ Minh Long > 4. Dashboard 1 – Quản trị hoạt động tài chính: “Vốn đến từ đâu, giá bao nhiêu, còn dư địa không?” > 4.3 Bối cảnh pháp lý – kế toán Việt Nam",
+        "snippet": "- **Chế độ kế toán**: Thông tư 200/2014/TT-BTC quy định TK 341 phản ánh vay và nợ thuê tài chính; chi phí lãi vay ghi vào chi phí tài chính (TK 635) và lên Báo cáo B02-DN ở mã 23. Báo cáo B01-DN dùng ",
+        "score": 0.0689
+      },
+      {
+        "citation_id": 4,
+        "source": "Cam_nang_Nghiep_vu_Toan_thu_GML.md",
+        "heading_path": "📘 CẨM NANG NGHIỆP VỤ TOÀN THƯ DỰ ÁN GỖ MINH LONG > 6. HỆ THỐNG TRÍ TUỆ NHÂN TẠO & TỐI ƯU HÓA TÀI CHÍNH (AI FINANCIAL BRAIN) > 6.6. Trợ lý Doanh nghiệp Thông minh (AI Business Assistant)",
+        "snippet": "- **Công nghệ:** Large Language Model (LLM) kết hợp RAG (Retrieval-Augmented Generation) và Text-to-SQL.\n- **Chức năng:** Cho phép Ban Giám đốc và CFO trò chuyện bằng ngôn ngữ tự nhiên:\n  - *\"Hôm nay ",
+        "score": 0.0666
+      },
+      {
+        "citation_id": 5,
+        "source": "Cam_nang_Nghiep_vu_Toan_thu_GML.md",
+        "heading_path": "📘 CẨM NANG NGHIỆP VỤ TOÀN THƯ DỰ ÁN GỖ MINH LONG > 4. CÁC QUY TẮC NGHIỆP VỤ ĐẶC THÙ & ĐỐI SOÁT DỮ LIỆU > 4.3. Loại bỏ bảng nhập tay `fact_loan` & Nguồn sự thật duy nhất (Single Source of Truth)",
+        "snippet": "- **Vấn đề:** Ban đầu doanh nghiệp duy trì file Excel khế ước vay (`fact_loan`) nhập tay độc lập. Dữ liệu này thường xuyên vênh lệch với sao kê ngân hàng do con người quên cập nhật hoặc hạch toán trễ.",
+        "score": 0.0607
+      }
+    ],
+    "confidence": 0.8727516459586369,
+    "warnings": [
+      "Chỉ có 1 tháng dữ liệu, chưa đủ để phân tích xu hướng"
+    ],
+    "request_id": "eval-BM_BOTH_DEV_01"
+  },
+  "trace": [
+    {
+      "node": "guard_input",
+      "status": "ok",
+      "latency_ms": 42.49
+    },
+    {
+      "node": "resolve_context",
+      "is_followup": false,
+      "cues": [],
+      "latency_ms": 0.0
+    },
+    {
+      "node": "classify_intent",
+      "intent": "both",
+      "latency_ms": 57.47
+    },
+    {
+      "node": "rag_lookup",
+      "grounding_ok": true,
+      "chunks_count": 5,
+      "latency_ms": 2499.11
+    },
+    {
+      "node": "sql_lookup",
+      "status": "ok",
+      "latency_ms": 2901.5,
+      "confidence": 0.8727516459586369,
+      "attempts": 1
+    },
+    {
+      "node": "join",
+      "latency_ms": 0.0
+    },
+    {
+      "node": "explain",
+      "kpi_keys": [
+        "ty_le_su_dung_han_muc"
+      ],
+      "explanation_present": true,
+      "latency_ms": 2017.58
+    },
+    {
+      "node": "trend",
+      "kpi_keys": [
+        "ty_le_su_dung_han_muc"
+      ],
+      "trend_present": true,
+      "latency_ms": 181.6
+    },
+    {
+      "node": "advise",
+      "kpi_keys": [
+        "ty_le_su_dung_han_muc"
+      ],
+      "advice_count": 1,
+      "latency_ms": 0.06
+    },
+    {
+      "node": "confidence_gate",
+      "latency_ms": 0.0
+    },
+    {
+      "node": "synthesize",
+      "confidence": 0.8727516459586369,
+      "figures_count": 1,
+      "sources_count": 5,
+      "latency_ms": 0.46
+    },
+    {
+      "node": "guard_output",
+      "status": "ok",
+      "latency_ms": 0.08
+    }
+  ]
+}

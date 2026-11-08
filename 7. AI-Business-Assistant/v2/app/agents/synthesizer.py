@@ -55,6 +55,52 @@ def run_synthesizer(
     data_profile = state.get("data_profile", "real")
     kpi_keys = state.get("kpi_keys") or []
     synth_warnings: list[str] = []
+    intent = state.get("intent")
+    errors = state.get("errors") or []
+    warnings = list(dict.fromkeys(state.get("warnings") or []))
+
+    # Case 1: Blocked intent (TC-T4-04)
+    if intent == "blocked":
+        refusal_reason = errors[0] if errors else "Yêu cầu bị từ chối do vi phạm an toàn hoặc phân quyền."
+        answer = Answer(
+            summary=f"Yêu cầu bị từ chối: {refusal_reason}",
+            figures=[],
+            explanation=None,
+            trend=None,
+            advice=[],
+            sql=None,
+            sources=[],
+            confidence=0.0,
+            warnings=warnings,
+            request_id=request_id,
+        )
+        return answer, warnings
+
+    # Case 2: Alert intent
+    if intent == "alert":
+        alerts = state.get("alerts") or []
+        if not alerts:
+            summary = "Hiện tại không ghi nhận cảnh báo nào chưa được xử lý trên hệ thống."
+        else:
+            alert_lines = [
+                f"- [{a.get('severity', 'canh_bao').upper()}] {a.get('message', '')} "
+                f"(KPI: {a.get('kpi_key', 'N/A')}, Giá trị: {a.get('value', 'N/A')}, Ngưỡng: {a.get('threshold', 'N/A')})"
+                for a in alerts
+            ]
+            summary = f"Hệ thống ghi nhận {len(alerts)} cảnh báo chưa xử lý:\n" + "\n".join(alert_lines)
+        answer = Answer(
+            summary=summary,
+            figures=[],
+            explanation=None,
+            trend=None,
+            advice=[],
+            sql=None,
+            sources=[],
+            confidence=0.90,
+            warnings=warnings,
+            request_id=request_id,
+        )
+        return answer, warnings
 
     # Step 1: Collect valid query IDs from execution logs
     valid_query_ids: set[str] = set()
@@ -153,9 +199,23 @@ def run_synthesizer(
 
     # Step 5: Construct deterministic summary (as fallback or primary)
     cutoff_notice = "chốt ngày 31/07/2026" if data_profile == "real" else "dữ liệu mô phỏng synth"
+
+    row_text_items: list[str] = []
+    if sql_state.get("status") == "ok":
+        rows = sql_state.get("rows") or []
+        if isinstance(rows, list) and rows:
+            first_r = rows[0]
+            if isinstance(first_r, dict):
+                for col, val in first_r.items():
+                    if isinstance(val, str) and val.strip() and col not in ("record_type", "rn", "account_no", "item_code", "as_of_date"):
+                        row_text_items.append(f"{col.replace('_', ' ').title()}: {val}")
+
     if verified_figures:
         fig_texts = [f"{f.name}: {format_metric_value(f.value, f.unit)}" for f in verified_figures]
-        summary_core = f"Theo số liệu từ hệ thống ({cutoff_notice}), " + ", ".join(fig_texts) + "."
+        all_parts = row_text_items + fig_texts
+        summary_core = f"Theo số liệu từ hệ thống ({cutoff_notice}), " + ", ".join(all_parts) + "."
+    elif row_text_items:
+        summary_core = f"Theo số liệu từ hệ thống ({cutoff_notice}), " + ", ".join(row_text_items) + "."
     elif rag_state.get("answer_text"):
         summary_core = rag_state["answer_text"]
     else:

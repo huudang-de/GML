@@ -16,6 +16,7 @@ class ChatState(TypedDict, total=False):
     data_profile: str  # "real" | "synth"
     sql: dict  # {"sql", "columns", "rows", "row_count", "status", "confidence"}
     rag: dict  # {"chunks", "sources", "grounding_ok"}
+    alerts: list[dict]  # Danh sách cảnh báo tài chính/vận hành từ app.alert_event
     kpi_keys: list[str]
     explanation: dict
     trend: dict
