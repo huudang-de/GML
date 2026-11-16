@@ -59,6 +59,10 @@ class KpiValueResponse(BaseModel):
     sql_executed: str
     warnings: list[str] = Field(default_factory=list)
     cached: bool = False
+    series: list[dict[str, Any]] | None = None
+    previous_value: float | None = None
+    delta_pct: float | None = None
+    series_warning: str | None = None
 
 
 # ==============================================================================
