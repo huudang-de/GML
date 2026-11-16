@@ -3,6 +3,12 @@ EVIDENCE REPORT EV-04: T2 Knowledge Base & KPI YAML Lint Report
 ================================================================================
 Lint Status: PASSED
 M-05 KPI Golden Reference Coverage: 100.0% (28/28 KPIs covered)
+M-05b Series Coverage: 100.0% (M-05b = 1.00)
 Violations Count: 0
 All 28 KPIs across 5 Dashboards validated with active business rules and golden queries.
+
+--------------------------------------------------------------------------------
+Series Queries & Role Profiles Status: PASSED
+M-05b = 1.00
+All series queries match views_used scope and AST allowlist; role profile overview KPIs authorized.
 ================================================================================

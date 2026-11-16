@@ -1,0 +1,118 @@
+# ==============================================================================
+# GML AI Business Assistant v2.0 — Time-Series Query Bank Index
+# Specification: Spec §5 T2, P2r Task 1
+# Coverage: 16 Standard Business KPIs with monthly time-series queries
+# ==============================================================================
+
+queries:
+  - id: "S_du_no_ngan_han"
+    kpi_key: "du_no_ngan_han"
+    sql_file: "S_du_no_ngan_han.sql"
+    views_used:
+      - "ai_v_no_vay"
+    grain: "month"
+
+  - id: "S_du_no_dai_han"
+    kpi_key: "du_no_dai_han"
+    sql_file: "S_du_no_dai_han.sql"
+    views_used:
+      - "ai_v_no_vay"
+    grain: "month"
+
+  - id: "S_ty_le_su_dung_han_muc"
+    kpi_key: "ty_le_su_dung_han_muc"
+    sql_file: "S_ty_le_su_dung_han_muc.sql"
+    views_used:
+      - "ai_v_no_vay"
+    grain: "month"
+
+  - id: "S_dong_tien_rong"
+    kpi_key: "dong_tien_rong"
+    sql_file: "S_dong_tien_rong.sql"
+    views_used:
+      - "ai_v_dong_tien"
+    grain: "month"
+
+  - id: "S_dong_tien_vao"
+    kpi_key: "dong_tien_vao"
+    sql_file: "S_dong_tien_vao.sql"
+    views_used:
+      - "ai_v_dong_tien"
+    grain: "month"
+
+  - id: "S_dong_tien_ra"
+    kpi_key: "dong_tien_ra"
+    sql_file: "S_dong_tien_ra.sql"
+    views_used:
+      - "ai_v_dong_tien"
+    grain: "month"
+
+  - id: "S_tien_va_tuong_duong_tien"
+    kpi_key: "tien_va_tuong_duong_tien"
+    sql_file: "S_tien_va_tuong_duong_tien.sql"
+    views_used:
+      - "ai_v_bctc"
+    grain: "month"
+
+  - id: "S_ty_le_no_tren_tong_nguon_von"
+    kpi_key: "ty_le_no_tren_tong_nguon_von"
+    sql_file: "S_ty_le_no_tren_tong_nguon_von.sql"
+    views_used:
+      - "ai_v_bctc"
+    grain: "month"
+
+  - id: "S_gia_tri_hang_ton_kho"
+    kpi_key: "gia_tri_hang_ton_kho"
+    sql_file: "S_gia_tri_hang_ton_kho.sql"
+    views_used:
+      - "ai_v_ton_kho"
+    grain: "month"
+
+  - id: "S_gia_tri_phai_thu"
+    kpi_key: "gia_tri_phai_thu"
+    sql_file: "S_gia_tri_phai_thu.sql"
+    views_used:
+      - "ai_v_cong_no"
+    grain: "month"
+
+  - id: "S_gia_tri_phai_tra"
+    kpi_key: "gia_tri_phai_tra"
+    sql_file: "S_gia_tri_phai_tra.sql"
+    views_used:
+      - "ai_v_cong_no"
+    grain: "month"
+
+  - id: "S_han_muc_phe_duyet"
+    kpi_key: "han_muc_phe_duyet"
+    sql_file: "S_han_muc_phe_duyet.sql"
+    views_used:
+      - "ai_v_no_vay"
+    grain: "month"
+
+  - id: "S_han_muc_duoc_cap"
+    kpi_key: "han_muc_duoc_cap"
+    sql_file: "S_han_muc_duoc_cap.sql"
+    views_used:
+      - "ai_v_no_vay"
+    grain: "month"
+
+  - id: "S_han_muc_con_lai"
+    kpi_key: "han_muc_con_lai"
+    sql_file: "S_han_muc_con_lai.sql"
+    views_used:
+      - "ai_v_no_vay"
+    grain: "month"
+
+  - id: "S_so_luong_hang_ton_kho"
+    kpi_key: "so_luong_hang_ton_kho"
+    sql_file: "S_so_luong_hang_ton_kho.sql"
+    views_used:
+      - "ai_v_ton_kho"
+    grain: "month"
+
+  - id: "S_tong_ma_san_pham"
+    kpi_key: "tong_ma_san_pham"
+    sql_file: "S_tong_ma_san_pham.sql"
+    views_used:
+      - "ai_v_ton_kho"
+    grain: "month"

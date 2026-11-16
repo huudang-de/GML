@@ -25,6 +25,7 @@ class KpiDefinition(BaseModel):
     plausible_range: tuple[float, float] | None = None
     nguong: dict[str, str] = Field(default_factory=dict)
     data_caveat: str | None = None
+    series_ref: str | None = None
 
 
 class BusinessRuleAction(BaseModel):
@@ -57,6 +58,26 @@ class GoldenMatch(BaseModel):
 
     query: GoldenQuery
     similarity: float
+
+
+class SeriesQuery(BaseModel):
+    """Canonical 12-month time-series query definition for standard business KPIs."""
+
+    id: str
+    kpi_key: str
+    sql_file: str
+    sql_text: str = ""
+    views_used: list[str]
+    grain: Literal["month"] = "month"
+
+
+class RoleProfile(BaseModel):
+    """Business role profile with greeting title, overview KPIs, and suggested questions."""
+
+    role: str
+    greeting_title: str
+    overview_kpis: list[str] = Field(default_factory=list)
+    suggested_questions: list[str] = Field(default_factory=list)
 
 
 class BenchmarkExpectation(BaseModel):

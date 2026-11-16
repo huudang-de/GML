@@ -6,6 +6,7 @@ Specifications:
 - Generates EV-04 (t2_yaml_lint.txt) and EV-05 (t2_leakage_check.txt)
 """
 
+import re
 import sys
 from pathlib import Path
 from typing import Optional
@@ -20,6 +21,8 @@ from sqlglot import exp
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+from app.core.errors import SqlRejected
+from app.core.security import can_access_kpi, kpi_domain
 from app.knowledge.loader import (
     KPIS_FILE,
     RULES_FILE,
@@ -27,9 +30,12 @@ from app.knowledge.loader import (
     load_business_rules,
     load_golden_queries,
     load_kpis,
+    load_role_profiles,
+    load_series_queries,
     prepare_search_text,
 )
 from app.knowledge.models import BenchmarkItem
+from app.sql.validator import validate
 
 REPORTS_DIR = Path(__file__).resolve().parent.parent.parent / "eval" / "reports"
 EV04_PATH = REPORTS_DIR / "t2_yaml_lint.txt"
@@ -151,24 +157,69 @@ def lint_knowledge_base() -> tuple[bool, list[str], float]:
 def check_benchmark_leakage(
     cosine_threshold: float = 0.92,
     custom_test_items: Optional[list[BenchmarkItem]] = None,
+    custom_corpus: Optional[list[str]] = None,
 ) -> tuple[bool, list[str]]:
-    """Check for benchmark leakage against Golden Query Bank.
+    """Check for benchmark leakage against Golden Query Bank or a custom corpus.
 
-    Review Focus #3:
-    Checks BOTH:
-    1. Question cosine similarity: TF-IDF similarity between any test item and any
-       golden query (including all paraphrases) must be strictly < cosine_threshold (default 0.92).
-    2. AST Skeleton inequality: For any test item with reference_sql, its canonical AST skeleton
-       must NOT equal the AST skeleton of ANY golden query.
+    Review Focus #3 & C7:
+    - If custom_corpus is provided:
+        Compares test_items against custom_corpus (e.g. suggested questions from role profiles).
+        Returns early (True, []) if custom_corpus is empty or contains only whitespace.
+        If cosine similarity >= cosine_threshold, flags leakage reporting ONLY item.id and
+        corpus index (suggested_question[{max_idx}]) - NEVER echoing item.cau_hoi (C7).
+    - If custom_corpus is None (default):
+        Dual check against Golden Query Bank:
+        1. Question cosine similarity: TF-IDF similarity between any test item and any
+           golden query (including all paraphrases) must be strictly < cosine_threshold (default 0.92).
+        2. AST Skeleton inequality: For any test item with reference_sql, its canonical AST skeleton
+           must NOT equal the AST skeleton of ANY golden query.
 
     Returns:
         tuple[bool, list[str]]: (is_ok, list_of_leakage_messages)
     """
     messages: list[str] = []
-    golden_queries = load_golden_queries()
     test_items = custom_test_items if custom_test_items is not None else [
         item for item in load_benchmark() if item.split == "test"
     ]
+
+    # Branch 1: Custom corpus comparison (e.g. role suggested questions vs test benchmark)
+    if custom_corpus is not None:
+        if len(custom_corpus) == 0:
+            return True, []
+
+        corpus_texts = [prepare_search_text(t) for t in custom_corpus]
+        if not any(t.strip() for t in corpus_texts):
+            return True, []
+
+        if len(test_items) == 0:
+            return True, []
+
+        vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5))
+        try:
+            corpus_tfidf = vectorizer.fit_transform(corpus_texts)
+        except ValueError:
+            return True, []
+
+        for item in test_items:
+            q_text = prepare_search_text(item.cau_hoi)
+            if not q_text.strip():
+                continue
+            q_vec = vectorizer.transform([q_text])
+            sims = cosine_similarity(q_vec, corpus_tfidf)[0]
+            max_idx = int(sims.argmax())
+            max_sim = float(sims[max_idx])
+
+            if max_sim >= cosine_threshold:
+                # C7: ONLY include item.id and corpus index — NEVER echo item.cau_hoi!
+                messages.append(
+                    f"QUESTION_LEAK: Test item '{item.id}' has cosine similarity {max_sim:.4f} "
+                    f">= {cosine_threshold} with suggested_question[{max_idx}]"
+                )
+
+        return len(messages) == 0, messages
+
+    # Branch 2: Default check against Golden Queries (preserved exact behavior)
+    golden_queries = load_golden_queries()
 
     # Pre-compute golden query AST skeletons and text representations
     golden_skeletons: list[tuple[str, str]] = []
@@ -214,25 +265,198 @@ def check_benchmark_leakage(
     return is_ok, messages
 
 
+def lint_series_and_role_profiles(
+    profiles_path: Optional[Path] = None,
+    series_index_path: Optional[Path] = None,
+) -> tuple[bool, list[str], float]:
+    """Lint series queries and role profiles for scope, RBAC, leakage, and coverage.
+
+    Specifications:
+    - TC-T2-08: Role overview KPIs must exist in kpi_definitions and be authorized by RBAC (can_access_kpi).
+    - TC-T2-09: Suggested questions must not leak into benchmark test items (cosine < 0.92, C7 non-echo).
+    - TC-T2-10: Series queries views_used ⊆ kpi.nguon_view, SQL passes validate(), AST tables ⊆ views_used.
+    - M-05b: Series query coverage for all overview KPIs across role profiles must equal 1.0 (100%).
+
+    Args:
+        profiles_path: Optional override for role_profiles.yaml.
+        series_index_path: Optional override for series_index.yaml.
+
+    Returns:
+        tuple[bool, list[str], float]: (is_ok, list_of_messages, m05b_series_coverage)
+    """
+    messages: list[str] = []
+    kpis = load_kpis()
+    series_map = load_series_queries(series_index_path)
+    profiles = load_role_profiles(profiles_path)
+
+    # 1. Validate series queries against KPI definitions and SQL security (TC-T2-10)
+    for sq in series_map.values():
+        if sq.kpi_key not in kpis:
+            messages.append(f"Series query '{sq.id}' references unknown KPI '{sq.kpi_key}'")
+            continue
+        kpi = kpis[sq.kpi_key]
+        if kpi.series_ref != sq.id:
+            messages.append(
+                f"KPI '{sq.kpi_key}' series_ref '{kpi.series_ref}' does not match series query id '{sq.id}'"
+            )
+        if not sq.sql_text or not sq.sql_text.strip():
+            messages.append(f"Series query '{sq.id}' has empty SQL text")
+            continue
+
+        # Check views_used ⊆ kpi.nguon_view
+        kpi_views = set(kpi.nguon_view)
+        sq_views = set(sq.views_used)
+        if not sq_views.issubset(kpi_views):
+            messages.append(
+                f"Series query '{sq.id}' views_used {sorted(list(sq_views))} is not a subset of KPI '{sq.kpi_key}' nguon_view {sorted(list(kpi_views))}"
+            )
+
+        # Validate SQL via validator (checks statements, forbidden functions, schemas, allowed tables)
+        try:
+            validate(sq.sql_text, allowed_tables=sq_views)
+        except (SqlRejected, Exception) as e:
+            messages.append(f"Series query '{sq.id}' SQL validation failed: {e}")
+
+        # AST Table check: verify all non-CTE tables belong to sq.views_used
+        norm_views_used = {v.strip().lower().split(".")[-1] for v in sq.views_used}
+        try:
+            trees = sqlglot.parse(sq.sql_text, read="postgres")
+            trees = [t for t in trees if t is not None]
+        except Exception as e:
+            messages.append(f"Series query '{sq.id}' SQL parse error: {e}")
+            trees = []
+
+        cte_names = set()
+        for tree in trees:
+            for c in tree.find_all(exp.CTE):
+                if c.alias_or_name:
+                    cte_names.add(c.alias_or_name.lower())
+
+        for tree in trees:
+            for t in tree.find_all(exp.Table):
+                table_name = t.name.lower() if t.name else ""
+                schema_name = t.db.lower() if t.db else ""
+                if table_name and table_name in cte_names and schema_name == "":
+                    continue
+                if schema_name and schema_name != "ai_views":
+                    messages.append(f"Series query '{sq.id}' references forbidden schema '{schema_name}'")
+                if table_name not in norm_views_used:
+                    messages.append(
+                        f"Series query '{sq.id}' uses table '{table_name}' not listed in views_used {sq.views_used}"
+                    )
+
+    # If using default series queries, ensure all KPIs with series_ref exist in series_map.
+    # Note: when series_index_path is provided as a tmp_path override during testing,
+    # the test index only supplies a focused subset of queries rather than the full catalogue,
+    # so we only enforce full catalogue completeness against the production default index.
+    if series_index_path is None:
+        for kpi_key, kpi in kpis.items():
+            if kpi.series_ref:
+                if kpi_key not in series_map:
+                    messages.append(
+                        f"KPI '{kpi_key}' series_ref '{kpi.series_ref}' not found in series_queries index"
+                    )
+
+    # 2. Validate role profiles RBAC and operational domain (TC-T2-08)
+    for role_name, profile in profiles.items():
+        for k in profile.overview_kpis:
+            if k not in kpis:
+                messages.append(f"Role '{role_name}' overview KPI '{k}' not found in KPI definitions")
+                continue
+            if not can_access_kpi(role_name, k):
+                messages.append(f"Role '{role_name}' is not authorized to access overview KPI '{k}'")
+            try:
+                kpi_domain(k)
+            except Exception as e:
+                messages.append(
+                    f"KPI domain lookup failed for overview KPI '{k}' in role '{role_name}': {e}"
+                )
+
+    # 3. Check suggested-question benchmark leakage (TC-T2-09, C7)
+    suggested_corpus: list[str] = []
+    suggested_map: list[tuple[str, int]] = []
+    for role_name, profile in profiles.items():
+        for q_idx, q in enumerate(profile.suggested_questions):
+            if q and q.strip():
+                suggested_corpus.append(q)
+                suggested_map.append((role_name, q_idx))
+
+    if suggested_corpus:
+        leak_ok, leak_msgs = check_benchmark_leakage(custom_corpus=suggested_corpus)
+        if not leak_ok:
+            for msg in leak_msgs:
+                m = re.search(r"suggested_question\[(\d+)\]", msg)
+                if m:
+                    idx = int(m.group(1))
+                    if idx < len(suggested_map):
+                        r_name, q_i = suggested_map[idx]
+                        msg = msg.replace(
+                            f"suggested_question[{idx}]",
+                            f"role '{r_name}' suggested_question[{q_i}]",
+                        )
+                messages.append(msg)
+
+    # 4. Compute M-05b series coverage for overview KPIs
+    all_overview_kpis = set()
+    for profile in profiles.values():
+        all_overview_kpis.update(profile.overview_kpis)
+
+    if not all_overview_kpis:
+        m05b_series_coverage = 1.0
+    else:
+        covered = {
+            k
+            for k in all_overview_kpis
+            if k in series_map
+            and series_map[k].sql_text
+            and series_map[k].sql_text.strip()
+            and k in kpis
+            and kpis[k].series_ref == series_map[k].id
+        }
+        m05b_series_coverage = len(covered) / len(all_overview_kpis)
+        if m05b_series_coverage < 1.0:
+            missing = sorted(list(all_overview_kpis - covered))
+            messages.append(
+                f"M-05b series coverage violation: {m05b_series_coverage * 100:.1f}% < 100%. "
+                f"Missing series queries for overview KPIs: {missing}"
+            )
+
+    is_ok = len(messages) == 0 and m05b_series_coverage == 1.0
+    return is_ok, messages, m05b_series_coverage
+
+
 def generate_reports() -> None:
     """Generate EV-04 (YAML lint report) and EV-05 (leakage check report)."""
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
     # EV-04
     lint_ok, lint_msgs, m05_cov = lint_knowledge_base()
+    series_ok, series_msgs, m05b_cov = lint_series_and_role_profiles()
+    overall_ok = lint_ok and series_ok
+
     ev04_content = [
         "================================================================================",
         "EVIDENCE REPORT EV-04: T2 Knowledge Base & KPI YAML Lint Report",
         "================================================================================",
-        f"Lint Status: {'PASSED' if lint_ok else 'FAILED'}",
+        f"Lint Status: {'PASSED' if overall_ok else 'FAILED'}",
         f"M-05 KPI Golden Reference Coverage: {m05_cov * 100:.1f}% (28/28 KPIs covered)",
-        f"Violations Count: {len(lint_msgs)}",
+        f"M-05b Series Coverage: {m05b_cov * 100:.1f}% (M-05b = {m05b_cov:.2f})",
+        f"Violations Count: {len(lint_msgs) + len(series_msgs)}",
     ]
     if lint_msgs:
-        ev04_content.append("\nDetailed Violations:")
+        ev04_content.append("\nDetailed KPI Violations:")
         ev04_content.extend([f"  - {msg}" for msg in lint_msgs])
     else:
         ev04_content.append("All 28 KPIs across 5 Dashboards validated with active business rules and golden queries.")
+
+    ev04_content.append("\n--------------------------------------------------------------------------------")
+    ev04_content.append(f"Series Queries & Role Profiles Status: {'PASSED' if series_ok else 'FAILED'}")
+    ev04_content.append(f"M-05b = {m05b_cov:.2f}")
+    if series_msgs:
+        ev04_content.append("\nDetailed Series & Profile Violations:")
+        ev04_content.extend([f"  - {msg}" for msg in series_msgs])
+    else:
+        ev04_content.append("All series queries match views_used scope and AST allowlist; role profile overview KPIs authorized.")
     ev04_content.append("================================================================================\n")
     EV04_PATH.write_text("\n".join(ev04_content), encoding="utf-8")
     print(f"Generated EV-04 at: {EV04_PATH}")
