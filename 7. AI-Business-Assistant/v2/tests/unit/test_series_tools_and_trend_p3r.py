@@ -11,7 +11,8 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.engine import Engine
 
-from app.agents.models import TrendPoint
+from app.agents.models import AlertEvidence, SeriesSummary, Trend, TrendAnomaly, TrendPoint
+from app.agents.series_tools import build_alert_evidence, summarize_series
 from app.agents.trend_agent import analyze_kpi_trend, load_kpi_series
 from app.knowledge.models import SeriesQuery
 from app.sql.executor import SqlExecutionResult
@@ -115,3 +116,68 @@ def test_load_kpi_series_non_kpi_fallback_current_ratio(fake_engine, executed_sq
     assert err is None
     assert sql is not None
     assert "B01-DN_100" in sql
+
+
+# ==============================================================================
+# Task 2: summarize_series & build_alert_evidence (TC-T3-15)
+# ==============================================================================
+
+P = lambda p, v: TrendPoint(period=p, value=v)
+
+
+def test_summarize_series_delta():
+    s = summarize_series([P("2026-06", 283.7), P("2026-07", 236.07)])
+    assert s.last_value == 236.07 and s.previous_value == 283.7
+    assert round(s.delta_pct, 3) == -0.168
+
+
+def test_summarize_series_single_point_and_zero_prev():
+    assert summarize_series([P("2026-07", 5.0)]).delta_pct is None
+    assert summarize_series([P("2026-06", 0.0), P("2026-07", 5.0)]).delta_pct is None
+    assert summarize_series([]).delta_pct is None
+    assert summarize_series([]).last_value is None
+
+
+def test_tc_t3_15_evidence_numbers_grounded():
+    trend = Trend(
+        kpi_key="ty_le_su_dung_han_muc",
+        data_coverage=12,
+        series=[P(f"2025-{m:02d}", 0.5) for m in range(8, 13)] + [P(f"2026-{m:02d}", 0.6 + m / 100) for m in range(1, 8)],
+        source_query_id="t",
+    )
+    ev = build_alert_evidence("ty_le_su_dung_han_muc", "nghiem_trong", 0.92, trend)
+    allowed = {p.value for p in trend.series} | {0.92, 0.90}
+    numbers = [p.value for p in ev.series] + [ev.value]
+    assert all(n in allowed for n in numbers)
+    assert ev.threshold_expr == ">= 0.90" and ev.authority_role == "ceo"
+    assert len(ev.series) == 12 and ev.period == "2026-07"
+
+
+def test_evidence_without_trend():
+    ev = build_alert_evidence("dong_tien_rong", "canh_bao", -1.0, None)
+    assert ev.series == [] and ev.coverage_warning == "Không có dữ liệu chuỗi"
+    assert ev.period is None
+    assert ev.anomalies == []
+
+
+def test_evidence_short_coverage_warning_and_anomalies_filtered():
+    trend = Trend(
+        kpi_key="ty_le_su_dung_han_muc",
+        data_coverage=4,
+        series=[P("2026-01", 0.5), P("2026-02", 0.6), P("2026-03", 0.7), P("2026-04", 0.75)],
+        anomalies=[
+            TrendAnomaly(period="2026-01", value=0.5, severity="canh_bao", reason="Spike"),
+            TrendAnomaly(period="2026-04", value=0.75, severity="canh_bao", reason="High usage"),
+        ],
+        source_query_id="t",
+    )
+    # limit=2 means only 2026-03 and 2026-04 will be in series; 2026-01 anomaly must be filtered out
+    ev = build_alert_evidence("ty_le_su_dung_han_muc", "canh_bao", 0.75, trend, limit=2)
+    assert ev.coverage_warning == "Chỉ có 4 tháng dữ liệu, chưa đủ để phân tích xu hướng"
+    assert len(ev.series) == 2
+    assert [p.period for p in ev.series] == ["2026-03", "2026-04"]
+    assert len(ev.anomalies) == 1
+    assert ev.anomalies[0].period == "2026-04"
+    assert ev.threshold_expr == ">= 0.70"
+    assert ev.period == "2026-04"
+
