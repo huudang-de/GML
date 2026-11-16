@@ -11,6 +11,10 @@ from pathlib import Path
 import pytest
 import yaml
 
+from app.knowledge.lint_and_leakage import (
+    check_benchmark_leakage,
+    lint_series_and_role_profiles,
+)
 from app.knowledge.loader import (
     get_kpi,
     get_role_profile,
@@ -19,7 +23,7 @@ from app.knowledge.loader import (
     load_role_profiles,
     load_series_queries,
 )
-from app.knowledge.models import KpiDefinition, RoleProfile, SeriesQuery
+from app.knowledge.models import BenchmarkItem, KpiDefinition, RoleProfile, SeriesQuery
 
 
 def test_series_query_loaded_verbatim_for_du_no_ngan_han():
@@ -199,4 +203,105 @@ def test_all_overview_kpis_exist_in_kpi_definitions():
     for role_name, profile in profiles.items():
         for kpi_key in profile.overview_kpis:
             assert kpi_key in kpis, f"Role {role_name} has unknown overview KPI {kpi_key}"
+
+
+# ---------------------------------------------------------------------------
+# Task 3: TC-T2-08, TC-T2-09, TC-T2-10, M-05b
+# ---------------------------------------------------------------------------
+
+
+def test_tc_t2_08_overview_kpis_accessible():
+    """TC-T2-08: All overview KPIs across all defined role profiles must be accessible via RBAC."""
+    ok, msgs, _ = lint_series_and_role_profiles()
+    assert ok, msgs
+
+
+def test_tc_t2_08_detects_forbidden_overview(tmp_path: Path):
+    """TC-T2-08: Lint detects when a role profile includes an overview KPI not allowed by RBAC."""
+    bad = tmp_path / "rp.yaml"
+    bad.write_text(
+        "quan_ly_kho:\n"
+        "  role: quan_ly_kho\n"
+        "  greeting_title: X\n"
+        "  overview_kpis: [vong_quay_hang_ton_kho]\n"
+        "  suggested_questions: []\n",
+        encoding="utf-8",
+    )
+    ok, msgs, _ = lint_series_and_role_profiles(profiles_path=bad)
+    assert not ok and any("vong_quay_hang_ton_kho" in m for m in msgs)
+
+
+def test_tc_t2_10_series_view_scope_violation(tmp_path: Path):
+    """TC-T2-10: Series query SQL must only access views declared in views_used (views_used ⊆ kpi.nguon_view)."""
+    bad_series = tmp_path / "series_bad.yaml"
+    bad_sql = tmp_path / "bad.sql"
+    bad_sql.write_text(
+        "SELECT t.period, t.value FROM ai_views.ai_v_ton_kho t "
+        "JOIN ai_views.ai_v_bctc b ON t.period = b.period LIMIT 10;",
+        encoding="utf-8",
+    )
+    data = {
+        "queries": [
+            {
+                "id": "S_gia_tri_hang_ton_kho",
+                "kpi_key": "gia_tri_hang_ton_kho",
+                "sql_file": "bad.sql",
+                "views_used": ["ai_v_ton_kho"],
+                "grain": "month",
+            }
+        ]
+    }
+    bad_series.write_text(yaml.dump(data), encoding="utf-8")
+    ok, msgs, _ = lint_series_and_role_profiles(series_index_path=bad_series)
+    assert not ok
+    assert any("ai_v_bctc" in m for m in msgs)
+
+
+def test_tc_t2_09_leakage_message_does_not_echo_test_question(monkeypatch, tmp_path: Path):
+    """TC-T2-09: Suggested-question leakage reporting MUST NOT echo benchmark test item text (C7)."""
+    secret_test_question = "CÂU_HỎI_BẢO_MẬT_BENCHMARK_TEST_XYZ_99999"
+    mock_test_item = BenchmarkItem(
+        id="BENCH_TEST_SECRET_01",
+        loai="sql",
+        do_kho="de",
+        split="test",
+        profile="real",
+        role="ceo",
+        cau_hoi=secret_test_question,
+        reference_sql="SELECT 1;",
+        expected_status="ok",
+        reviewed_by="auditor",
+        reviewed_at="2026-11-08",
+    )
+    import app.knowledge.lint_and_leakage as ll_mod
+    monkeypatch.setattr(ll_mod, "load_benchmark", lambda: [mock_test_item])
+
+    bad_profiles = tmp_path / "rp_leaking.yaml"
+    bad_profiles.write_text(
+        "ceo:\n"
+        "  role: ceo\n"
+        "  greeting_title: Tổng Giám đốc\n"
+        "  overview_kpis: [du_no_ngan_han]\n"
+        f"  suggested_questions: ['{secret_test_question}']\n",
+        encoding="utf-8",
+    )
+    ok, msgs, _ = lint_series_and_role_profiles(profiles_path=bad_profiles)
+    assert not ok
+    assert any("BENCH_TEST_SECRET_01" in m for m in msgs)
+    assert not any(secret_test_question in m for m in msgs)
+
+    # Also test check_benchmark_leakage with custom_corpus directly
+    leak_ok, leak_msgs = check_benchmark_leakage(
+        custom_test_items=[mock_test_item],
+        custom_corpus=[secret_test_question],
+    )
+    assert not leak_ok
+    assert any("BENCH_TEST_SECRET_01" in m for m in leak_msgs)
+    assert not any(secret_test_question in m for m in leak_msgs)
+
+
+def test_m05b_series_coverage_is_full():
+    """M-05b: Series query coverage for all overview KPIs across role profiles must be 1.0 (100%)."""
+    assert lint_series_and_role_profiles()[2] == 1.0
+
 
