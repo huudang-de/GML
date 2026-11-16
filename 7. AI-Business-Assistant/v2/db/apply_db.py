@@ -248,11 +248,11 @@ def apply_all(
         conn.commit()
 
     # 3. Apply schema 'app' migrations
-    mig_path = DB_DIR / "migrations" / "001_init_app_schema.sql"
-    mig_sql = mig_path.read_text(encoding="utf-8")
-    with admin_engine.connect() as conn:
-        conn.execute(sa.text(mig_sql))
-        conn.commit()
+    for mig_path in sorted((DB_DIR / "migrations").glob("*.sql"), key=lambda p: p.name):
+        mig_sql = mig_path.read_text(encoding="utf-8")
+        with admin_engine.connect() as conn:
+            conn.execute(sa.text(mig_sql))
+            conn.commit()
 
 
 def generate_t1_evidence(output_dir: Path | str | None = None) -> tuple[str, str]:
