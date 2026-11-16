@@ -71,6 +71,15 @@ class SeriesQuery(BaseModel):
     grain: Literal["month"] = "month"
 
 
+class RoleProfile(BaseModel):
+    """Business role profile with greeting title, overview KPIs, and suggested questions."""
+
+    role: str
+    greeting_title: str
+    overview_kpis: list[str] = Field(default_factory=list)
+    suggested_questions: list[str] = Field(default_factory=list)
+
+
 class BenchmarkExpectation(BaseModel):
     """Expected evaluation metrics for a benchmark item."""
 

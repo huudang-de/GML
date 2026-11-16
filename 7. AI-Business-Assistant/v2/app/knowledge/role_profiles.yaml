@@ -1,0 +1,55 @@
+# ==============================================================================
+# GML AI Business Assistant v2.0 — Role Profiles Specification
+# Specifications: Spec §5 T2, Task 2 P2r
+# ==============================================================================
+
+ceo:
+  role: ceo
+  greeting_title: "Tổng Giám đốc"
+  overview_kpis:
+    - du_no_ngan_han
+    - ty_le_su_dung_han_muc
+    - tien_va_tuong_duong_tien
+    - dong_tien_rong
+    - gia_tri_phai_thu
+    - gia_tri_hang_ton_kho
+  suggested_questions:
+    - "Tổng dư nợ ngắn hạn tại các ngân hàng hiện tại là bao nhiêu?"
+    - "Tỷ lệ sử dụng hạn mức tín dụng hiện nay đang ở mức an toàn hay cảnh báo?"
+    - "Tình hình tiền và tương đương tiền hiện có đủ đáp ứng chi trả ngắn hạn không?"
+    - "Dòng tiền ròng của công ty trong các tháng gần đây diễn biến như thế nào?"
+
+ke_toan_truong:
+  role: ke_toan_truong
+  greeting_title: "Kế toán trưởng"
+  overview_kpis:
+    - du_no_ngan_han
+    - ty_le_su_dung_han_muc
+    - tien_va_tuong_duong_tien
+    - dong_tien_rong
+    - gia_tri_phai_thu
+    - gia_tri_phai_tra
+  suggested_questions:
+    - "Dư nợ ngắn hạn và tỷ lệ sử dụng hạn mức tín dụng hiện tại là bao nhiêu?"
+    - "Số dư tiền và tương đương tiền hiện tại biến động ra sao?"
+    - "Dòng tiền ròng qua các tháng gần nhất đang âm hay dương?"
+    - "Tổng giá trị phải thu khách hàng và giá trị phải trả nhà cung cấp chênh lệch thế nào?"
+
+quan_ly_kho:
+  role: quan_ly_kho
+  greeting_title: "Quản lý kho"
+  overview_kpis:
+    - gia_tri_hang_ton_kho
+    - so_luong_hang_ton_kho
+    - tong_ma_san_pham
+  suggested_questions:
+    - "Giá trị tồn kho thay đổi thế nào trong 6 tháng gần đây?"
+    - "Tổng số lượng hàng tồn kho tại các kho hiện nay là bao nhiêu?"
+    - "Hiện tại công ty có bao nhiêu mã sản phẩm còn tồn kho?"
+    - "Số lượng và giá trị hàng tồn kho diễn biến thế nào qua các tháng?"
+
+quan_tri_he_thong:
+  role: quan_tri_he_thong
+  greeting_title: "Quản trị hệ thống"
+  overview_kpis: []
+  suggested_questions: []

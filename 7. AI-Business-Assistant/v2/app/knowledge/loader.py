@@ -21,6 +21,7 @@ from app.knowledge.models import (
     GoldenMatch,
     GoldenQuery,
     KpiDefinition,
+    RoleProfile,
     SeriesQuery,
 )
 
@@ -30,6 +31,7 @@ RULES_FILE = KNOWLEDGE_DIR / "business_rules.yaml"
 PLAYBOOKS_FILE = KNOWLEDGE_DIR / "cfo_playbooks.yaml"
 GQ_INDEX_FILE = KNOWLEDGE_DIR / "golden_queries" / "index.yaml"
 SERIES_INDEX_FILE = KNOWLEDGE_DIR / "golden_queries" / "series_index.yaml"
+ROLE_PROFILES_FILE = KNOWLEDGE_DIR / "role_profiles.yaml"
 BENCHMARK_FILE = KNOWLEDGE_DIR.parent.parent / "eval" / "benchmark.yaml"
 
 
@@ -262,6 +264,49 @@ def get_series_query(kpi_key: str) -> Optional[SeriesQuery]:
         return None
     series_dict = load_series_queries()
     return series_dict.get(kpi_key)
+
+
+def _load_role_profiles_from_path(target_path: Path) -> dict[str, RoleProfile]:
+    with open(target_path, "r", encoding="utf-8") as f:
+        raw_data = yaml.safe_load(f) or {}
+
+    profiles: dict[str, RoleProfile] = {}
+    for role_key, data in raw_data.items():
+        if isinstance(data, dict):
+            if "role" not in data:
+                data["role"] = role_key
+            profiles[role_key.strip().lower()] = RoleProfile(**data)
+    return profiles
+
+
+@lru_cache(maxsize=1)
+def _load_role_profiles_default() -> dict[str, RoleProfile]:
+    return _load_role_profiles_from_path(ROLE_PROFILES_FILE)
+
+
+def load_role_profiles(path: Optional[Path] = None) -> dict[str, RoleProfile]:
+    """Load role profiles from role_profiles.yaml.
+
+    Returns dict mapping role_name -> RoleProfile.
+    Bypasses cache when path is explicitly provided.
+    """
+    if path is not None:
+        return _load_role_profiles_from_path(path)
+    return _load_role_profiles_default()
+
+
+def get_role_profile(role: str) -> RoleProfile:
+    """Retrieve profile for a given role, or fallback profile if unknown."""
+    normalized = (role or "").strip().lower()
+    profiles = load_role_profiles()
+    if normalized in profiles:
+        return profiles[normalized]
+    return RoleProfile(
+        role=role,
+        greeting_title="",
+        overview_kpis=[],
+        suggested_questions=[],
+    )
 
 
 def load_benchmark(path: Optional[Path] = None) -> list[BenchmarkItem]:

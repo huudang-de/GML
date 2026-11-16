@@ -13,11 +13,13 @@ import yaml
 
 from app.knowledge.loader import (
     get_kpi,
+    get_role_profile,
     get_series_query,
     load_kpis,
+    load_role_profiles,
     load_series_queries,
 )
-from app.knowledge.models import KpiDefinition, SeriesQuery
+from app.knowledge.models import KpiDefinition, RoleProfile, SeriesQuery
 
 
 def test_series_query_loaded_verbatim_for_du_no_ngan_han():
@@ -110,3 +112,91 @@ def test_load_series_queries_bypasses_cache_when_custom_path_provided(tmp_path: 
     default_res = load_series_queries()
     assert "dummy_kpi" not in default_res
     assert "du_no_ngan_han" in default_res
+
+
+def test_role_profiles_shape():
+    p = get_role_profile("quan_ly_kho")
+    assert p.role == "quan_ly_kho"
+    assert p.greeting_title == "Quản lý kho"
+    assert p.overview_kpis == ["gia_tri_hang_ton_kho", "so_luong_hang_ton_kho", "tong_ma_san_pham"]
+    assert len(p.suggested_questions) == 4
+
+    p_ceo = get_role_profile("ceo")
+    assert p_ceo.role == "ceo"
+    assert p_ceo.greeting_title == "Tổng Giám đốc"
+    assert p_ceo.overview_kpis == [
+        "du_no_ngan_han",
+        "ty_le_su_dung_han_muc",
+        "tien_va_tuong_duong_tien",
+        "dong_tien_rong",
+        "gia_tri_phai_thu",
+        "gia_tri_hang_ton_kho",
+    ]
+    assert len(p_ceo.suggested_questions) == 4
+
+    p_ktt = get_role_profile("ke_toan_truong")
+    assert p_ktt.role == "ke_toan_truong"
+    assert p_ktt.greeting_title == "Kế toán trưởng"
+    assert p_ktt.overview_kpis == [
+        "du_no_ngan_han",
+        "ty_le_su_dung_han_muc",
+        "tien_va_tuong_duong_tien",
+        "dong_tien_rong",
+        "gia_tri_phai_thu",
+        "gia_tri_phai_tra",
+    ]
+    assert len(p_ktt.suggested_questions) == 4
+
+    p_admin = get_role_profile("quan_tri_he_thong")
+    assert p_admin.role == "quan_tri_he_thong"
+    assert p_admin.greeting_title == "Quản trị hệ thống"
+    assert p_admin.overview_kpis == []
+    assert p_admin.suggested_questions == []
+
+    p_unknown = get_role_profile("unknown")
+    assert p_unknown.role == "unknown"
+    assert p_unknown.greeting_title == ""
+    assert p_unknown.overview_kpis == []
+    assert p_unknown.suggested_questions == []
+
+
+def test_get_role_profile_normalizes_role_name():
+    p1 = get_role_profile("  CEO  ")
+    assert p1.role == "ceo"
+    assert p1.greeting_title == "Tổng Giám đốc"
+
+    p2 = get_role_profile("Quan_Ly_Kho")
+    assert p2.role == "quan_ly_kho"
+    assert p2.greeting_title == "Quản lý kho"
+
+
+def test_load_role_profiles_bypasses_cache_when_custom_path_provided(tmp_path: Path):
+    custom_yaml = tmp_path / "custom_role_profiles.yaml"
+    data = {
+        "custom_role": {
+            "role": "custom_role",
+            "greeting_title": "Chuyên viên Tùy chỉnh",
+            "overview_kpis": ["du_no_ngan_han"],
+            "suggested_questions": ["Câu hỏi kiểm thử 1?"],
+        }
+    }
+    custom_yaml.write_text(yaml.dump(data), encoding="utf-8")
+
+    res = load_role_profiles(custom_yaml)
+    assert "custom_role" in res
+    assert res["custom_role"].greeting_title == "Chuyên viên Tùy chỉnh"
+    assert res["custom_role"].overview_kpis == ["du_no_ngan_han"]
+
+    # Default cached loader must remain intact and contain CEO
+    default_res = load_role_profiles()
+    assert "custom_role" not in default_res
+    assert "ceo" in default_res
+
+
+def test_all_overview_kpis_exist_in_kpi_definitions():
+    profiles = load_role_profiles()
+    kpis = load_kpis()
+    for role_name, profile in profiles.items():
+        for kpi_key in profile.overview_kpis:
+            assert kpi_key in kpis, f"Role {role_name} has unknown overview KPI {kpi_key}"
+
