@@ -21,6 +21,7 @@ from app.api.deps import (
     get_request_id,
 )
 from app.api.routers import (
+    actions,
     alerts,
     chat,
     feedback,
@@ -169,6 +170,7 @@ def create_app(
     app.include_router(chat.router)
     app.include_router(kpi.router)
     app.include_router(alerts.router)
+    app.include_router(actions.router)
     app.include_router(feedback.router)
     app.include_router(history.router)
     app.include_router(metrics.router)

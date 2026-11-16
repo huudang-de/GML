@@ -5,7 +5,7 @@ Specifications:
 - Unified Error Envelope: {"error": {"code": str, "message": str, "request_id": str}}
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 from pydantic import BaseModel, Field
 
@@ -159,3 +159,47 @@ class ReadyResponse(BaseModel):
     profile: str
     details: dict[str, Any] = Field(default_factory=dict)
     error: ApiErrorDetail | None = None
+
+
+# ==============================================================================
+# Action Schemas
+# ==============================================================================
+
+class ActionCreateRequest(BaseModel):
+    source_type: Literal["alert", "chat"]
+    source_ref: str
+    kpi_key: str
+    level: Literal["canh_bao", "nghiem_trong"]
+    title: str
+    due_date: date | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class ActionItem(BaseModel):
+    id: int
+    title: str
+    kpi_key: str
+    level: str
+    domain: str
+    source_type: str
+    source_ref: str
+    assigned_role: str
+    status: str
+    due_date: date | None = None
+    note: str | None = None
+    created_by: str
+    created_at: str | datetime
+    updated_at: str | datetime
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ActionListResponse(BaseModel):
+    actions: list[ActionItem]
+    total: int
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ActionUpdateRequest(BaseModel):
+    status: Literal["open", "in_progress", "done", "dismissed"] | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
