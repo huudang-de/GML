@@ -21,6 +21,7 @@ from app.knowledge.models import (
     GoldenMatch,
     GoldenQuery,
     KpiDefinition,
+    SeriesQuery,
 )
 
 KNOWLEDGE_DIR = Path(__file__).resolve().parent
@@ -28,6 +29,7 @@ KPIS_FILE = KNOWLEDGE_DIR / "kpi_definitions.yaml"
 RULES_FILE = KNOWLEDGE_DIR / "business_rules.yaml"
 PLAYBOOKS_FILE = KNOWLEDGE_DIR / "cfo_playbooks.yaml"
 GQ_INDEX_FILE = KNOWLEDGE_DIR / "golden_queries" / "index.yaml"
+SERIES_INDEX_FILE = KNOWLEDGE_DIR / "golden_queries" / "series_index.yaml"
 BENCHMARK_FILE = KNOWLEDGE_DIR.parent.parent / "eval" / "benchmark.yaml"
 
 
@@ -210,6 +212,56 @@ def load_golden_queries(index_path: Optional[Path] = None) -> list[GoldenQuery]:
         golden_list.append(GoldenQuery(**item))
 
     return golden_list
+
+
+def _load_series_queries_from_path(target_path: Path) -> dict[str, SeriesQuery]:
+    with open(target_path, "r", encoding="utf-8") as f:
+        raw_data = yaml.safe_load(f) or {}
+
+    queries_data = raw_data.get("queries", [])
+    series_dict: dict[str, SeriesQuery] = {}
+    base_dir = target_path.parent
+
+    for item in queries_data:
+        sql_file_name = item.get("sql_file", "")
+        series_dir_path = base_dir / "series" / sql_file_name
+        direct_path = base_dir / sql_file_name
+        if series_dir_path.exists():
+            item["sql_text"] = series_dir_path.read_text(encoding="utf-8")
+        elif direct_path.exists():
+            item["sql_text"] = direct_path.read_text(encoding="utf-8")
+        else:
+            item["sql_text"] = ""
+        sq = SeriesQuery(**item)
+        series_dict[sq.kpi_key] = sq
+
+    return series_dict
+
+
+@lru_cache(maxsize=1)
+def _load_series_queries_default() -> dict[str, SeriesQuery]:
+    return _load_series_queries_from_path(SERIES_INDEX_FILE)
+
+
+def load_series_queries(index_path: Optional[Path] = None) -> dict[str, SeriesQuery]:
+    """Load time-series queries from series_index.yaml and populate sql_text from SQL files.
+
+    Returns dict mapping kpi_key -> SeriesQuery.
+    Bypasses cache when index_path is explicitly provided.
+    """
+    if index_path is not None:
+        return _load_series_queries_from_path(index_path)
+    return _load_series_queries_default()
+
+
+def get_series_query(kpi_key: str) -> Optional[SeriesQuery]:
+    """Retrieve canonical time-series query for a KPI key, or None if not defined or has no series_ref."""
+    kpis = load_kpis()
+    kpi = kpis.get(kpi_key)
+    if not kpi or not kpi.series_ref:
+        return None
+    series_dict = load_series_queries()
+    return series_dict.get(kpi_key)
 
 
 def load_benchmark(path: Optional[Path] = None) -> list[BenchmarkItem]:

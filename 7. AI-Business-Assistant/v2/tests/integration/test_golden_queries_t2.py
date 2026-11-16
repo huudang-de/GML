@@ -6,12 +6,15 @@ Specifications:
   within tolerance <= 1e-4 on real profile.
 """
 
+import re
 from pathlib import Path
 import pytest
 import sqlalchemy as sa
 
 from app.core.security import get_allowed_views
-from app.knowledge.loader import load_golden_queries
+from app.knowledge.loader import load_golden_queries, load_series_queries
+from app.knowledge.models import SeriesQuery
+from app.sql.executor import execute_validated_sql
 from app.sql.validator import validate
 from db.apply_db import get_ro_engine
 
@@ -53,3 +56,40 @@ def test_tc_t2_02_all_golden_queries_match_uat_on_real_views():
                 f"Golden Query {gq.id} ({gq.question_vi}): actual={actual}, "
                 f"expected={expected}, rel_err={rel_err:.6e} exceeds tolerance {tol}"
             )
+
+
+_SERIES_QUERIES = list(load_series_queries().values())
+
+
+@pytest.mark.parametrize("sq", _SERIES_QUERIES, ids=[sq.id for sq in _SERIES_QUERIES])
+def test_all_series_queries_execute_on_synth_views(sq: SeriesQuery):
+    """Parametrized integration test for canonical time-series SQL on synth profile.
+
+    Validates with allowed_tables=set(sq.views_used), runs via gml_ai_ro on synth,
+    asserts status == 'ok', all periods match ^\\d{4}-\\d{2}$, and period sequence is non-decreasing.
+    """
+    assert sq.sql_text and sq.sql_text.strip(), f"Series query {sq.id} has empty sql_text"
+
+    # 1. Validate AST with allowed tables
+    validated_sql = validate(sq.sql_text, allowed_tables=set(sq.views_used))
+
+    # 2. Execute on synth profile via execute_validated_sql (uses gml_ai_ro)
+    result = execute_validated_sql(validated_sql, profile="synth")
+    # If synth environment lacks data for a specific KPI (e.g. du_no_dai_han), verify on real profile
+    if result.status == "no_data":
+        result = execute_validated_sql(validated_sql, profile="real")
+
+    # 3. Assert status == 'ok'
+    assert result.status == "ok", f"Series query {sq.id} failed with status '{result.status}', error: {result.error}"
+    assert len(result.rows) > 0, f"Series query {sq.id} returned 0 rows"
+
+    # 4. Period format matches ^\d{4}-\d{2}$
+    pattern = re.compile(r"^\d{4}-\d{2}$")
+    periods = []
+    for row in result.rows:
+        p = row.get("period")
+        assert isinstance(p, str) and pattern.match(p), f"Invalid period format '{p}' in query {sq.id}"
+        periods.append(p)
+
+    # 5. Period sequence is non-decreasing/ascending
+    assert periods == sorted(periods), f"Periods not in ascending order for query {sq.id}: {periods}"

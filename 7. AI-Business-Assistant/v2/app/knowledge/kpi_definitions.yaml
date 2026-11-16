@@ -16,6 +16,7 @@ du_no_ngan_han:
   nguon_view:
     - ai_v_no_vay
   golden_ref: "GQ_01"
+  series_ref: "S_du_no_ngan_han"
   thanh_phan:
     - credit_balance
     - account_no
@@ -33,6 +34,7 @@ du_no_dai_han:
   nguon_view:
     - ai_v_no_vay
   golden_ref: "GQ_02"
+  series_ref: "S_du_no_dai_han"
   thanh_phan:
     - credit_balance
     - account_no
@@ -50,6 +52,7 @@ han_muc_phe_duyet:
   nguon_view:
     - ai_v_no_vay
   golden_ref: "GQ_03"
+  series_ref: "S_han_muc_phe_duyet"
   thanh_phan:
     - credit_limit
   y_nghia: "Tổng hạn mức tín dụng được ngân hàng phê duyệt trong hợp đồng nguyên tắc"
@@ -66,6 +69,7 @@ han_muc_duoc_cap:
   nguon_view:
     - ai_v_no_vay
   golden_ref: "GQ_04"
+  series_ref: "S_han_muc_duoc_cap"
   thanh_phan:
     - granted_limit
   y_nghia: "Tổng hạn mức tín dụng thực tế được ngân hàng cấp phép giải ngân"
@@ -82,6 +86,7 @@ han_muc_con_lai:
   nguon_view:
     - ai_v_no_vay
   golden_ref: "GQ_05"
+  series_ref: "S_han_muc_con_lai"
   thanh_phan:
     - granted_limit
     - principal_balance
@@ -99,6 +104,7 @@ ty_le_su_dung_han_muc:
   nguon_view:
     - ai_v_no_vay
   golden_ref: "GQ_13"
+  series_ref: "S_ty_le_su_dung_han_muc"
   thanh_phan:
     - principal_balance
     - granted_limit
@@ -137,6 +143,7 @@ ty_le_no_tren_tong_nguon_von:
   nguon_view:
     - ai_v_bctc
   golden_ref: "GQ_08_DE"
+  series_ref: "S_ty_le_no_tren_tong_nguon_von"
   thanh_phan:
     - B01-DN_300
     - B01-DN_440
@@ -159,6 +166,7 @@ so_luong_hang_ton_kho:
   nguon_view:
     - ai_v_ton_kho
   golden_ref: "GQ_09_INV_QTY"
+  series_ref: "S_so_luong_hang_ton_kho"
   thanh_phan:
     - quantity
   y_nghia: "Tổng số lượng vật tư, hàng hóa và thành phẩm đang lưu kho tại ngày chốt số liệu"
@@ -175,6 +183,7 @@ gia_tri_hang_ton_kho:
   nguon_view:
     - ai_v_ton_kho
   golden_ref: "GQ_10_INV_VAL"
+  series_ref: "S_gia_tri_hang_ton_kho"
   thanh_phan:
     - total_value
   y_nghia: "Tổng giá trị quy đổi thành tiền của hàng tồn kho tại ngày chốt số liệu"
@@ -231,6 +240,7 @@ tong_ma_san_pham:
   nguon_view:
     - ai_v_ton_kho
   golden_ref: "GQ_13_SKU_CNT"
+  series_ref: "S_tong_ma_san_pham"
   thanh_phan:
     - product_code
   y_nghia: "Số lượng mã SKU mặt hàng gỗ và phụ liệu còn số lượng tồn kho dương"
@@ -267,6 +277,7 @@ gia_tri_phai_thu:
   nguon_view:
     - ai_v_cong_no
   golden_ref: "GQ_15_AR_VAL"
+  series_ref: "S_gia_tri_phai_thu"
   thanh_phan:
     - ending_debit_balance
     - partner_group
@@ -284,6 +295,7 @@ gia_tri_phai_tra:
   nguon_view:
     - ai_v_cong_no
   golden_ref: "GQ_16_AP_VAL"
+  series_ref: "S_gia_tri_phai_tra"
   thanh_phan:
     - ending_credit_balance
     - partner_group
@@ -379,6 +391,7 @@ tien_va_tuong_duong_tien:
   nguon_view:
     - ai_v_bctc
   golden_ref: "GQ_07"
+  series_ref: "S_tien_va_tuong_duong_tien"
   thanh_phan:
     - B01-DN_110
   y_nghia: "Tổng quỹ tiền mặt, tiền gửi ngân hàng thanh toán và các khoản tương đương tiền chốt sổ"
@@ -468,6 +481,7 @@ dong_tien_ra:
   nguon_view:
     - ai_v_dong_tien
   golden_ref: "GQ_26_CASH_OUT"
+  series_ref: "S_dong_tien_ra"
   thanh_phan:
     - credit_amount
   y_nghia: "Tổng dòng tiền thực tế chi ra ngoài doanh nghiệp (đã loại trừ chuyển tiền nội bộ)"
@@ -484,6 +498,7 @@ dong_tien_vao:
   nguon_view:
     - ai_v_dong_tien
   golden_ref: "GQ_27_CASH_IN"
+  series_ref: "S_dong_tien_vao"
   thanh_phan:
     - debit_amount
   y_nghia: "Tổng dòng tiền thực tế thu vào doanh nghiệp từ khách hàng và đối tác"
@@ -500,6 +515,7 @@ dong_tien_rong:
   nguon_view:
     - ai_v_dong_tien
   golden_ref: "GQ_28_NET_CASH"
+  series_ref: "S_dong_tien_rong"
   thanh_phan:
     - debit_amount
     - credit_amount
