@@ -3,6 +3,7 @@
 Adheres to:
 - Spec §11.9 (Role-to-View Authorization Matrix)
 - Plan Task 1 / Task 2 interfaces
+- Plan Task 3 / P1r interfaces (KPI-level RBAC and domain mapping)
 """
 
 from pathlib import Path
@@ -12,6 +13,14 @@ import yaml
 Role = Literal["ceo", "ke_toan_truong", "quan_ly_kho", "quan_tri_he_thong"]
 
 DEFAULT_CATALOG_PATH = Path(__file__).resolve().parent.parent.parent / "db" / "catalog.yaml"
+
+DOMAIN_BY_DASHBOARD: dict[str, str] = {
+    "D1": "no_vay",
+    "D2": "kho",
+    "D3": "cong_no",
+    "D4": "tien_gui",
+    "D5": "dong_tien",
+}
 
 
 def load_catalog(catalog_path: Optional[Path] = None) -> dict:
@@ -56,3 +65,54 @@ def get_allowed_views(role: str, catalog_path: Optional[Path] = None) -> Set[str
             allowed.add(view_name)
 
     return allowed
+
+
+def can_access_kpi(role: str, kpi_key: str) -> bool:
+    """Check if a given role has permission to access the specified KPI.
+
+    Uses KPI definition source views: required views must be a subset of allowed views for the role.
+    If the KPI key is not found in the knowledge base, falls back to role in ('ceo', 'quan_tri_he_thong').
+    Import get_kpi lazily to prevent circular imports with knowledge.loader.
+
+    Args:
+        role: Role identifier string (e.g. 'ceo', 'quan_ly_kho').
+        kpi_key: Identifier key of the KPI.
+
+    Returns:
+        bool: True if authorized, False otherwise.
+    """
+    from app.knowledge.loader import get_kpi
+
+    try:
+        kpi_def = get_kpi(kpi_key)
+        required_views = set(kpi_def.nguon_view)
+        allowed_views = get_allowed_views(role)
+        return required_views.issubset(allowed_views)
+    except KeyError:
+        return role in ("ceo", "quan_tri_he_thong")
+
+
+def kpi_domain(kpi_key: str) -> str:
+    """Return the operational domain for a given KPI key.
+
+    Maps dashboard identifier (D1-D5) to domain string:
+    - D1 -> no_vay
+    - D2 -> kho
+    - D3 -> cong_no
+    - D4 -> tien_gui
+    - D5 -> dong_tien
+
+    Raises:
+        KeyError: If kpi_key is not found in knowledge base.
+        ValueError: If the KPI definition specifies an unknown dashboard.
+    """
+    from app.knowledge.loader import get_kpi
+
+    kpi_def = get_kpi(kpi_key)
+    if kpi_def.dashboard not in DOMAIN_BY_DASHBOARD:
+        raise ValueError(
+            f"Unknown dashboard '{kpi_def.dashboard}' for KPI '{kpi_key}'. "
+            f"Expected one of {list(DOMAIN_BY_DASHBOARD.keys())}."
+        )
+    return DOMAIN_BY_DASHBOARD[kpi_def.dashboard]
+

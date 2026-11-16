@@ -19,22 +19,10 @@ from app.api.deps import (
 from app.api.schemas import AlertAckResponse, AlertItem, AlertListResponse
 from app.core.auth import UserPrincipal
 from app.core.config import Settings, get_settings
-from app.core.security import get_allowed_views
-from app.knowledge.loader import get_kpi
+from app.core.security import can_access_kpi
 from db.apply_db import get_app_engine
 
 router = APIRouter(prefix="/v1/alerts", tags=["Alerts"], dependencies=[Depends(check_rate_limit)])
-
-
-def _user_can_access_kpi(role: str, kpi_key: str) -> bool:
-    """Check if role has access to view/ack alerts for a given KPI key."""
-    try:
-        kpi_def = get_kpi(kpi_key)
-        required_views = set(kpi_def.nguon_view)
-        allowed_views = get_allowed_views(role)
-        return required_views.issubset(allowed_views)
-    except KeyError:
-        return role in ("ceo", "quan_tri_he_thong")
 
 
 @router.get("", response_model=AlertListResponse)
@@ -62,7 +50,7 @@ def list_alerts(
 
     items: list[AlertItem] = []
     for r in rows:
-        if not _user_can_access_kpi(user.role, r.kpi_key):
+        if not can_access_kpi(user.role, r.kpi_key):
             continue  # Strictly hide unauthorized alert
 
         created_str = r.created_at.isoformat() if isinstance(r.created_at, datetime) else str(r.created_at)
@@ -128,7 +116,7 @@ def acknowledge_alert(
         )
 
     # 2. Check RBAC for this alert's KPI
-    if not _user_can_access_kpi(user.role, alert_row.kpi_key):
+    if not can_access_kpi(user.role, alert_row.kpi_key):
         write_audit_log(
             engine=app_engine,
             user_id=user.user_id,
