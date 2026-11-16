@@ -11,6 +11,15 @@ import httpx
 _DEFAULT_TEST_TRANSPORT: httpx.BaseTransport | None = None
 
 
+class ApiClientError(httpx.HTTPError):
+    """Exception raised by HttpApiClient when an API call fails."""
+
+    def __init__(self, message: str = "", status_code: int | None = None, response: httpx.Response | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.response = response
+
+
 def set_default_transport_for_testing(transport: httpx.BaseTransport | None) -> None:
     """Set process-wide mock transport for in-process testing."""
     global _DEFAULT_TEST_TRANSPORT
@@ -46,6 +55,19 @@ class HttpApiClient:
             timeout=timeout,
         )
 
+    def _handle_response(self, resp: httpx.Response) -> Any:
+        try:
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as exc:
+            raise ApiClientError(
+                f"HTTP {exc.response.status_code}: {exc.response.text}",
+                status_code=exc.response.status_code,
+                response=exc.response,
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise ApiClientError(f"HTTP error: {exc}") from exc
+
     def chat(
         self,
         query: str,
@@ -60,26 +82,50 @@ class HttpApiClient:
             payload["data_profile"] = data_profile
 
         resp = self._client.post("/v1/chat", json=payload)
-        resp.raise_for_status()
-        return resp.json()
+        return self._handle_response(resp)
 
-    def get_kpi(self, kpi_key: str, profile: str | None = None) -> dict[str, Any]:
+    def get_overview(self, profile: str | None = None) -> dict[str, Any]:
+        """Retrieve executive overview from GET /v1/overview."""
+        params: dict[str, str] = {}
+        if profile:
+            params["profile"] = profile
+        resp = self._client.get("/v1/overview", params=params)
+        return self._handle_response(resp)
+
+    def get_kpi(
+        self,
+        kpi_key: str,
+        profile: str | None = None,
+        include_series: bool = False,
+    ) -> dict[str, Any]:
         """Retrieve deterministic KPI value from GET /v1/kpi/{kpi_key}."""
         params: dict[str, str] = {}
         if profile:
             params["profile"] = profile
+        if include_series:
+            params["include"] = "series"
         resp = self._client.get(f"/v1/kpi/{kpi_key}", params=params)
-        resp.raise_for_status()
-        return resp.json()
+        return self._handle_response(resp)
 
-    def list_alerts(self, profile: str | None = None) -> list[dict[str, Any]]:
-        """Retrieve active operational alerts from GET /v1/alerts."""
+    def list_alerts(
+        self,
+        profile: str | None = None,
+        domain: str | None = None,
+        severity: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Retrieve operational alerts from GET /v1/alerts."""
         params: dict[str, str] = {}
         if profile:
             params["profile"] = profile
+        if domain:
+            params["domain"] = domain
+        if severity:
+            params["severity"] = severity
+        if status:
+            params["status"] = status
         resp = self._client.get("/v1/alerts", params=params)
-        resp.raise_for_status()
-        data = resp.json()
+        data = self._handle_response(resp)
         return data.get("alerts", [])
 
     def ack_alert(self, alert_id: int, profile: str | None = None) -> dict[str, Any]:
@@ -88,8 +134,68 @@ class HttpApiClient:
         if profile:
             params["profile"] = profile
         resp = self._client.post(f"/v1/alerts/{alert_id}/ack", params=params)
-        resp.raise_for_status()
-        return resp.json()
+        return self._handle_response(resp)
+
+    def list_actions(
+        self,
+        profile: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Retrieve operational action items from GET /v1/actions."""
+        params: dict[str, str] = {}
+        if profile:
+            params["profile"] = profile
+        if status:
+            params["status"] = status
+        resp = self._client.get("/v1/actions", params=params)
+        data = self._handle_response(resp)
+        return data.get("actions", [])
+
+    def create_action(self, payload: dict[str, Any], profile: str | None = None) -> dict[str, Any]:
+        """Create an action item via POST /v1/actions."""
+        params: dict[str, str] = {}
+        if profile:
+            params["profile"] = profile
+        resp = self._client.post("/v1/actions", json=payload, params=params)
+        return self._handle_response(resp)
+
+    def update_action(
+        self,
+        action_id: int,
+        payload: dict[str, Any],
+        profile: str | None = None,
+    ) -> dict[str, Any]:
+        """Update an action item via PATCH /v1/actions/{action_id}."""
+        params: dict[str, str] = {}
+        if profile:
+            params["profile"] = profile
+        resp = self._client.patch(f"/v1/actions/{action_id}", json=payload, params=params)
+        return self._handle_response(resp)
+
+    def list_pins(self, profile: str | None = None) -> list[dict[str, Any]]:
+        """Retrieve pinned KPIs from GET /v1/pins."""
+        params: dict[str, str] = {}
+        if profile:
+            params["profile"] = profile
+        resp = self._client.get("/v1/pins", params=params)
+        data = self._handle_response(resp)
+        return data.get("pins", [])
+
+    def add_pin(self, kpi_key: str, profile: str | None = None) -> dict[str, Any]:
+        """Pin a KPI via POST /v1/pins."""
+        params: dict[str, str] = {}
+        if profile:
+            params["profile"] = profile
+        resp = self._client.post("/v1/pins", json={"kpi_key": kpi_key}, params=params)
+        return self._handle_response(resp)
+
+    def remove_pin(self, kpi_key: str, profile: str | None = None) -> dict[str, Any]:
+        """Unpin a KPI via DELETE /v1/pins/{kpi_key}."""
+        params: dict[str, str] = {}
+        if profile:
+            params["profile"] = profile
+        resp = self._client.delete(f"/v1/pins/{kpi_key}", params=params)
+        return self._handle_response(resp)
 
     def submit_feedback(
         self,
@@ -108,8 +214,7 @@ class HttpApiClient:
             "comment": note,
         }
         resp = self._client.post("/v1/feedback", json=payload, params=params)
-        resp.raise_for_status()
-        return resp.json()
+        return self._handle_response(resp)
 
     def get_history(
         self,
@@ -123,8 +228,7 @@ class HttpApiClient:
         if profile:
             params["profile"] = profile
         resp = self._client.get("/v1/history", params=params)
-        resp.raise_for_status()
-        data = resp.json()
+        data = self._handle_response(resp)
         return data.get("turns", [])
 
     def clear_history(
@@ -139,14 +243,12 @@ class HttpApiClient:
         if profile:
             params["profile"] = profile
         resp = self._client.delete("/v1/history", params=params)
-        resp.raise_for_status()
-        return resp.json()
+        return self._handle_response(resp)
 
     def health(self) -> dict[str, Any]:
         """Check API gateway health via GET /health."""
         resp = self._client.get("/health")
-        resp.raise_for_status()
-        return resp.json()
+        return self._handle_response(resp)
 
     def close(self) -> None:
         """Close HTTP client connection."""

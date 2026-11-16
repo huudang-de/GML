@@ -51,6 +51,7 @@ def setup_api_transport():
 def test_tc_t6_01_chat_displays_dual_output():
     """TC-T6-01: User submits query in AppTest; verifies dual output: summary text, figures table, SQL expander, sources, and confidence badge."""
     at = AppTest.from_file(APP_PATH)
+    at.query_params["screen"] = "chat"
     at.run(timeout=35)
     assert not at.exception
 
@@ -81,6 +82,7 @@ def test_tc_t6_01_chat_displays_dual_output():
 def test_tc_t6_02_synthetic_profile_always_renders_simulation_banner():
     """TC-T6-02: Profile synth (or URL param profile=synth) ALWAYS renders warning banner containing exact substring 'DỮ LIỆU MÔ PHỎNG'."""
     at = AppTest.from_file(APP_PATH)
+    at.query_params["screen"] = "chat"
     at.query_params["profile"] = "synth"
     at.run(timeout=35)
     assert not at.exception
@@ -133,6 +135,7 @@ def test_tc_t6_03_alert_center_ack_calls_post_ack_and_updates_status():
 def test_tc_t6_04_thumbs_down_feedback_persists_to_app_feedback_with_request_id():
     """TC-T6-04: Clicking 👎 + entering feedback note + submitting calls POST /v1/feedback and inserts row in app.feedback."""
     at = AppTest.from_file(APP_PATH)
+    at.query_params["screen"] = "chat"
     at.run(timeout=35)
     assert not at.exception
 
