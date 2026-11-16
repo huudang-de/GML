@@ -29,6 +29,7 @@ from app.api.routers import (
     history,
     kpi,
     metrics,
+    pins,
 )
 from app.core.config import Settings, get_settings
 from app.core.errors import sanitize_db_error
@@ -171,6 +172,7 @@ def create_app(
     app.include_router(kpi.router)
     app.include_router(alerts.router)
     app.include_router(actions.router)
+    app.include_router(pins.router)
     app.include_router(feedback.router)
     app.include_router(history.router)
     app.include_router(metrics.router)

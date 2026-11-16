@@ -203,3 +203,30 @@ class ActionUpdateRequest(BaseModel):
     status: Literal["open", "in_progress", "done", "dismissed"] | None = None
     note: str | None = Field(default=None, max_length=1000)
 
+
+# ==============================================================================
+# Pin Schemas
+# ==============================================================================
+
+class PinRequest(BaseModel):
+    kpi_key: str
+
+
+class PinItem(BaseModel):
+    kpi_key: str
+    position: int
+    created_at: str | datetime
+    warnings: list[str] = Field(default_factory=list)
+
+
+class PinListResponse(BaseModel):
+    pins: list[PinItem]
+    total: int
+    warnings: list[str] = Field(default_factory=list)
+
+
+class PinDeleteResponse(BaseModel):
+    deleted: int
+    warnings: list[str] = Field(default_factory=list)
+
+

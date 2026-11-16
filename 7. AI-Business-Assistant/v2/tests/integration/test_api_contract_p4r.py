@@ -630,3 +630,181 @@ def test_audit_has_no_title_or_note(client_ceo, seed_alert_id, approved_text_nt)
         assert unique_title_part not in q
         assert approved_text_nt not in q
 
+
+# ==============================================================================
+# Task 4: /v1/pins Contract Tests
+# ==============================================================================
+
+@pytest.fixture(autouse=True)
+def clean_pinned_kpis():
+    """Ensure app.pinned_kpi is wiped in both real and synth profiles around each test."""
+    for p in ("real", "synth"):
+        eng = get_app_engine(profile=p)
+        with eng.begin() as conn:
+            conn.execute(sa.text("DELETE FROM app.pinned_kpi"))
+    yield
+    for p in ("real", "synth"):
+        eng = get_app_engine(profile=p)
+        with eng.begin() as conn:
+            conn.execute(sa.text("DELETE FROM app.pinned_kpi"))
+
+
+def test_pin_scoped_by_profile(client_ceo):
+    # 1. Pin on real profile
+    r_real = client_ceo.post("/v1/pins?profile=real", json={"kpi_key": "gia_tri_phai_tra"})
+    assert r_real.status_code == 201
+    assert "SYNTHETIC_DATA" not in r_real.json().get("warnings", [])
+
+    # 2. Get pins on synth profile -> should not see real pin, warnings must have SYNTHETIC_DATA
+    res_synth = client_ceo.get("/v1/pins?profile=synth")
+    assert res_synth.status_code == 200
+    synth_body = res_synth.json()
+    assert [p["kpi_key"] for p in synth_body["pins"]] == []
+    assert synth_body["total"] == 0
+    assert "SYNTHETIC_DATA" in synth_body["warnings"]
+
+    # 3. Pin on synth profile
+    r_synth = client_ceo.post("/v1/pins?profile=synth", json={"kpi_key": "gia_tri_phai_tra"})
+    assert r_synth.status_code == 201
+    assert "SYNTHETIC_DATA" in r_synth.json()["warnings"]
+
+    # 4. Verify synth pins now has the pin
+    res_synth2 = client_ceo.get("/v1/pins?profile=synth")
+    assert res_synth2.status_code == 200
+    assert [p["kpi_key"] for p in res_synth2.json()["pins"]] == ["gia_tri_phai_tra"]
+    assert "SYNTHETIC_DATA" in res_synth2.json()["warnings"]
+
+    # 5. Verify real pins is intact and without SYNTHETIC_DATA
+    res_real2 = client_ceo.get("/v1/pins?profile=real")
+    assert res_real2.status_code == 200
+    assert [p["kpi_key"] for p in res_real2.json()["pins"]] == ["gia_tri_phai_tra"]
+    assert "SYNTHETIC_DATA" not in res_real2.json().get("warnings", [])
+
+
+def test_pin_idempotent_and_forbidden(client_ceo, client_kho):
+    req_1 = f"req-test-pin-1-{uuid.uuid4().hex[:8]}"
+    req_2 = f"req-test-pin-2-{uuid.uuid4().hex[:8]}"
+    req_forbid = f"req-test-pin-forbid-{uuid.uuid4().hex[:8]}"
+    req_unk = f"req-test-pin-unk-{uuid.uuid4().hex[:8]}"
+
+    # 1. First pin -> 201 Created
+    r1 = client_ceo.post(
+        "/v1/pins?profile=synth",
+        json={"kpi_key": "gia_tri_phai_tra"},
+        headers={"X-Request-ID": req_1},
+    )
+    assert r1.status_code == 201
+    b1 = r1.json()
+    assert b1["position"] == 1
+    assert b1["kpi_key"] == "gia_tri_phai_tra"
+    assert "created_at" in b1
+    assert "SYNTHETIC_DATA" in b1["warnings"]
+    assert audit_rows_for(req_1, profile="synth") == 1
+
+    # 2. Second pin (same kpi_key) -> 200 OK (idempotent, same position and created_at)
+    r2 = client_ceo.post(
+        "/v1/pins?profile=synth",
+        json={"kpi_key": "gia_tri_phai_tra"},
+        headers={"X-Request-ID": req_2},
+    )
+    assert r2.status_code == 200
+    b2 = r2.json()
+    assert b2["position"] == b1["position"]
+    assert b2["created_at"] == b1["created_at"]
+    assert b2["kpi_key"] == "gia_tri_phai_tra"
+    assert "SYNTHETIC_DATA" in b2["warnings"]
+    assert audit_rows_for(req_2, profile="synth") == 1
+
+    # 3. Forbidden KPI for warehouse manager (kho cannot access finance KPI du_no_ngan_han)
+    r_forbid = client_kho.post(
+        "/v1/pins?profile=synth",
+        json={"kpi_key": "du_no_ngan_han"},
+        headers={"X-Request-ID": req_forbid},
+    )
+    assert r_forbid.status_code == 403
+    assert r_forbid.json()["error"]["code"] == "FORBIDDEN"
+    assert audit_rows_for(req_forbid, profile="synth") == 1
+
+    # 4. Unknown KPI -> 404 KPI_NOT_FOUND (checked before can_access_kpi)
+    r_unk = client_ceo.post(
+        "/v1/pins?profile=synth",
+        json={"kpi_key": "kpi_khong_ton_tai"},
+        headers={"X-Request-ID": req_unk},
+    )
+    assert r_unk.status_code == 404
+    assert r_unk.json()["error"]["code"] == "KPI_NOT_FOUND"
+    assert audit_rows_for(req_unk, profile="synth") == 1
+
+
+def test_delete_pin_and_ordering(client_ceo):
+    kpis = ["gia_tri_phai_tra", "gia_tri_phai_thu", "ty_le_su_dung_han_muc"]
+
+    # 1. Pin 3 KPIs in order on real profile
+    for i, k in enumerate(kpis, start=1):
+        res = client_ceo.post("/v1/pins?profile=real", json={"kpi_key": k})
+        assert res.status_code == 201
+        assert res.json()["position"] == i
+
+    # 2. Check ordering on GET /v1/pins
+    list_res = client_ceo.get("/v1/pins?profile=real")
+    assert list_res.status_code == 200
+    items = list_res.json()["pins"]
+    assert [p["kpi_key"] for p in items] == kpis
+    assert [p["position"] for p in items] == [1, 2, 3]
+
+    # 3. Also pin kpis[1] on synth profile
+    r_synth = client_ceo.post("/v1/pins?profile=synth", json={"kpi_key": kpis[1]})
+    assert r_synth.status_code == 201
+
+    # 4. DELETE kpis[1] on real -> returns deleted=1
+    del_req_1 = f"req-test-del-1-{uuid.uuid4().hex[:8]}"
+    del_res1 = client_ceo.delete(
+        f"/v1/pins/{kpis[1]}?profile=real",
+        headers={"X-Request-ID": del_req_1},
+    )
+    assert del_res1.status_code == 200
+    assert del_res1.json()["deleted"] == 1
+    assert "SYNTHETIC_DATA" not in del_res1.json().get("warnings", [])
+    assert audit_rows_for(del_req_1, profile="real") == 1
+
+    # 5. DELETE kpis[1] again on real -> returns deleted=0
+    del_req_2 = f"req-test-del-2-{uuid.uuid4().hex[:8]}"
+    del_res2 = client_ceo.delete(
+        f"/v1/pins/{kpis[1]}?profile=real",
+        headers={"X-Request-ID": del_req_2},
+    )
+    assert del_res2.status_code == 200
+    assert del_res2.json()["deleted"] == 0
+    assert audit_rows_for(del_req_2, profile="real") == 1
+
+    # 6. Verify synth profile is unaffected
+    synth_pins = client_ceo.get("/v1/pins?profile=synth").json()["pins"]
+    assert [p["kpi_key"] for p in synth_pins] == [kpis[1]]
+
+    # 7. Verify real profile now has remaining 2 pins in order
+    real_pins = client_ceo.get("/v1/pins?profile=real").json()["pins"]
+    assert [p["kpi_key"] for p in real_pins] == [kpis[0], kpis[2]]
+
+
+def test_get_pins_filters_by_rbac(client_kho):
+    # Directly seed pins in DB: one restricted (du_no_ngan_han) and one permitted (gia_tri_hang_ton_kho)
+    engine = get_app_engine(profile="real")
+    with engine.begin() as conn:
+        conn.execute(
+            sa.text("""
+                INSERT INTO app.pinned_kpi (user_id, data_profile, kpi_key, position)
+                VALUES
+                    ('usr_kho', 'real', 'du_no_ngan_han', 1),
+                    ('usr_kho', 'real', 'gia_tri_hang_ton_kho', 2)
+            """)
+        )
+
+    # kho role should only see gia_tri_hang_ton_kho, du_no_ngan_han is filtered out by RBAC
+    res = client_kho.get("/v1/pins?profile=real")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["total"] == 1
+    assert len(body["pins"]) == 1
+    assert body["pins"][0]["kpi_key"] == "gia_tri_hang_ton_kho"
+
+
