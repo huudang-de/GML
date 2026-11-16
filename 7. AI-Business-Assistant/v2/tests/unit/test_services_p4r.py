@@ -155,3 +155,85 @@ def test_series_cache_does_not_collide_with_value(cache, settings):
 
     assert isinstance(val_entry, dict)
     assert isinstance(series_entry, SeriesSummary)
+
+
+# ==============================================================================
+# Task 5: build_briefing Unit Tests
+# ==============================================================================
+
+from app.api.schemas import OverviewKpiCard, OverviewResponse
+from app.core.auth import UserPrincipal
+from app.services.briefing import build_briefing
+from db.apply_db import get_app_engine
+import sqlalchemy as sa
+
+
+def test_build_briefing_direct_structure_and_counts(cache, settings):
+    user = UserPrincipal(user_id="usr_ceo", role="ceo", display_name="Nguyễn Văn A (CEO)")
+    app_engine = get_app_engine(profile="synth")
+
+    resp = build_briefing(user=user, profile="synth", settings=settings, cache=cache, app_engine=app_engine)
+
+    assert isinstance(resp, OverviewResponse)
+    assert resp.greeting_title == "Tổng Giám đốc"
+    assert resp.data_profile == "synth"
+    assert resp.as_of_date == str(settings.as_of_date)
+    assert "SYNTHETIC_DATA" in resp.warnings
+    assert isinstance(resp.open_alerts, dict)
+    assert "nghiem_trong" in resp.open_alerts
+    assert "canh_bao" in resp.open_alerts
+    assert isinstance(resp.open_actions, int)
+    assert len(resp.kpis) > 0
+    assert len(resp.suggested_questions) > 0
+    # Every card must be an OverviewKpiCard
+    for c in resp.kpis:
+        assert isinstance(c, OverviewKpiCard)
+        assert c.domain is not None
+
+
+def test_build_briefing_one_failing_kpi_isolated(cache, settings, monkeypatch):
+    import app.services.briefing as briefing_mod
+    orig_val = briefing_mod.compute_kpi_value
+
+    def fake_compute_val(key, *args, **kwargs):
+        if key == "dong_tien_rong":
+            raise KpiComputationError("Simulated query timeout on dong_tien_rong")
+        return orig_val(key, *args, **kwargs)
+
+    monkeypatch.setattr(briefing_mod, "compute_kpi_value", fake_compute_val)
+
+    user = UserPrincipal(user_id="usr_ceo", role="ceo", display_name="CEO")
+    app_engine = get_app_engine(profile="synth")
+
+    resp = briefing_mod.build_briefing(user=user, profile="synth", settings=settings, cache=cache, app_engine=app_engine)
+
+    failed_card = next((c for c in resp.kpis if c.kpi_key == "dong_tien_rong"), None)
+    assert failed_card is not None
+    assert failed_card.value is None
+    assert "Simulated query timeout" in (failed_card.error or "")
+    assert failed_card.kpi_name is not None  # metadata preserved from get_kpi
+
+    # Other cards must succeed
+    other_cards = [c for c in resp.kpis if c.kpi_key != "dong_tien_rong"]
+    assert len(other_cards) > 0
+    assert any(c.value is not None for c in other_cards)
+    assert all(c.error is None for c in other_cards)
+
+
+def test_build_briefing_uncatalogued_alert_safety(cache, settings):
+    app_engine = get_app_engine(profile="synth")
+    # Seed an uncatalogued alert
+    with app_engine.begin() as conn:
+        conn.execute(
+            sa.text("""
+                INSERT INTO app.alert_event (rule_id, kpi_key, severity, message, value, threshold, is_acknowledged, created_at)
+                VALUES ('TEST_UNCAT', 'uncatalogued_metric_999', 'nghiem_trong', 'Uncatalogued metric alert', 99.0, 50.0, FALSE, now());
+            """)
+        )
+
+    user = UserPrincipal(user_id="usr_ceo", role="ceo", display_name="CEO")
+    # Must not raise KeyError or crash
+    resp = build_briefing(user=user, profile="synth", settings=settings, cache=cache, app_engine=app_engine)
+    assert isinstance(resp, OverviewResponse)
+    assert resp.open_alerts["nghiem_trong"] >= 1
+

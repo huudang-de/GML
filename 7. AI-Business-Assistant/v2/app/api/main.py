@@ -29,6 +29,7 @@ from app.api.routers import (
     history,
     kpi,
     metrics,
+    overview,
     pins,
 )
 from app.core.config import Settings, get_settings
@@ -171,6 +172,7 @@ def create_app(
     app.include_router(chat.router)
     app.include_router(kpi.router)
     app.include_router(alerts.router)
+    app.include_router(overview.router)
     app.include_router(actions.router)
     app.include_router(pins.router)
     app.include_router(feedback.router)

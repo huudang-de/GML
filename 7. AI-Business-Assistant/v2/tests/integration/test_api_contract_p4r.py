@@ -808,3 +808,123 @@ def test_get_pins_filters_by_rbac(client_kho):
     assert body["pins"][0]["kpi_key"] == "gia_tri_hang_ton_kho"
 
 
+# ==============================================================================
+# Task 5: /v1/overview Contract Tests
+# ==============================================================================
+
+@pytest.fixture
+def client_kho_synth():
+    settings = Settings(data_profile="synth")
+    app = create_app(settings=settings)
+    return TestClient(app, headers={"Authorization": "Bearer gml-dev-token-kho"})
+
+
+@pytest.fixture
+def client_ktt_synth():
+    settings = Settings(data_profile="synth")
+    app = create_app(settings=settings)
+    return TestClient(app, headers={"Authorization": "Bearer gml-dev-token-ktt"})
+
+
+@pytest.fixture
+def client_admin():
+    app = create_app()
+    return TestClient(app, headers={"Authorization": "Bearer gml-dev-token-admin"})
+
+
+def test_tc_t5_12_one_failing_kpi_does_not_break_overview(monkeypatch, client_ceo_synth):
+    import app.services.briefing as briefing_mod
+    orig_val = briefing_mod.compute_kpi_value
+
+    def fake_compute_val(key, *args, **kwargs):
+        if key == "dong_tien_rong":
+            raise briefing_mod.KpiComputationError("Simulated golden failure on dong_tien_rong")
+        return orig_val(key, *args, **kwargs)
+
+    monkeypatch.setattr(briefing_mod, "compute_kpi_value", fake_compute_val)
+
+    r = client_ceo_synth.get("/v1/overview?profile=synth")
+    assert r.status_code == 200
+    b = r.json()
+    card = next((c for c in b["kpis"] if c["kpi_key"] == "dong_tien_rong"), None)
+    assert card is not None
+    assert card["error"] is not None
+    assert "Simulated golden failure" in card["error"]
+    assert any(c["value"] is not None for c in b["kpis"] if c["kpi_key"] != "dong_tien_rong")
+
+
+def test_overview_role_scoping(client_kho_synth):
+    r = client_kho_synth.get("/v1/overview?profile=synth")
+    assert r.status_code == 200
+    b = r.json()
+    assert [c["kpi_key"] for c in b["kpis"]] == [
+        "gia_tri_hang_ton_kho",
+        "so_luong_hang_ton_kho",
+        "tong_ma_san_pham",
+    ]
+    assert all(a["domain"] == "kho" for a in b["top_alerts"])
+    assert b["greeting_title"] == "Quản lý kho"
+
+
+def test_overview_includes_pins_after_profile_kpis(client_ktt_synth):
+    # KTT defaults: du_no_ngan_han, ty_le_su_dung_han_muc, tien_va_tuong_duong_tien, dong_tien_rong, gia_tri_phai_thu, gia_tri_phai_tra
+    # Pin du_no_dai_han (valid for KTT, not in overview_kpis)
+    # Pin du_no_ngan_han (already in overview_kpis)
+    r1 = client_ktt_synth.post("/v1/pins?profile=synth", json={"kpi_key": "du_no_ngan_han"})
+    assert r1.status_code in (200, 201)
+    r2 = client_ktt_synth.post("/v1/pins?profile=synth", json={"kpi_key": "du_no_dai_han"})
+    assert r2.status_code in (200, 201)
+
+    r = client_ktt_synth.get("/v1/overview?profile=synth")
+    assert r.status_code == 200
+    b = r.json()
+    kpi_keys = [c["kpi_key"] for c in b["kpis"]]
+
+    # du_no_dai_han should be appended after the default 6 KPIs
+    assert "du_no_dai_han" in kpi_keys
+    assert kpi_keys[-1] == "du_no_dai_han"
+    # du_no_ngan_han should not be duplicated
+    assert kpi_keys.count("du_no_ngan_han") == 1
+
+    # Check pinned flags
+    card_dai_han = next(c for c in b["kpis"] if c["kpi_key"] == "du_no_dai_han")
+    assert card_dai_han["pinned"] is True
+    card_du_no = next(c for c in b["kpis"] if c["kpi_key"] == "du_no_ngan_han")
+    assert card_du_no["pinned"] is True
+    card_dong_tien = next(c for c in b["kpis"] if c["kpi_key"] == "dong_tien_rong")
+    assert card_dong_tien["pinned"] is False
+
+
+def test_overview_admin_empty_but_200(client_admin):
+    r = client_admin.get("/v1/overview")
+    assert r.status_code == 200
+    b = r.json()
+    assert b["kpis"] == []
+    assert b["greeting_title"] == "Quản trị hệ thống"
+    assert b["suggested_questions"] == []
+
+
+def test_overview_audit_log_written_single_row(client_ceo_synth):
+    req_id = f"req-test-overview-audit-{uuid.uuid4().hex[:8]}"
+    r = client_ceo_synth.get("/v1/overview?profile=synth", headers={"X-Request-ID": req_id})
+    assert r.status_code == 200
+
+    engine = get_app_engine(profile="synth")
+    with engine.connect() as conn:
+        rows = conn.execute(
+            sa.text("SELECT * FROM app.audit_log WHERE request_id = :req_id"),
+            {"req_id": req_id},
+        ).mappings().fetchall()
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["query"] == "GET /v1/overview"
+    assert row["role"] == "ceo"
+    assert row["user_id"] == "usr_ceo"
+    assert row["views_accessed"] is not None
+    assert len(row["views_accessed"]) > 0
+    # Should contain ai_v_no_vay etc. from rendered cards
+    assert "ai_v_no_vay" in row["views_accessed"]
+
+
+

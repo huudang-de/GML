@@ -230,3 +230,35 @@ class PinDeleteResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+# ==============================================================================
+# Overview Schemas
+# ==============================================================================
+
+class OverviewKpiCard(BaseModel):
+    kpi_key: str
+    kpi_name: str | None = None
+    unit: str | None = None
+    domain: str
+    value: float | None = None
+    previous_value: float | None = None
+    delta_pct: float | None = None
+    series: list[dict[str, Any]] = Field(default_factory=list)
+    pinned: bool = False
+    error: str | None = None
+    series_warning: str | None = None
+
+
+class OverviewResponse(BaseModel):
+    greeting_title: str
+    data_profile: str
+    as_of_date: str
+    last_alert_job_at: str | None = None
+    open_alerts: dict[str, int] = Field(default_factory=dict)
+    open_actions: int = 0
+    kpis: list[OverviewKpiCard] = Field(default_factory=list)
+    top_alerts: list[AlertItem] = Field(default_factory=list)
+    suggested_questions: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+
