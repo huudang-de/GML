@@ -151,4 +151,5 @@ def chat_turn(
         intent=final_state.get("intent"),
         data_profile=effective_profile,
         trace=traces,
+        kpi_keys=[str(k) for k in (final_state.get("kpi_keys") or [])],
     )

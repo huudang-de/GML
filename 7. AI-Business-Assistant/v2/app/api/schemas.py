@@ -43,6 +43,7 @@ class ChatResponse(BaseModel):
     intent: str | None = None
     data_profile: str = "real"
     trace: list[dict[str, Any]] = Field(default_factory=list)
+    kpi_keys: list[str] = Field(default_factory=list)
 
 
 # ==============================================================================
@@ -84,11 +85,16 @@ class AlertItem(BaseModel):
     created_at: str | datetime
     acknowledged_at: str | datetime | None = None
     acknowledged_by: str | None = None
+    period: str | None = None
+    evidence: dict[str, Any] | None = None
+    domain: str | None = None
+    escalated_at: str | None = None
 
 
 class AlertListResponse(BaseModel):
     alerts: list[AlertItem]
     total: int
+    warnings: list[str] = Field(default_factory=list)
 
 
 class AlertAckResponse(BaseModel):
