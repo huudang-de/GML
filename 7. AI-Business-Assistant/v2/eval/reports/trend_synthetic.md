@@ -1,7 +1,7 @@
 # Phase 3 Gate Evidence EV-09: Trend & Anomaly Evaluation Report
 
-- **Generated At**: `2026-11-08 14:08:23 UTC`
-- **Git Commit**: `96ee6dc`
+- **Generated At**: `2026-11-16 08:05:42 UTC`
+- **Git Commit**: `36a52a1`
 - **M-09 (Anomaly Recall Target >= 90%)**: `100.00%` (5/5)
 - **M-10 (Max FP Target <= 1/KPI/12m)**: `0` per KPI
 - **TC-T3-10 Honest Coverage Guard**: `PASSED`

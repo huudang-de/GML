@@ -114,6 +114,35 @@ def filter_approved_actions(
     return filtered, has_unapproved
 
 
+def resolve_approved_action(
+    kpi_key: str,
+    level: str,
+    text: str,
+) -> tuple[str, str] | None:
+    """Resolve an action string against approved business rule actions for a given KPI and level.
+
+    Specifications:
+    - TC-T3-11: Strict allowlist matching against business rules actions.
+    - Normalizes both target text and approved actions with _normalize_text.
+    - Returns (canonical_action, authority_role) if strictly matched.
+    - Returns None if no rule exists, text is empty, or action is unapproved.
+    """
+    try:
+        rule = get_business_actions(kpi_key, level)
+    except KeyError:
+        return None
+
+    norm_text = _normalize_text(text)
+    if not norm_text:
+        return None
+
+    for act in rule.get("actions", []):
+        if _normalize_text(act) == norm_text:
+            return (act, rule["authority_role"])
+
+    return None
+
+
 def _extract_candidate_actions(text: str) -> list[str]:
     """Parse bullet points or numbered lines from LLM response text."""
     lines = text.strip().splitlines()

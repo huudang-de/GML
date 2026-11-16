@@ -110,3 +110,27 @@ class GroundingVerdict(BaseModel):
 
     ok: bool
     ungrounded_tokens: list[str] = Field(default_factory=list)
+
+
+class SeriesSummary(BaseModel):
+    """Summary metrics of a time-series window."""
+
+    points: list[TrendPoint] = Field(default_factory=list)
+    last_value: float | None = None
+    previous_value: float | None = None
+    delta_pct: float | None = None
+
+
+class AlertEvidence(BaseModel):
+    """Deterministic grounding evidence for KPI threshold alerts."""
+
+    kpi_key: str
+    level: Literal["canh_bao", "nghiem_trong"]
+    period: str | None = None
+    value: float | None = None
+    threshold_expr: str | None = None
+    series: list[TrendPoint] = Field(default_factory=list)
+    anomalies: list[TrendAnomaly] = Field(default_factory=list)
+    coverage_warning: str | None = None
+    approved_actions: list[str] = Field(default_factory=list)
+    authority_role: str | None = None
