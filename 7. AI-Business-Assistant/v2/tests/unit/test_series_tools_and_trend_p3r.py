@@ -11,9 +11,11 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.engine import Engine
 
+from app.agents.advisor import resolve_approved_action
 from app.agents.models import AlertEvidence, SeriesSummary, Trend, TrendAnomaly, TrendPoint
 from app.agents.series_tools import build_alert_evidence, summarize_series
 from app.agents.trend_agent import analyze_kpi_trend, load_kpi_series
+from app.knowledge.loader import get_business_actions
 from app.knowledge.models import SeriesQuery
 from app.sql.executor import SqlExecutionResult
 
@@ -180,4 +182,26 @@ def test_evidence_short_coverage_warning_and_anomalies_filtered():
     assert ev.anomalies[0].period == "2026-04"
     assert ev.threshold_expr == ">= 0.70"
     assert ev.period == "2026-04"
+
+
+# ==============================================================================
+# Task 3: resolve_approved_action (TC-T3-11)
+# ==============================================================================
+
+
+def test_resolve_approved_action_exact_and_normalized():
+    acts = get_business_actions("ty_le_su_dung_han_muc", "canh_bao")["actions"]
+    assert resolve_approved_action("ty_le_su_dung_han_muc", "canh_bao", "  " + acts[0].upper() + " ") == (acts[0], "ke_toan_truong")
+
+
+def test_resolve_approved_action_rejects_near_miss_and_unknown():
+    acts = get_business_actions("ty_le_su_dung_han_muc", "canh_bao")["actions"]
+    assert resolve_approved_action("ty_le_su_dung_han_muc", "canh_bao", acts[0] + " ngay") is None
+    assert resolve_approved_action("ty_le_su_dung_han_muc", "canh_bao", "Bán bớt tài sản") is None
+    assert resolve_approved_action("du_no_ngan_han", "canh_bao", acts[0]) is None
+    assert resolve_approved_action("ty_le_su_dung_han_muc", "canh_bao", "") is None
+    assert resolve_approved_action("ty_le_su_dung_han_muc", "canh_bao", "   ") is None
+    assert resolve_approved_action("unknown_kpi", "canh_bao", acts[0]) is None
+    assert resolve_approved_action("ty_le_su_dung_han_muc", "unknown_level", acts[0]) is None
+
 
