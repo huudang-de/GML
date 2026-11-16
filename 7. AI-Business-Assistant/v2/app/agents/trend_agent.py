@@ -196,7 +196,7 @@ _NON_KPI_SERIES_SQL: dict[str, Any] = {
 }
 
 
-def _get_trend_sql(kpi_key: str, product_code: str | None = None) -> str:
+def _resolve_non_kpi_sql(kpi_key: str, product_code: str | None = None) -> str | None:
     """Build time-series SQL for non-KPI keys remaining in Phase 3.
 
     Intentional Phase 3 Exception:
@@ -209,7 +209,7 @@ def _get_trend_sql(kpi_key: str, product_code: str | None = None) -> str:
         if callable(entry):
             return entry(product_code)
         return entry
-    raise KeyError(f"Unsupported KPI key for trend analysis: '{kpi_key}'")
+    return None
 
 
 def load_kpi_series(
@@ -238,13 +238,10 @@ def load_kpi_series(
     sq = get_series_query(kpi_key)
     if sq is not None and sq.sql_text:
         raw_sql = sq.sql_text
-    elif kpi_key in _NON_KPI_SERIES_SQL:
-        entry = _NON_KPI_SERIES_SQL[kpi_key]
-        if callable(entry):
-            raw_sql = entry(product_code)
-        else:
-            raw_sql = entry
     else:
+        raw_sql = _resolve_non_kpi_sql(kpi_key, product_code=product_code)
+
+    if not raw_sql:
         return [], None, f"KPI '{kpi_key}' chưa có truy vấn chuỗi thời gian"
 
     allowed_views = get_allowed_views(role)

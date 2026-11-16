@@ -205,3 +205,143 @@ def test_resolve_approved_action_rejects_near_miss_and_unknown():
     assert resolve_approved_action("ty_le_su_dung_han_muc", "unknown_level", acts[0]) is None
 
 
+# ==============================================================================
+# Task 4: Final Review Fix Wave Coverage (Normalizations, Invariants, Safe Fallbacks)
+# ==============================================================================
+
+
+def test_build_alert_evidence_severity_alias_normalization_and_validation():
+    """Important #1: build_alert_evidence normalizes warning->canh_bao, critical->nghiem_trong,
+    and raises ValueError on unknown level.
+    """
+    trend = Trend(
+        kpi_key="ty_le_su_dung_han_muc",
+        data_coverage=12,
+        series=[P(f"2026-{m:02d}", 0.5) for m in range(1, 13)],
+        source_query_id="t",
+    )
+    # "warning" alias -> normalized to "canh_bao"
+    ev_warn = build_alert_evidence("ty_le_su_dung_han_muc", "warning", 0.75, trend)
+    assert ev_warn.level == "canh_bao"
+    assert ev_warn.threshold_expr == ">= 0.70"
+    assert len(ev_warn.approved_actions) > 0
+    assert ev_warn.authority_role == "ke_toan_truong"
+
+    # "critical" alias -> normalized to "nghiem_trong"
+    ev_crit = build_alert_evidence("ty_le_su_dung_han_muc", "critical", 0.95, trend)
+    assert ev_crit.level == "nghiem_trong"
+    assert ev_crit.threshold_expr == ">= 0.90"
+    assert len(ev_crit.approved_actions) > 0
+    assert ev_crit.authority_role == "ceo"
+
+    # Unknown level raises ValueError
+    with pytest.raises(ValueError, match="Unsupported alert level"):
+        build_alert_evidence("ty_le_su_dung_han_muc", "info", 0.5, trend)
+
+
+def test_build_alert_evidence_zero_limit_coverage_warning_invariant():
+    """Important #2: build_alert_evidence with limit=0 on a 12-month trend sets series=[]
+    and non-empty coverage_warning ('Không có dữ liệu chuỗi').
+    """
+    trend = Trend(
+        kpi_key="ty_le_su_dung_han_muc",
+        data_coverage=12,
+        series=[P(f"2026-{m:02d}", 0.5) for m in range(1, 13)],
+        source_query_id="t",
+    )
+    ev = build_alert_evidence("ty_le_su_dung_han_muc", "canh_bao", 0.75, trend, limit=0)
+    assert ev.series == []
+    assert ev.coverage_warning == "Không có dữ liệu chuỗi"
+    assert ev.period is None
+    assert ev.anomalies == []
+
+
+def test_build_alert_evidence_missing_nguong_and_rules_safe_fallback():
+    """Minor #3: build_alert_evidence on a KPI missing nguong / business_rules
+    safely sets threshold_expr=None, approved_actions=[], authority_role=None.
+    """
+    trend = Trend(
+        kpi_key="du_no_ngan_han",
+        data_coverage=12,
+        series=[P(f"2026-{m:02d}", 100.0) for m in range(1, 13)],
+        source_query_id="t",
+    )
+    ev = build_alert_evidence("du_no_ngan_han", "canh_bao", 120.0, trend)
+    assert ev.threshold_expr is None
+    assert ev.approved_actions == []
+    assert ev.authority_role is None
+    assert len(ev.series) == 12
+
+
+def test_summarize_series_limit_non_positive_and_negative_previous_value():
+    """Minor #3: summarize_series with limit <= 0 returns empty points, and negative
+    previous_value uses abs(previous_value) for delta_pct.
+    """
+    pts = [P("2026-01", 100.0), P("2026-02", 110.0)]
+    s_zero = summarize_series(pts, limit=0)
+    assert s_zero.points == []
+    assert s_zero.last_value is None
+    assert s_zero.previous_value is None
+    assert s_zero.delta_pct is None
+
+    s_neg_limit = summarize_series(pts, limit=-5)
+    assert s_neg_limit.points == []
+    assert s_neg_limit.last_value is None
+    assert s_neg_limit.delta_pct is None
+
+    # Negative previous_value: delta = (-50 - (-100)) / abs(-100) = +0.50
+    neg_prev_pts = [P("2026-01", -100.0), P("2026-02", -50.0)]
+    s_neg_val = summarize_series(neg_prev_pts)
+    assert s_neg_val.last_value == -50.0
+    assert s_neg_val.previous_value == -100.0
+    assert s_neg_val.delta_pct == 0.50
+
+    # Negative to more negative: delta = (-150 - (-100)) / abs(-100) = -0.50
+    neg_prev_pts2 = [P("2026-01", -100.0), P("2026-02", -150.0)]
+    s_neg_val2 = summarize_series(neg_prev_pts2)
+    assert s_neg_val2.delta_pct == -0.50
+
+
+def test_load_kpi_series_error_propagation_and_chronological_sorting(monkeypatch, fake_engine):
+    """Minor #3: load_kpi_series propagates exec_res.error and sorts out-of-order rows chronologically."""
+    # 1. Error propagation
+    def mock_execute_err(sql: str, engine: Engine | None = None, **kwargs):
+        return SqlExecutionResult(
+            sql=sql,
+            status="execution_error",
+            error="DB error: connection lost",
+            rows=[],
+            columns=[],
+            row_count=0,
+            latency_ms=0.5,
+        )
+
+    monkeypatch.setattr("app.agents.trend_agent.execute_validated_sql", mock_execute_err)
+    series_err, sql_err, err_msg = load_kpi_series("ty_le_su_dung_han_muc", role="ceo", engine=fake_engine)
+    assert series_err == []
+    assert sql_err is None
+    assert err_msg == "Lỗi truy vấn SQL: DB error: connection lost"
+
+    # 2. Chronological sorting of out-of-order rows
+    def mock_execute_unordered(sql: str, engine: Engine | None = None, **kwargs):
+        return SqlExecutionResult(
+            sql=sql,
+            status="ok",
+            rows=[
+                {"period": "2026-05", "value": 50.0},
+                {"period": "2026-01", "value": 10.0},
+                {"period": "2026-03", "value": 30.0},
+            ],
+            columns=["period", "value"],
+            row_count=3,
+            latency_ms=0.5,
+        )
+
+    monkeypatch.setattr("app.agents.trend_agent.execute_validated_sql", mock_execute_unordered)
+    series_sorted, sql_sorted, err_sorted = load_kpi_series("ty_le_su_dung_han_muc", role="ceo", engine=fake_engine)
+    assert err_sorted is None
+    assert [p.period for p in series_sorted] == ["2026-01", "2026-03", "2026-05"]
+    assert [p.value for p in series_sorted] == [10.0, 30.0, 50.0]
+
+
+

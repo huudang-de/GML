@@ -46,6 +46,14 @@ def summarize_series(series: list[TrendPoint], limit: int = 12) -> SeriesSummary
     )
 
 
+_LEVEL_MAP: dict[str, Literal["canh_bao", "nghiem_trong"]] = {
+    "canh_bao": "canh_bao",
+    "warning": "canh_bao",
+    "nghiem_trong": "nghiem_trong",
+    "critical": "nghiem_trong",
+}
+
+
 def build_alert_evidence(
     kpi_key: str,
     level: Literal["canh_bao", "nghiem_trong"] | str,
@@ -65,14 +73,18 @@ def build_alert_evidence(
     Returns:
         AlertEvidence populated with strictly grounded values and business rules.
     """
+    norm_level = _LEVEL_MAP.get(str(level).strip().lower())
+    if norm_level is None:
+        raise ValueError(f"Unsupported alert level: {level!r}")
+
     try:
         kpi_def = get_kpi(kpi_key)
-        threshold_expr = kpi_def.nguong.get(str(level))
+        threshold_expr = kpi_def.nguong.get(norm_level)
     except KeyError:
         threshold_expr = None
 
     try:
-        actions_info = get_business_actions(kpi_key, str(level))
+        actions_info = get_business_actions(kpi_key, norm_level)
         approved_actions = actions_info.get("actions", [])
         authority_role = actions_info.get("authority_role")
     except KeyError:
@@ -82,7 +94,7 @@ def build_alert_evidence(
     if trend is None:
         return AlertEvidence(
             kpi_key=kpi_key,
-            level=level,  # type: ignore[arg-type]
+            level=norm_level,
             period=None,
             value=value,
             threshold_expr=threshold_expr,
@@ -103,10 +115,12 @@ def build_alert_evidence(
         if trend.data_coverage < 6
         else None
     )
+    if not series_points and coverage_warning is None:
+        coverage_warning = "Không có dữ liệu chuỗi"
 
     return AlertEvidence(
         kpi_key=kpi_key,
-        level=level,  # type: ignore[arg-type]
+        level=norm_level,
         period=period,
         value=value,
         threshold_expr=threshold_expr,
