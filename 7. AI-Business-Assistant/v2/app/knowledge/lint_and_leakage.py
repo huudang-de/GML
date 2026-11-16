@@ -345,7 +345,10 @@ def lint_series_and_role_profiles(
                         f"Series query '{sq.id}' uses table '{table_name}' not listed in views_used {sq.views_used}"
                     )
 
-    # If using default series queries, ensure all KPIs with series_ref exist in series_map
+    # If using default series queries, ensure all KPIs with series_ref exist in series_map.
+    # Note: when series_index_path is provided as a tmp_path override during testing,
+    # the test index only supplies a focused subset of queries rather than the full catalogue,
+    # so we only enforce full catalogue completeness against the production default index.
     if series_index_path is None:
         for kpi_key, kpi in kpis.items():
             if kpi.series_ref:

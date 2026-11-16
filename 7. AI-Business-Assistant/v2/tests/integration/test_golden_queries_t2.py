@@ -6,13 +6,14 @@ Specifications:
   within tolerance <= 1e-4 on real profile.
 """
 
+import math
 import re
 from pathlib import Path
 import pytest
 import sqlalchemy as sa
 
 from app.core.security import get_allowed_views
-from app.knowledge.loader import load_golden_queries, load_series_queries
+from app.knowledge.loader import load_golden_queries, load_kpis, load_series_queries
 from app.knowledge.models import SeriesQuery
 from app.sql.executor import execute_validated_sql
 from app.sql.validator import validate
@@ -83,13 +84,58 @@ def test_all_series_queries_execute_on_synth_views(sq: SeriesQuery):
     assert result.status == "ok", f"Series query {sq.id} failed with status '{result.status}', error: {result.error}"
     assert len(result.rows) > 0, f"Series query {sq.id} returned 0 rows"
 
-    # 4. Period format matches ^\d{4}-\d{2}$
+    # 4. Period format matches ^\d{4}-\d{2}$ and values are finite floats
     pattern = re.compile(r"^\d{4}-\d{2}$")
     periods = []
     for row in result.rows:
         p = row.get("period")
         assert isinstance(p, str) and pattern.match(p), f"Invalid period format '{p}' in query {sq.id}"
         periods.append(p)
+        val = float(row.get("value"))
+        assert math.isfinite(val), f"Non-finite value '{val}' in query {sq.id}"
 
-    # 5. Period sequence is non-decreasing/ascending
+    # 5. Period sequence is unique and non-decreasing/ascending
+    assert len(periods) == len(set(periods)), f"Duplicate periods in query {sq.id}: {periods}"
     assert periods == sorted(periods), f"Periods not in ascending order for query {sq.id}: {periods}"
+
+
+def test_all_series_queries_execute_on_real_views():
+    """Verify all canonical SeriesQuery queries execute cleanly on real profile via gml_ai_ro.
+
+    Where rows exist, asserts period uniqueness, finite float values, ascending period order,
+    and sanity-checks AR/AP balances against kpi.plausible_range (< 500B VND).
+    """
+    sqs = load_series_queries()
+    kpis = load_kpis()
+    pattern = re.compile(r"^\d{4}-\d{2}$")
+
+    for kpi_key, sq in sqs.items():
+        assert sq.sql_text and sq.sql_text.strip(), f"Series query {sq.id} has empty sql_text"
+        validated_sql = validate(sq.sql_text, allowed_tables=set(sq.views_used))
+        result = execute_validated_sql(validated_sql, profile="real")
+        assert result.status == "ok", (
+            f"Series query {sq.id} failed on real profile with status '{result.status}', error: {result.error}"
+        )
+        assert len(result.rows) > 0, f"Series query {sq.id} returned 0 rows on real profile"
+
+        periods = []
+        for row in result.rows:
+            p = row.get("period")
+            assert isinstance(p, str) and pattern.match(p), f"Invalid period format '{p}' in {sq.id}"
+            periods.append(p)
+            val = float(row.get("value"))
+            assert math.isfinite(val), f"Non-finite value {val} in {sq.id}"
+
+        assert len(periods) == len(set(periods)), f"Duplicate periods found in series query {sq.id}: {periods}"
+        assert periods == sorted(periods), f"Periods not ascending for {sq.id}: {periods}"
+
+        if kpi_key in ("gia_tri_phai_thu", "gia_tri_phai_tra"):
+            kpi = kpis.get(kpi_key)
+            assert kpi is not None and kpi.plausible_range is not None, f"KPI {kpi_key} missing plausible_range"
+            min_val, max_val = kpi.plausible_range
+            for row in result.rows:
+                val = float(row.get("value"))
+                assert min_val <= val <= max_val, (
+                    f"KPI {kpi_key} period {row.get('period')} value {val} outside plausible range "
+                    f"[{min_val}, {max_val}] (check for lack of deduplication / cross-join overcounts)"
+                )

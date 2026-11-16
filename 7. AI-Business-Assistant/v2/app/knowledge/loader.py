@@ -200,7 +200,7 @@ def load_golden_queries(index_path: Optional[Path] = None) -> list[GoldenQuery]:
     with open(target_path, "r", encoding="utf-8") as f:
         raw_data = yaml.safe_load(f) or {}
 
-    queries_data = raw_data.get("queries", [])
+    queries_data = raw_data.get("queries") or []
     golden_list: list[GoldenQuery] = []
     base_dir = target_path.parent
 
@@ -220,7 +220,7 @@ def _load_series_queries_from_path(target_path: Path) -> dict[str, SeriesQuery]:
     with open(target_path, "r", encoding="utf-8") as f:
         raw_data = yaml.safe_load(f) or {}
 
-    queries_data = raw_data.get("queries", [])
+    queries_data = raw_data.get("queries") or []
     series_dict: dict[str, SeriesQuery] = {}
     base_dir = target_path.parent
 
