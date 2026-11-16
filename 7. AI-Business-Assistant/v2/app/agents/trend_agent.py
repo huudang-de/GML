@@ -21,6 +21,7 @@ from app.core.errors import SqlRejected
 from app.knowledge.loader import (
     get_kpi,
     get_seasonality_insight,
+    get_series_query,
     load_kpis,
 )
 from app.orchestration.state import ChatState
@@ -151,233 +152,127 @@ def detect_series_anomalies(
     return anomalies
 
 
+def _build_ton_kho_sku_sql(product_code: str | None = None) -> str:
+    clean_code = (product_code or "SYNTH_SKU_MDF17").replace("'", "''")
+    return f"""
+    SELECT 
+        to_char(tx_date, 'YYYY-MM') AS period,
+        SUM(total_value) AS value
+    FROM ai_views.ai_v_ton_kho
+    WHERE record_type = 'balance'
+      AND product_code = '{clean_code}'
+    GROUP BY 1
+    ORDER BY 1;
+    """
+
+
+# Intentional Phase 3 Exception:
+# Keys 'ton_kho_sku' (parameterized by product_code), 'current_ratio', and
+# 'doanh_thu_thuan' remain here in _NON_KPI_SERIES_SQL because they are either
+# dynamically parameterized or used by eval/playbook without a static series_ref in T2.
+_NON_KPI_SERIES_SQL: dict[str, Any] = {
+    "ton_kho_sku": _build_ton_kho_sku_sql,
+    "current_ratio": """
+    SELECT 
+        to_char(reporting_date, 'YYYY-MM') AS period,
+        MAX(CASE WHEN item_code = 'B01-DN_100' THEN ending_balance END) /
+        NULLIF(MAX(CASE WHEN item_code = 'B01-DN_310' THEN ending_balance END), 0) AS value
+    FROM ai_views.ai_v_bctc
+    WHERE report_type = 'B01-DN'
+      AND item_code IN ('B01-DN_100', 'B01-DN_310')
+    GROUP BY reporting_date
+    ORDER BY reporting_date;
+    """,
+    "doanh_thu_thuan": """
+    SELECT 
+        to_char(reporting_date, 'YYYY-MM') AS period,
+        SUM(ending_balance) AS value
+    FROM ai_views.ai_v_bctc
+    WHERE report_type = 'B02-DN'
+      AND item_code = 'B02-DN_10'
+    GROUP BY reporting_date
+    ORDER BY reporting_date;
+    """,
+}
+
+
 def _get_trend_sql(kpi_key: str, product_code: str | None = None) -> str:
-    """Build canonical 12-month time-series SQL for supported KPIs on ai_views.*."""
-    if kpi_key == "du_no_ngan_han":
-        return """
-        WITH ranked AS (
-            SELECT 
-                to_char(posting_date, 'YYYY-MM') AS period,
-                account_no,
-                credit_balance,
-                ROW_NUMBER() OVER (
-                    PARTITION BY account_no, to_char(posting_date, 'YYYY-MM') 
-                    ORDER BY posting_date DESC, tx_id DESC
-                ) as rn
-            FROM ai_views.ai_v_no_vay
-            WHERE record_type = 'ledger_balance'
-              AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%')
-        )
-        SELECT period, SUM(credit_balance) AS value
-        FROM ranked
-        WHERE rn = 1
-        GROUP BY period
-        ORDER BY period;
-        """
+    """Build time-series SQL for non-KPI keys remaining in Phase 3.
 
-    if kpi_key == "du_no_dai_han":
-        return """
-        WITH ranked AS (
-            SELECT 
-                to_char(posting_date, 'YYYY-MM') AS period,
-                account_no,
-                credit_balance,
-                ROW_NUMBER() OVER (
-                    PARTITION BY account_no, to_char(posting_date, 'YYYY-MM') 
-                    ORDER BY posting_date DESC, tx_id DESC
-                ) as rn
-            FROM ai_views.ai_v_no_vay
-            WHERE record_type = 'ledger_balance'
-              AND account_no LIKE '34112%'
-        )
-        SELECT period, SUM(credit_balance) AS value
-        FROM ranked
-        WHERE rn = 1
-        GROUP BY period
-        ORDER BY period;
-        """
-
-    if kpi_key == "ton_kho_sku":
-        clean_code = (product_code or "SYNTH_SKU_MDF17").replace("'", "''")
-        return f"""
-        SELECT 
-            to_char(tx_date, 'YYYY-MM') AS period,
-            SUM(total_value) AS value
-        FROM ai_views.ai_v_ton_kho
-        WHERE record_type = 'balance'
-          AND product_code = '{clean_code}'
-        GROUP BY 1
-        ORDER BY 1;
-        """
-
-    if kpi_key == "current_ratio":
-        return """
-        SELECT 
-            to_char(reporting_date, 'YYYY-MM') AS period,
-            MAX(CASE WHEN item_code = 'B01-DN_100' THEN ending_balance END) /
-            NULLIF(MAX(CASE WHEN item_code = 'B01-DN_310' THEN ending_balance END), 0) AS value
-        FROM ai_views.ai_v_bctc
-        WHERE report_type = 'B01-DN'
-          AND item_code IN ('B01-DN_100', 'B01-DN_310')
-        GROUP BY reporting_date
-        ORDER BY reporting_date;
-        """
-
-    if kpi_key == "ty_le_su_dung_han_muc":
-        return """
-        SELECT 
-            to_char(COALESCE(as_of_date, posting_date), 'YYYY-MM') AS period,
-            SUM(principal_balance) / NULLIF(SUM(granted_limit), 0) AS value
-        FROM ai_views.ai_v_no_vay
-        WHERE record_type = 'credit_limit'
-        GROUP BY 1
-        ORDER BY 1;
-        """
-
-    if kpi_key == "dong_tien_rong":
-        return """
-        SELECT 
-            to_char(posting_date, 'YYYY-MM') AS period,
-            SUM(debit_amount - credit_amount) AS value
-        FROM ai_views.ai_v_dong_tien
-        WHERE is_external_cashflow = TRUE
-        GROUP BY 1
-        ORDER BY 1;
-        """
-
-    if kpi_key == "dong_tien_vao":
-        return """
-        SELECT 
-            to_char(posting_date, 'YYYY-MM') AS period,
-            SUM(debit_amount) AS value
-        FROM ai_views.ai_v_dong_tien
-        WHERE is_external_cashflow = TRUE
-        GROUP BY 1
-        ORDER BY 1;
-        """
-
-    if kpi_key == "dong_tien_ra":
-        return """
-        SELECT 
-            to_char(posting_date, 'YYYY-MM') AS period,
-            SUM(credit_amount) AS value
-        FROM ai_views.ai_v_dong_tien
-        WHERE is_external_cashflow = TRUE
-        GROUP BY 1
-        ORDER BY 1;
-        """
-
-    if kpi_key == "doanh_thu_thuan":
-        return """
-        SELECT 
-            to_char(reporting_date, 'YYYY-MM') AS period,
-            SUM(ending_balance) AS value
-        FROM ai_views.ai_v_bctc
-        WHERE report_type = 'B02-DN'
-          AND item_code = 'B02-DN_10'
-        GROUP BY reporting_date
-        ORDER BY reporting_date;
-        """
-
-    if kpi_key == "tien_va_tuong_duong_tien":
-        return """
-        SELECT 
-            to_char(reporting_date, 'YYYY-MM') AS period,
-            SUM(ending_balance) AS value
-        FROM ai_views.ai_v_bctc
-        WHERE report_type = 'B01-DN'
-          AND item_code = 'B01-DN_110'
-        GROUP BY reporting_date
-        ORDER BY reporting_date;
-        """
-
-    if kpi_key == "ty_le_no_tren_tong_nguon_von":
-        return """
-        SELECT 
-            to_char(reporting_date, 'YYYY-MM') AS period,
-            MAX(CASE WHEN item_code = 'B01-DN_300' THEN ending_balance END) /
-            NULLIF(MAX(CASE WHEN item_code = 'B01-DN_440' THEN ending_balance END), 0) AS value
-        FROM ai_views.ai_v_bctc
-        WHERE report_type = 'B01-DN'
-          AND item_code IN ('B01-DN_300', 'B01-DN_440')
-        GROUP BY reporting_date
-        ORDER BY reporting_date;
-        """
-
-    if kpi_key == "gia_tri_hang_ton_kho":
-        return """
-        SELECT 
-            to_char(tx_date, 'YYYY-MM') AS period,
-            SUM(total_value) AS value
-        FROM ai_views.ai_v_ton_kho
-        WHERE record_type = 'balance'
-        GROUP BY 1
-        ORDER BY 1;
-        """
-
-    if kpi_key == "gia_tri_phai_thu":
-        return """
-        SELECT 
-            to_char(COALESCE(ar_date, report_date), 'YYYY-MM') AS period,
-            SUM(total_receivable) AS value
-        FROM ai_views.ai_v_cong_no
-        WHERE record_type = 'ar'
-        GROUP BY 1
-        ORDER BY 1;
-        """
-
-    if kpi_key == "gia_tri_phai_tra":
-        return """
-        SELECT 
-            to_char(COALESCE(ap_date, report_date), 'YYYY-MM') AS period,
-            SUM(total_payable) AS value
-        FROM ai_views.ai_v_cong_no
-        WHERE record_type = 'ap'
-        GROUP BY 1
-        ORDER BY 1;
-        """
-
-    if kpi_key == "han_muc_phe_duyet":
-        return """
-        SELECT 
-            to_char(COALESCE(as_of_date, posting_date), 'YYYY-MM') AS period,
-            SUM(credit_limit) AS value
-        FROM ai_views.ai_v_no_vay
-        WHERE record_type = 'credit_limit'
-        GROUP BY 1
-        ORDER BY 1;
-        """
-
-    if kpi_key == "han_muc_duoc_cap":
-        return """
-        SELECT 
-            to_char(COALESCE(as_of_date, posting_date), 'YYYY-MM') AS period,
-            SUM(granted_limit) AS value
-        FROM ai_views.ai_v_no_vay
-        WHERE record_type = 'credit_limit'
-        GROUP BY 1
-        ORDER BY 1;
-        """
-
-    if kpi_key == "han_muc_con_lai":
-        return """
-        SELECT 
-            to_char(COALESCE(as_of_date, posting_date), 'YYYY-MM') AS period,
-            SUM(remaining_disbursement) AS value
-        FROM ai_views.ai_v_no_vay
-        WHERE record_type = 'credit_limit'
-        GROUP BY 1
-        ORDER BY 1;
-        """
-
-    # Default fallback: check if KPI is defined in knowledge base
-    kpis = load_kpis()
-    if kpi_key in kpis:
-        kpi_def = kpis[kpi_key]
-        primary_view = kpi_def.nguon_view[0] if kpi_def.nguon_view else "ai_v_bctc"
-        return f"SELECT '2026-07' AS period, 0.0 AS value FROM ai_views.{primary_view} LIMIT 1;"
-
+    Intentional Phase 3 Exception:
+    Keys 'ton_kho_sku' (parameterized by product_code), 'current_ratio', and
+    'doanh_thu_thuan' remain here in _NON_KPI_SERIES_SQL because they are either
+    dynamically parameterized or used by eval/playbook without a static series_ref in T2.
+    """
+    if kpi_key in _NON_KPI_SERIES_SQL:
+        entry = _NON_KPI_SERIES_SQL[kpi_key]
+        if callable(entry):
+            return entry(product_code)
+        return entry
     raise KeyError(f"Unsupported KPI key for trend analysis: '{kpi_key}'")
+
+
+def load_kpi_series(
+    kpi_key: str,
+    role: str = "ceo",
+    data_profile: str = "real",
+    engine: Engine | None = None,
+    product_code: str | None = None,
+) -> tuple[list[TrendPoint], str | None, str | None]:
+    """Load canonical monthly time-series points for a KPI.
+
+    Specifications:
+    - Spec §5 T3 (TrendAnalyst Revision), TC-T3-14, TC-T3-15
+    - Lookup order:
+        1. T2 Knowledge layer: get_series_query(kpi_key)
+        2. Non-KPI series fallback: _NON_KPI_SERIES_SQL (intentional Phase 3 exception)
+        3. None: return ([], None, f"KPI '{kpi_key}' chưa có truy vấn chuỗi thời gian")
+    - Role-based security validation via validate(raw_sql, allowed_tables)
+    - SQL execution via execute_validated_sql
+    - Returns sorted list of TrendPoint objects chronologically by period.
+
+    Returns:
+        tuple of (series_sorted, validated_sql, error)
+    """
+    raw_sql: str | None = None
+    sq = get_series_query(kpi_key)
+    if sq is not None and sq.sql_text:
+        raw_sql = sq.sql_text
+    elif kpi_key in _NON_KPI_SERIES_SQL:
+        entry = _NON_KPI_SERIES_SQL[kpi_key]
+        if callable(entry):
+            raw_sql = entry(product_code)
+        else:
+            raw_sql = entry
+    else:
+        return [], None, f"KPI '{kpi_key}' chưa có truy vấn chuỗi thời gian"
+
+    allowed_views = get_allowed_views(role)
+    try:
+        validated_sql = validate(raw_sql, allowed_tables=allowed_views)
+    except SqlRejected as exc:
+        return [], None, f"Quyền hạn của role '{role}' không đủ để xem dữ liệu cho KPI '{kpi_key}': {exc}"
+    except Exception as exc:
+        return [], None, f"SQL validation rejected: {exc}"
+
+    active_engine = engine or get_ro_engine(profile=data_profile)
+    exec_res = execute_validated_sql(validated_sql, engine=active_engine)
+    if exec_res.error:
+        return [], None, f"Lỗi truy vấn SQL: {exec_res.error}"
+
+    series: list[TrendPoint] = []
+    for row in exec_res.rows:
+        p = str(row.get("period") or "")
+        val = row.get("value")
+        if p and val is not None:
+            try:
+                series.append(TrendPoint(period=p, value=float(val)))
+            except (ValueError, TypeError):
+                continue
+
+    # Sort series chronologically
+    series.sort(key=lambda x: x.period)
+    return series, validated_sql, None
 
 
 def analyze_kpi_trend(
@@ -396,37 +291,17 @@ def analyze_kpi_trend(
     - Seasonality insight attached based on target closing month.
     """
     warnings: list[str] = []
-    active_engine = engine or get_ro_engine(profile=data_profile)
-    allowed_views = get_allowed_views(role)
 
-    try:
-        raw_sql = _get_trend_sql(kpi_key, product_code=product_code)
-    except KeyError as exc:
-        return None, warnings, str(exc)
+    series, validated_sql, err = load_kpi_series(
+        kpi_key=kpi_key,
+        role=role,
+        data_profile=data_profile,
+        engine=engine,
+        product_code=product_code,
+    )
+    if err:
+        return None, warnings, err
 
-    try:
-        validated_sql = validate(raw_sql, allowed_tables=allowed_views)
-    except SqlRejected as exc:
-        return None, warnings, f"Quyền hạn của role '{role}' không đủ để xem dữ liệu cho KPI '{kpi_key}': {exc}"
-    except Exception as exc:
-        return None, warnings, f"SQL validation rejected: {exc}"
-
-    exec_res = execute_validated_sql(validated_sql, engine=active_engine)
-    if exec_res.error:
-        return None, warnings, f"Lỗi truy vấn SQL: {exec_res.error}"
-
-    series: list[TrendPoint] = []
-    for row in exec_res.rows:
-        p = str(row.get("period") or "")
-        val = row.get("value")
-        if p and val is not None:
-            try:
-                series.append(TrendPoint(period=p, value=float(val)))
-            except (ValueError, TypeError):
-                continue
-
-    # Sort series chronologically
-    series.sort(key=lambda x: x.period)
     data_coverage = len(series)
     source_query_id = f"trend-{uuid.uuid4().hex[:8]}"
 
