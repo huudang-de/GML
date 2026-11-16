@@ -9,6 +9,8 @@ Specifications:
 - Single audit log written per request
 """
 
+import json
+from pathlib import Path
 import uuid
 import pytest
 import sqlalchemy as sa
@@ -925,6 +927,271 @@ def test_overview_audit_log_written_single_row(client_ceo_synth):
     assert len(row["views_accessed"]) > 0
     # Should contain ai_v_no_vay etc. from rendered cards
     assert "ai_v_no_vay" in row["views_accessed"]
+
+
+# ==============================================================================
+# Task 7: OpenAPI Snapshot Contract (M-13) & Audit Completeness (M-14)
+# ==============================================================================
+
+DOCS_OPENAPI_PATH = Path(__file__).resolve().parent.parent.parent / "docs" / "openapi.json"
+
+NEW_ENDPOINTS = [
+    ("GET", "/v1/overview"),
+    ("GET", "/v1/actions"),
+    ("POST", "/v1/actions"),
+    ("PATCH", "/v1/actions/{action_id}"),
+    ("GET", "/v1/pins"),
+    ("POST", "/v1/pins"),
+    ("DELETE", "/v1/pins/{kpi_key}"),
+]
+
+
+def test_m13_new_endpoints_in_openapi_snapshot():
+    assert DOCS_OPENAPI_PATH.exists(), f"OpenAPI snapshot file {DOCS_OPENAPI_PATH} must exist"
+    spec = json.loads(DOCS_OPENAPI_PATH.read_text(encoding="utf-8"))
+
+    # 1. Verify 7 new endpoints exist in snapshot
+    for m, p in NEW_ENDPOINTS:
+        assert p in spec["paths"], f"Endpoint path {p} missing from openapi.json"
+        assert m.lower() in spec["paths"][p], f"Method {m} missing from openapi.json for {p}"
+
+    # 2. Verify ?include=series query param in /v1/kpi/{key}
+    kpi_params = spec["paths"]["/v1/kpi/{key}"]["get"]["parameters"]
+    include_param = next((p for p in kpi_params if p["name"] == "include"), None)
+    assert include_param is not None, "Parameter ?include missing from /v1/kpi/{key}"
+
+    # 3. Verify filters in /v1/alerts: domain, severity, status
+    alert_params = spec["paths"]["/v1/alerts"]["get"]["parameters"]
+    alert_param_names = {p["name"] for p in alert_params}
+    for filter_name in ("domain", "severity", "status"):
+        assert filter_name in alert_param_names, f"Filter ?{filter_name} missing from /v1/alerts"
+
+
+def test_m14_every_new_endpoint_writes_one_audit_row(
+    client_ceo, client_kho, client_ktt, seed_alert_id, approved_text_nt
+):
+    """M-14: Every new endpoint (200/201 as well as error paths 403/404/409/422) writes exactly one audit row.
+
+    Verifies that no financial values, titles, or notes leak into the audit table.
+    """
+    cases = []
+
+    # 1. GET /v1/overview -> 200
+    rid = f"req-audit-ov-200-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.get("/v1/overview?profile=synth", headers={"X-Request-ID": rid})
+    assert r.status_code == 200
+    cases.append((rid, "synth", "GET /v1/overview"))
+
+    # 2. GET /v1/actions -> 200
+    rid = f"req-audit-act-get-200-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.get("/v1/actions", headers={"X-Request-ID": rid})
+    assert r.status_code == 200
+    cases.append((rid, "real", "GET /v1/actions"))
+
+    # 3. POST /v1/actions -> 201 (Created)
+    rid = f"req-audit-act-post-201-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.post(
+        "/v1/actions",
+        json={
+            "source_type": "alert",
+            "source_ref": str(seed_alert_id),
+            "kpi_key": "ty_le_su_dung_han_muc",
+            "level": "nghiem_trong",
+            "title": approved_text_nt,
+            "note": "CEO audit test note",
+        },
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 201
+    act_id = r.json()["id"]
+    cases.append((rid, "real", "POST /v1/actions"))
+
+    # 4. POST /v1/actions -> 403 (Forbidden: kho creates finance action)
+    rid = f"req-audit-act-post-403-{uuid.uuid4().hex[:8]}"
+    r = client_kho.post(
+        "/v1/actions",
+        json={
+            "source_type": "alert",
+            "source_ref": str(seed_alert_id),
+            "kpi_key": "ty_le_su_dung_han_muc",
+            "level": "nghiem_trong",
+            "title": approved_text_nt,
+        },
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 403
+    cases.append((rid, "real", "POST /v1/actions"))
+
+    # 5. POST /v1/actions -> 404 (Not Found: unknown kpi)
+    rid = f"req-audit-act-post-404-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.post(
+        "/v1/actions",
+        json={
+            "source_type": "alert",
+            "source_ref": str(seed_alert_id),
+            "kpi_key": "kpi_unknown_nonexistent",
+            "level": "nghiem_trong",
+            "title": approved_text_nt,
+        },
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 404
+    cases.append((rid, "real", "POST /v1/actions"))
+
+    # 6. POST /v1/actions -> 409 (Conflict: duplicate action)
+    rid = f"req-audit-act-post-409-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.post(
+        "/v1/actions",
+        json={
+            "source_type": "alert",
+            "source_ref": str(seed_alert_id),
+            "kpi_key": "ty_le_su_dung_han_muc",
+            "level": "nghiem_trong",
+            "title": approved_text_nt,
+        },
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 409
+    cases.append((rid, "real", "POST /v1/actions"))
+
+    # 7. POST /v1/actions -> 422 (Validation: unapproved title)
+    rid = f"req-audit-act-post-422-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.post(
+        "/v1/actions",
+        json={
+            "source_type": "alert",
+            "source_ref": str(seed_alert_id),
+            "kpi_key": "ty_le_su_dung_han_muc",
+            "level": "nghiem_trong",
+            "title": "Unapproved random title for audit test",
+        },
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 422
+    cases.append((rid, "real", "POST /v1/actions"))
+
+    # 8. PATCH /v1/actions/{action_id} -> 200 (OK)
+    rid = f"req-audit-act-patch-200-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.patch(
+        f"/v1/actions/{act_id}",
+        json={"status": "in_progress", "note": "Updating note"},
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 200
+    cases.append((rid, "real", f"PATCH /v1/actions/{act_id}"))
+
+    # 9. PATCH /v1/actions/{action_id} -> 404 (Not accessible by KTT)
+    rid = f"req-audit-act-patch-404-{uuid.uuid4().hex[:8]}"
+    r = client_ktt.patch(
+        f"/v1/actions/{act_id}",
+        json={"status": "in_progress"},
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 404
+    cases.append((rid, "real", f"PATCH /v1/actions/{act_id}"))
+
+    # 10. GET /v1/pins -> 200
+    rid = f"req-audit-pins-get-200-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.get("/v1/pins?profile=real", headers={"X-Request-ID": rid})
+    assert r.status_code == 200
+    cases.append((rid, "real", "GET /v1/pins"))
+
+    # 11. POST /v1/pins -> 201 (Created)
+    rid = f"req-audit-pins-post-201-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.post(
+        "/v1/pins?profile=real",
+        json={"kpi_key": "gia_tri_phai_tra"},
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 201
+    cases.append((rid, "real", "POST /v1/pins"))
+
+    # 12. POST /v1/pins -> 200 (Idempotent OK)
+    rid = f"req-audit-pins-post-200-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.post(
+        "/v1/pins?profile=real",
+        json={"kpi_key": "gia_tri_phai_tra"},
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 200
+    cases.append((rid, "real", "POST /v1/pins"))
+
+    # 13. POST /v1/pins -> 403 (Forbidden: kho pins du_no_ngan_han)
+    rid = f"req-audit-pins-post-403-{uuid.uuid4().hex[:8]}"
+    r = client_kho.post(
+        "/v1/pins?profile=real",
+        json={"kpi_key": "du_no_ngan_han"},
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 403
+    cases.append((rid, "real", "POST /v1/pins"))
+
+    # 14. POST /v1/pins -> 404 (Not Found: unknown kpi)
+    rid = f"req-audit-pins-post-404-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.post(
+        "/v1/pins?profile=real",
+        json={"kpi_key": "kpi_unknown_nonexistent"},
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 404
+    cases.append((rid, "real", "POST /v1/pins"))
+
+    # 15. DELETE /v1/pins/{kpi_key} -> 200 (deleted=1)
+    rid = f"req-audit-pins-del-1-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.delete(
+        "/v1/pins/gia_tri_phai_tra?profile=real",
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 200
+    assert r.json()["deleted"] == 1
+    cases.append((rid, "real", "DELETE /v1/pins/gia_tri_phai_tra"))
+
+    # 16. DELETE /v1/pins/{kpi_key} -> 200 (deleted=0)
+    rid = f"req-audit-pins-del-0-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.delete(
+        "/v1/pins/gia_tri_phai_tra?profile=real",
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 200
+    assert r.json()["deleted"] == 0
+    cases.append((rid, "real", "DELETE /v1/pins/gia_tri_phai_tra"))
+
+    # 17. GET /v1/kpi/{key}?include=series -> 200
+    rid = f"req-audit-kpi-series-200-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.get(
+        "/v1/kpi/du_no_ngan_han?profile=real&include=series",
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 200
+    cases.append((rid, "real", "GET /v1/kpi/du_no_ngan_han?include=series"))
+
+    # 18. GET /v1/alerts with filters -> 200
+    rid = f"req-audit-alerts-200-{uuid.uuid4().hex[:8]}"
+    r = client_ceo.get(
+        "/v1/alerts?domain=no_vay&severity=critical&status=open",
+        headers={"X-Request-ID": rid},
+    )
+    assert r.status_code == 200
+    cases.append((rid, "real", "GET /v1/alerts"))
+
+    # Now verify M-14 audit rows for every single case
+    for req_id, profile, expected_query_prefix in cases:
+        eng = get_app_engine(profile=profile)
+        with eng.connect() as conn:
+            rows = conn.execute(
+                sa.text("SELECT * FROM app.audit_log WHERE request_id = :rid"),
+                {"rid": req_id},
+            ).mappings().fetchall()
+
+        assert len(rows) == 1, f"Expected exactly 1 audit row for {req_id} ({expected_query_prefix}), got {len(rows)}"
+        row = rows[0]
+        q = row["query"] or ""
+        assert expected_query_prefix.split()[0] in q, f"HTTP method missing in query: {q}"
+        # Ensure sensitive text / financial numbers are NOT logged
+        assert "236065233815" not in q, f"Financial number leaked in audit query: {q}"
+        assert "CEO audit test note" not in q, f"Note leaked in audit query: {q}"
+        assert "Unapproved random title" not in q, f"Title leaked in audit query: {q}"
+
 
 
 

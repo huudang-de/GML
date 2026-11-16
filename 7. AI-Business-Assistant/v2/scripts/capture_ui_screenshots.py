@@ -26,7 +26,9 @@ V2_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(V2_DIR))
 
 from app.memory.session_store import SessionStore
-from db.apply_db import get_app_engine
+from app.agents.series_tools import build_alert_evidence
+from app.agents.trend_agent import analyze_kpi_trend
+from db.apply_db import get_app_engine, get_ro_engine
 
 SCREENSHOTS_DIR = V2_DIR / "eval" / "reports" / "ui_screens"
 
@@ -58,24 +60,93 @@ def get_browser_executable() -> str:
 
 
 def seed_demo_database_state() -> None:
-    """Seed representative operational alerts and history turns into PostgreSQL."""
+    """Seed representative operational alerts, actions, and history turns into PostgreSQL."""
     print("Seeding demo database state...")
     engine_real = get_app_engine(profile="real")
+    engine_synth = get_app_engine(profile="synth")
+    ro_synth = get_ro_engine(profile="synth")
 
-    # 1. Seed alerts in app.alert_event
+    # 1. Build real series analysis on synth
+    trend_1 = analyze_kpi_trend("ty_le_su_dung_han_muc", role="ceo", data_profile="synth", engine=ro_synth)[0]
+    ev_1 = build_alert_evidence("ty_le_su_dung_han_muc", "critical", 0.885, trend_1).model_dump(mode="json")
+
+    trend_2 = analyze_kpi_trend("du_no_ngan_han", role="ceo", data_profile="synth", engine=ro_synth)[0]
+    ev_2 = build_alert_evidence("du_no_ngan_han", "warning", 236065233815.0, trend_2).model_dump(mode="json")
+
+    trend_3 = analyze_kpi_trend("gia_tri_hang_ton_kho", role="ceo", data_profile="synth", engine=ro_synth)[0]
+    ev_3 = build_alert_evidence("gia_tri_hang_ton_kho", "warning", 120000000000.0, trend_3).model_dump(mode="json")
+
+    # 2. Seed alerts into both real and synth databases for consistent UI testing
+    for eng in (engine_real, engine_synth):
+        with eng.begin() as conn:
+            conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id IN ('AL-001', 'AL-002', 'AL-003')"))
+            conn.execute(
+                sa.text("""
+                    INSERT INTO app.alert_event (
+                        rule_id, kpi_key, severity, message, value, threshold,
+                        is_acknowledged, acknowledged_by, acknowledged_at, created_at,
+                        period, dedup_key, evidence
+                    )
+                    VALUES
+                    (
+                        'AL-001', 'ty_le_su_dung_han_muc', 'critical',
+                        'Tỷ lệ sử dụng hạn mức vượt ngưỡng an toàn (88.5% > 85%)',
+                        0.885, 0.85, false, null, null, now() - interval '2 hours',
+                        '2026-07', 'AL-001:ty_le_su_dung_han_muc:2026-07:critical',
+                        CAST(:ev_1 AS jsonb)
+                    ),
+                    (
+                        'AL-002', 'du_no_ngan_han', 'warning',
+                        'Dư nợ ngắn hạn đạt đỉnh chu kỳ tích trữ nguyên liệu Q3',
+                        236065233815, 200000000000, false, null, null, now() - interval '1 hour',
+                        '2026-07', 'AL-002:du_no_ngan_han:2026-07:warning',
+                        CAST(:ev_2 AS jsonb)
+                    ),
+                    (
+                        'AL-003', 'gia_tri_hang_ton_kho', 'warning',
+                        'Tồn kho melamine tăng cao so với kế hoạch',
+                        120000000000, 100000000000, true, 'usr_ceo', now() - interval '10 minutes', now() - interval '3 hours',
+                        '2026-07', 'AL-003:gia_tri_hang_ton_kho:2026-07:warning',
+                        CAST(:ev_3 AS jsonb)
+                    );
+                """),
+                {"ev_1": json.dumps(ev_1), "ev_2": json.dumps(ev_2), "ev_3": json.dumps(ev_3)},
+            )
+
+    # 3. Seed demo actions in app.action_item
     with engine_real.begin() as conn:
-        conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id IN ('AL-001', 'AL-002', 'AL-003')"))
+        conn.execute(sa.text("DELETE FROM app.action_item WHERE title LIKE 'Kích hoạt phương án%' OR title LIKE 'Tạm dừng giải ngân%'"))
         conn.execute(
             sa.text("""
-                INSERT INTO app.alert_event (rule_id, kpi_key, severity, message, value, threshold, is_acknowledged, acknowledged_by, acknowledged_at, created_at)
+                INSERT INTO app.action_item (
+                    title, kpi_key, level, source_type, source_ref,
+                    assigned_role, status, due_date, note, created_by, created_at
+                )
                 VALUES
-                ('AL-001', 'ty_le_su_dung_han_muc', 'critical', 'Tỷ lệ sử dụng hạn mức vượt ngưỡng an toàn (88.5% > 85%)', 0.885, 0.85, false, null, null, now() - interval '2 hours'),
-                ('AL-002', 'du_no_ngan_han', 'warning', 'Dư nợ ngắn hạn đạt đỉnh chu kỳ tích trữ nguyên liệu Q3', 236065233815, 200000000000, false, null, null, now() - interval '1 hour'),
-                ('AL-003', 'gia_tri_hang_ton_kho', 'warning', 'Tồn kho melamine tăng cao so với kế hoạch', 120000000000, 100000000000, true, 'usr_ceo', now() - interval '10 minutes', now() - interval '3 hours');
+                (
+                    'Kích hoạt phương án khẩn cấp: ngừng toàn bộ các khoản giải ngân mới chưa cấp thiết.',
+                    'ty_le_su_dung_han_muc', 'nghiem_trong', 'alert', 'AL-001',
+                    'ceo', 'open', '2026-08-15', 'CEO phê duyệt khẩn cấp', 'usr_ceo', now() - interval '1 hour'
+                ),
+                (
+                    'Tạm dừng giải ngân mới từ các ngân hàng có tỷ lệ sử dụng trên 80%.',
+                    'ty_le_su_dung_han_muc', 'canh_bao', 'alert', 'AL-002',
+                    'ke_toan_truong', 'in_progress', '2026-08-20', 'KTT đang làm việc với các ngân hàng', 'usr_ceo', now() - interval '30 minutes'
+                );
             """)
         )
 
-    # 2. Seed history in app.chat_turn
+    # 4. Seed demo pinned KPI in synth
+    with engine_synth.begin() as conn:
+        conn.execute(sa.text("DELETE FROM app.pinned_kpi WHERE user_id = 'usr_ceo' AND data_profile = 'synth'"))
+        conn.execute(
+            sa.text("""
+                INSERT INTO app.pinned_kpi (user_id, data_profile, kpi_key, position)
+                VALUES ('usr_ceo', 'synth', 'gia_tri_phai_tra', 1);
+            """)
+        )
+
+    # 5. Seed history in app.chat_turn
     store = SessionStore(engine=engine_real, data_profile="real")
     demo_session = "sess-demo-history-ev16"
     store.add_turn(
@@ -188,7 +259,7 @@ async def capture_url_cdp(browser_exe: str, url: str, out_file: Path, wait_sec: 
 
 
 def capture_screens() -> None:
-    """Launch services, capture 4 UI screenshots, and verify file sizes."""
+    """Launch services, capture 7 UI screenshots, and verify file sizes."""
     SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     browser_exe = get_browser_executable()
     print(f"Using browser: {browser_exe}")
@@ -204,7 +275,7 @@ def capture_screens() -> None:
     env["PYTHONPATH"] = str(V2_DIR)
     env["API_BASE_URL"] = f"http://127.0.0.1:{api_port}"
     env["LLM_PROVIDER"] = "heuristic"
-    env["GOOGLE_API_KEY"] = ""
+    env["GOOGLE_API_KEY"] = "mock_offline"
 
     api_proc: subprocess.Popen | None = None
     st_proc: subprocess.Popen | None = None
@@ -245,12 +316,15 @@ def capture_screens() -> None:
         st_proc = subprocess.Popen(st_cmd, cwd=str(V2_DIR), env=env)
         wait_for_http_ready(f"http://127.0.0.1:{st_port}/_stcore/health", timeout_sec=30.0, label="Streamlit")
 
-        # 3. Capture the 4 target screens
+        # 3. Capture the 7 target screens (EV-16)
         targets = [
             ("01_chat_real.png", f"http://127.0.0.1:{st_port}/?screen=chat&profile=real&autoload_last=1", 5.0),
             ("02_chat_synth.png", f"http://127.0.0.1:{st_port}/?screen=chat&profile=synth&autoload_last=1", 5.0),
-            ("03_alert_center.png", f"http://127.0.0.1:{st_port}/?screen=alerts&profile=real", 3.5),
-            ("04_history.png", f"http://127.0.0.1:{st_port}/?screen=history&profile=real", 3.5),
+            ("03_alert_center.png", f"http://127.0.0.1:{st_port}/?screen=alerts&profile=real", 4.0),
+            ("04_history.png", f"http://127.0.0.1:{st_port}/?screen=history&profile=real", 4.0),
+            ("05_overview.png", f"http://127.0.0.1:{st_port}/?screen=overview&profile=synth", 5.0),
+            ("06_alert_detail.png", f"http://127.0.0.1:{st_port}/?screen=alerts&profile=real", 4.0),
+            ("07_actions.png", f"http://127.0.0.1:{st_port}/?screen=actions&profile=real", 4.0),
         ]
 
         for filename, url, wait_time in targets:
@@ -271,7 +345,7 @@ def capture_screens() -> None:
             if size_kb < 15.0:
                 raise ValueError(f"Screenshot {filename} too small ({size_kb:.1f} KB), expected > 15 KB")
 
-        print("\nAll 4 EV-16 UI screenshots captured and verified successfully!")
+        print(f"\nAll {len(targets)} EV-16 UI screenshots captured and verified successfully!")
 
     finally:
         print("Cleaning up background processes...")
