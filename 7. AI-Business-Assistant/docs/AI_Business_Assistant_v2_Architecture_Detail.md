@@ -98,7 +98,7 @@ DATA_PROFILE=synth ►│ ai_views.* trên synthetic│─► Câu trả lời g
 ## 4. Bản đồ tầng
 
 ```
- T6  CLIENT ............ Streamlit (Chat · Alert Center · Lịch sử) · nút "Hỏi AI" từ Power BI
+ T6  CLIENT ............ Streamlit (Tổng quan · Cảnh báo · Hỏi đáp · Hành động · Lịch sử) · nút "Hỏi AI" từ Power BI
  T5  API GATEWAY ....... FastAPI /v1 · auth · RBAC · rate limit · request_id · audit
  T4  ORCHESTRATOR ...... LangGraph: guard_input → resolve_context → classify → branches → join
                          → explain ∥ trend → advise → confidence_gate → synthesize → guard_output
@@ -110,6 +110,8 @@ DATA_PROFILE=synth ►│ ai_views.* trên synthetic│─► Câu trả lời g
 ```
 
 Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song song từ Phase 2 trở đi. Mỗi tầng chỉ được gọi tầng ngay dưới nó qua hợp đồng đã định (T4 không truy vấn DB trực tiếp; T3 không đọc HTTP request).
+
+Xem thêm: docs/plans/2026-11-15-dataagent-adoption-impact-analysis.md
 
 ---
 
@@ -125,7 +127,7 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 | --- | --- |
 | `db/roles.sql` | Role `gml_ai_ro` (read-only, `statement_timeout=15s`, `default_transaction_read_only=on`), role `gml_ai_app` (ghi `app.*`) |
 | `db/views.sql.j2` | Template tạo `ai_views.*` từ schema nguồn (`silver` hoặc `synthetic`) |
-| `db/migrations/` | `app.chat_turn`, `app.audit_log`, `app.alert_event`, `app.feedback`, `app.job_heartbeat` |
+| `db/migrations/` | `app.chat_turn`, `app.audit_log`, `app.alert_event`, `app.feedback`, `app.job_heartbeat`; thêm `002_dataagent_adoption.sql`: `app.action_item`, `app.pinned_kpi`, cột `alert_event.{period, evidence, dedup_key, escalated_at}` |
 | `db/synthetic/generate.py`, `anomalies.yaml` | Bộ sinh dữ liệu mô phỏng (mục 3.1) |
 | `db/catalog.yaml` | Mô tả máy đọc được của từng view: cột, ý nghĩa, đơn vị, vai trò được xem |
 
@@ -144,6 +146,8 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 | TC-T1-05 | Bộ sinh tất định | Chạy `generate.py --seed 42` hai lần | Checksum bảng giống hệt | [S] |
 | TC-T1-06 | Không trộn profile | Kết nối profile `real`, tìm marker `SYNTH_` trong mọi view | 0 dòng | [R] |
 | TC-T1-07 | Bất thường được cài đúng | Đọc `anomalies.yaml`, truy vấn điểm tương ứng | Giá trị đúng như nhãn | [S] |
+| TC-T1-08 | Migration 002 idempotent | Chạy migration 002 hai lần | migration 002 áp dụng được 2 lần không lỗi; các cột/bảng tồn tại | — |
+| TC-T1-09 | Role AI không ghi bảng mới | `INSERT` vào `app.action_item`/`app.pinned_kpi` bằng `gml_ai_ro` | `gml_ai_ro` không ghi được `app.action_item`/`app.pinned_kpi` | — |
 
 **Phép đo**: M-01 tỷ lệ view khớp UAT (mục tiêu 100%); M-02 số lệnh ghi lọt qua role AI (mục tiêu 0).
 
@@ -162,10 +166,12 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 | `app/knowledge/kpi_definitions.yaml` | 18 KPI: tên, công thức, view, `golden_ref`, ngưỡng, ý nghĩa | BRD + Data Dictionary |
 | `app/knowledge/business_rules.yaml` | (KPI, mức) → hành động đã duyệt | BRD ngưỡng + Storytelling |
 | `app/knowledge/golden_queries/*.sql` + `index.yaml` | Truy vấn mẫu, câu hỏi mẫu, `split: dev` | 5 file UAT (chỉ phần **dev**) |
+| `app/knowledge/golden_queries/series/*.sql` + `series_index.yaml` | Truy vấn chuỗi thời gian cho KPI (sparkline) | — |
+| `app/knowledge/role_profiles.yaml` | Hồ sơ vai trò: KPI tổng quan, câu hỏi gợi ý | — |
 | `app/rag/ingest.py` | Nạp có phiên bản (hash), chia theo heading, NFC | `guide_dashboard1–5.md`, Cẩm nang nghiệp vụ, Storytelling, Tri thức tài chính GML |
 | `app/memory/session_store.py` | `app.chat_turn`, TTL, xoá theo yêu cầu | — |
 
-**Hợp đồng.** `get_kpi(key) -> KPI`; `match_golden(question, k=3) -> list[GoldenQuery]`; `retrieve(query, k=5, role) -> list[Chunk{text, source, version}]`; `history(session_id, n=5)`.
+**Hợp đồng.** `get_kpi(key) -> KPI`; `get_series_query(kpi_key) -> SeriesQuery | None`; `get_role_profile(role) -> RoleProfile`; `match_golden(question, k=3) -> list[GoldenQuery]`; `retrieve(query, k=5, role) -> list[Chunk{text, source, version}]`; `history(session_id, n=5)`.
 
 **Test case**
 
@@ -178,8 +184,11 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 | TC-T2-05 | Ingest phát hiện thay đổi | Sửa 1 dòng `guide_dashboard3.md` → chỉ chunk của file đó được index lại | — |
 | TC-T2-06 | Tiếng Việt không dấu | "vong quay phai thu" truy hồi được chunk định nghĩa vòng quay phải thu trong top 5 | — |
 | TC-T2-07 | TTL & xoá lịch sử | Lượt quá TTL bị xoá; lệnh xoá theo user xoá hết | — |
+| TC-T2-08 | Quyền KPI tổng quan | mọi `overview_kpis` của vai trò đều truy cập được bằng chính vai trò đó | — |
+| TC-T2-09 | Chống rò rỉ câu hỏi gợi ý | câu hỏi gợi ý không rò rỉ sang benchmark `split: test` (cosine < 0,92) | — |
+| TC-T2-10 | Validator SQL chuỗi | mọi SQL chuỗi chỉ dùng view trong `views_used` và qua được validator | — |
 
-**Phép đo**: M-03 Hit@5, M-04 MRR trên 10 câu RAG (mục tiêu: đặt sau baseline v1, v2 phải ≥ baseline + 15 điểm %); M-05 độ phủ KPI (số KPI có golden query / 18, mục tiêu 100%).
+**Phép đo**: M-03 Hit@5, M-04 MRR trên 10 câu RAG (mục tiêu: đặt sau baseline v1, v2 phải ≥ baseline + 15 điểm %); M-05 độ phủ KPI (số KPI có golden query / 18, mục tiêu 100%); M-05b độ phủ chuỗi = số KPI tổng quan có `series_ref` / tổng số KPI tổng quan (mục tiêu 100%).
 
 **Bằng chứng**: EV-04 `eval/reports/t2_yaml_lint.txt`; EV-05 `eval/reports/t2_leakage_check.txt`; EV-06 `eval/reports/rag_retrieval.md` (Hit@5, MRR, so v1).
 
@@ -187,14 +196,14 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 
 ### T3 — Agents
 
-**Trách nhiệm.** Mỗi agent là một hàm thuần (đầu vào state → đầu ra phần state), không tự gọi agent khác, không tự đọc HTTP.
+**Trách nhiệm.** Mỗi agent là một hàm thuần (đầu vào state → đầu ra phần state), không tự gọi agent khác, không tự đọc HTTP. Thêm các hàm thuần `summarize_series`, `build_alert_evidence`, `resolve_approved_action`.
 
 | Agent | Vào | Ra | Có LLM? | Điểm kiểm soát |
 | --- | --- | --- | --- | --- |
 | SQL (6 bước, Phần II §6.2) | `standalone_query`, `role`, golden matches | `sql{sql, rows, row_count, status, confidence}` | Sinh/sửa SQL | Validator AST + allowlist theo role; `status ∈ {ok,no_data,execution_error,rejected}` |
 | RAG | query, role | `rag{chunks, sources, grounding_ok}` | Sinh câu trả lời có trích nguồn | Kiểm tra bám nguồn |
 | Explainer | `kpi_keys`, `sql` | `explanation{formula, components[], meaning}` | Chỉ diễn đạt | **Kiểm tra bám số**: mọi số trong văn bản ∈ tập số đầu vào |
-| Trend | `kpi_keys` | `trend{series, mom, yoy, anomalies[], data_coverage}` | Không (luật) | Báo `data_coverage < 12` thay vì suy diễn |
+| Trend | `kpi_keys` | `trend{series, mom, yoy, anomalies[], data_coverage}` | Không (luật) | Đọc chuỗi từ T2; báo `data_coverage < 12` thay vì suy diễn |
 | Advisor | KPI, giá trị, mức | `advice[]` từ `business_rules.yaml` | Chỉ diễn đạt | Hành động ∉ danh sách → chặn |
 | Synthesizer | toàn bộ state | `Answer` (Pydantic, Phần II §6.4) | Diễn đạt | Mỗi `Figure` có `source_query_id` |
 
@@ -217,6 +226,8 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 | TC-T3-11 | Advisor không vượt danh sách | LLM mock thêm "bán bớt tài sản" → bị lọc | — |
 | TC-T3-12 | Advisor gắn nhãn | Mọi `advice` có dòng "cần người có thẩm quyền quyết định" | — |
 | TC-T3-13 | Synthesizer có kiểu | `Answer` validate được; mọi `Figure.source_query_id` tồn tại trong log | — |
+| TC-T3-14 | KPI không có series_ref | KPI không có `series_ref` → `trend=None` kèm lỗi "chưa có truy vấn chuỗi thời gian", không có chuỗi giả | — |
+| TC-T3-15 | Bằng chứng cảnh báo bám số | bằng chứng cảnh báo chỉ chứa số có trong chuỗi đầu vào | — |
 
 **Phép đo**: M-06 Execution accuracy SQL (≥ 85% trên bộ test 25 câu); M-07 tỷ lệ SQL hợp lệ (≥ 95%); M-08 tỷ lệ số không bám nguồn lọt ra ngoài (0%); M-09 recall phát hiện bất thường trên synthetic (≥ 90% nhãn); M-10 false positive bất thường (≤ 1 / KPI / 12 tháng).
 
@@ -255,7 +266,7 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 
 **Trách nhiệm.** Đóng gói dịch vụ: xác thực, phân quyền, giới hạn tần suất, `request_id`, nhật ký kiểm toán, lỗi thống nhất. Endpoint như Phần II §6.8.
 
-**File**: `app/api/main.py`, `deps.py`, `schemas.py`, `routers/{chat,kpi,alerts,feedback,history,health}.py`, `app/core/{config,security,errors,logging}.py`.
+**File**: `app/api/main.py`, `deps.py`, `schemas.py`, `routers/{chat,kpi,alerts,feedback,history,health,overview,actions,pins}.py`, `app/services/`, `app/core/{config,security,errors,logging}.py`.
 
 **Test case** (contract test bằng `httpx`/`TestClient`)
 
@@ -270,6 +281,9 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 | TC-T5-07 | Audit log | Mỗi `/v1/chat` ghi 1 dòng `app.audit_log` có user, role, SQL, view, `request_id`; không chứa dữ liệu trả về |
 | TC-T5-08 | OpenAPI | `/openapi.json` hợp lệ, khớp snapshot đã duyệt |
 | TC-T5-09 | Chặn cấu hình triển khai không an toàn | `APP_ENV=production` + LLM đám mây gói miễn phí → app từ chối khởi động (bảo vệ cho triển khai thật sau này) |
+| TC-T5-10 | Chặn thao tác KPI vượt quyền | quản lý kho ghim/tạo hành động trên KPI tài chính → 403 và có audit |
+| TC-T5-11 | Chặn hành động từ request khác | tạo hành động từ `request_id` của người khác → 404 |
+| TC-T5-12 | Dự phòng lỗi KPI tổng quan | một KPI tổng quan lỗi → `/v1/overview` vẫn 200, thẻ đó có `error` |
 
 **Phép đo**: M-13 % endpoint có contract test (100%); M-14 % request có audit (100%).
 
@@ -279,7 +293,7 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 
 ### T6 — Client
 
-**Trách nhiệm.** Streamlit: Chat (hiện tóm tắt + bảng số + SQL + nguồn + độ tin cậy + nhãn Synthetic), Alert Center (xem/xác nhận), Lịch sử, nút 👍/👎.
+**Trách nhiệm.** Streamlit 5 màn hình: Tổng quan, Cảnh báo (Alert Center dạng Master–Detail), Hỏi đáp (Chat hiện tóm tắt + bảng số + SQL + nguồn + độ tin cậy + nhãn Synthetic), Hành động, Lịch sử; nút 👍/👎.
 
 **File**: `app/ui/streamlit_app.py`, `app/ui/components/`.
 
@@ -292,10 +306,12 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 | TC-T6-03 | Xác nhận cảnh báo | Bấm "Đã xem" → `POST /v1/alerts/{id}/ack`, trạng thái đổi | `AppTest` + API mock |
 | TC-T6-04 | Feedback | 👎 + ghi chú → `app.feedback` có `request_id` | `AppTest` |
 | TC-T6-05 | Thử người dùng | 2–3 người dùng thử (đóng vai CEO/KTT theo kịch bản) làm 5 nhiệm vụ | Thủ công, phiếu ghi |
+| TC-T6-06 | Màn hình mặc định & Quick Ask | mặc định mở Tổng quan, nhưng URL Quick Ask có `kpi`/`dashboard` thì mở Chat | Streamlit `AppTest` |
+| TC-T6-07 | Nút tạo hành động | nút "Tạo hành động" gọi `POST /v1/actions` | Streamlit `AppTest` + API mock |
 
 **Phép đo**: M-15 tỷ lệ hoàn thành nhiệm vụ trong phiên thử (≥ 80%); M-16 thời gian trả lời cảm nhận (P95 end-to-end ≤ 15 s).
 
-**Bằng chứng**: EV-16 ảnh chụp màn hình 4 màn (Chat, Chat-synthetic, Alert Center, Lịch sử); EV-17 `eval/reports/user_test.md` (phiếu ghi, trích dẫn, vấn đề).
+**Bằng chứng**: EV-16 ảnh chụp màn hình (Chat, Chat-synthetic, Alert Center, Lịch sử; thêm `05_overview.png`, `06_alert_detail.png`, `07_actions.png`); EV-17 `eval/reports/user_test.md` (phiếu ghi, trích dẫn, vấn đề).
 
 ---
 
@@ -304,6 +320,12 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 **Trách nhiệm.** Tự chạy theo lịch: alert engine 07:00 hằng ngày, bản tin tuần thứ Hai, heartbeat. Tính KPI **bằng golden query, không qua LLM** (Phần II §6.6). Không thực hiện hành động tài chính.
 
 **File**: `app/alerts/rules.yaml`, `engine.py`, `scheduler.py`, `notifier.py`, `weekly_brief.py`.
+
+**Quy cách đặt trước cho P5 (DataAgent adoption):**
+- `engine.py` ghi `app.alert_event` với `period` (`YYYY-MM`), `dedup_key = f"{rule_id}:{kpi_key}:{period}"` dùng `INSERT … ON CONFLICT (dedup_key) DO NOTHING` (đáp ứng TC-T7-03), và `evidence = build_alert_evidence(...).model_dump()`.
+- Leo thang (TC-T7-05) đặt `escalated_at`. Không tạo cảnh báo mới.
+- Heartbeat ghi `app.job_heartbeat(job_name='alert_engine', status='ok'|'error')`. `build_briefing` đọc dòng `ok` mới nhất làm `last_alert_job_at`.
+- `weekly_brief.py` gọi `build_briefing(role='ceo', …)` (không dựng KPI lần hai). TC-T7-08 giữ nguyên.
 
 **Test case**
 
@@ -318,6 +340,7 @@ Thứ tự xây là **từ dưới lên** (T1 → T6), T7 và T8 chạy song son
 | TC-T7-07 | Chạy trên Real | Engine trên `silver` cho tỷ lệ sử dụng hạn mức = G-13 (91,8%) → kích hoạt **AL-002 Nghiêm trọng**, AL-001 bị loại | [R] |
 | TC-T7-08 | Bản tin tuần | Có 5 KPI, delta so tuần trước, cảnh báo còn mở | [S] |
 | TC-T7-09 | Chạy liên tục 7 ngày | Lịch tua nhanh (clock giả lập 7 ngày) và/hoặc chạy thật 7 ngày | [S] |
+| TC-T7-10 | Bằng chứng cảnh báo từ engine | mọi cảnh báo do engine tạo đều có `evidence.series` khác rỗng **hoặc** `evidence.coverage_warning`. Mọi số trong `evidence` đều thuộc chuỗi đầu vào | [S] |
 
 **Phép đo**: M-17 precision/recall cảnh báo so với nhãn `anomalies.yaml` (precision ≥ 90%, recall 100% cho nhãn mức nghiêm trọng); M-18 tỷ lệ job chạy đúng lịch (100% trong 7 ngày); M-19 số cảnh báo trùng (0).
 
