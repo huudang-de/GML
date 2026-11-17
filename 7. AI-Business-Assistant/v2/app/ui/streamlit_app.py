@@ -107,6 +107,15 @@ def main() -> None:
     autoload_last = qp.get("autoload_last")
     has_kpi_or_dashboard = bool(query_dashboard or query_kpi)
 
+    current_qp = {
+        "role": query_role,
+        "profile": query_profile,
+        "screen": query_screen,
+        "dashboard": query_dashboard,
+        "kpi": query_kpi,
+    }
+    prev_qp = st.session_state.get("_applied_qp") or {}
+
     # 3. Sidebar Configuration
     with st.sidebar:
         st.title("🪵 Gỗ Minh Long AI Assistant v2.0")
@@ -114,33 +123,42 @@ def main() -> None:
         st.divider()
 
         role_options = list(ROLE_TOKENS.keys())
-        initial_role_idx = role_options.index(query_role) if query_role in role_options else 0
-        if query_role and query_role in role_options and st.session_state.get("role_selector") != query_role:
+        if "role_selector" not in st.session_state:
+            st.session_state["role_selector"] = query_role if query_role in role_options else role_options[0]
+        elif query_role != prev_qp.get("role") and query_role in role_options:
             st.session_state["role_selector"] = query_role
 
         role = st.selectbox(
             "👤 Vai trò người dùng",
             options=role_options,
             format_func=lambda r: f"{ROLE_LABELS.get(r, r)} ({r})",
-            index=initial_role_idx,
             key="role_selector",
         )
 
-        initial_profile_idx = _resolve_profile_index(query_profile)
-        target_profile_val = "synth" if initial_profile_idx == 1 else "real"
-        if query_profile and st.session_state.get("profile_selector") != target_profile_val:
-            st.session_state["profile_selector"] = target_profile_val
+        profile_options = ["real", "synth"]
+        if "profile_selector" not in st.session_state:
+            st.session_state["profile_selector"] = (
+                "synth" if _resolve_profile_index(query_profile) == 1 else "real"
+            )
+        elif query_profile != prev_qp.get("profile") and query_profile is not None:
+            st.session_state["profile_selector"] = (
+                "synth" if _resolve_profile_index(query_profile) == 1 else "real"
+            )
 
         active_profile = st.radio(
             "🌐 Nguồn dữ liệu (Profile)",
-            options=["real", "synth"],
+            options=profile_options,
             format_func=lambda p: "Dữ liệu Thực tế (Data Warehouse)" if p == "real" else "Dữ liệu Mô phỏng (Synthetic)",
-            index=initial_profile_idx,
             key="profile_selector",
         )
 
         # Cross-screen programmatic navigation handling
         nav_screen = st.session_state.pop("nav_screen", None)
+        qp_screen_changed = (
+            query_screen != prev_qp.get("screen")
+            or query_dashboard != prev_qp.get("dashboard")
+            or query_kpi != prev_qp.get("kpi")
+        )
         if nav_screen and nav_screen in SCREEN_OPTIONS:
             st.session_state["screen_selector"] = nav_screen
         elif "screen_selector" not in st.session_state:
@@ -149,12 +167,16 @@ def main() -> None:
                 has_kpi_or_dashboard=has_kpi_or_dashboard,
             )
             st.session_state["screen_selector"] = SCREEN_OPTIONS[initial_screen_idx]
-        elif query_screen:
-            target_opt = SCREEN_OPTIONS[_resolve_screen_index(query_screen, has_kpi_or_dashboard=has_kpi_or_dashboard)]
-            if st.session_state.get("screen_selector") != target_opt:
-                st.session_state["screen_selector"] = target_opt
+        elif qp_screen_changed and (query_screen is not None or has_kpi_or_dashboard):
+            target_idx = _resolve_screen_index(
+                query_screen,
+                has_kpi_or_dashboard=has_kpi_or_dashboard,
+            )
+            st.session_state["screen_selector"] = SCREEN_OPTIONS[target_idx]
 
-        active_screen = st.sidebar.radio(
+        st.session_state["_applied_qp"] = current_qp
+
+        active_screen = st.radio(
             "📌 Chức năng",
             options=SCREEN_OPTIONS,
             key="screen_selector",
@@ -207,7 +229,7 @@ def main() -> None:
             with col_qa1:
                 if st.button(f"Hỏi nhanh: {kpi_name}", key="pbi_quick_ask_btn"):
                     st.session_state["pending_query"] = f"{kpi_name} hiện tại là bao nhiêu?"
-                    st.session_state["screen_selector"] = SCREEN_OPTIONS[2]
+                    st.session_state["nav_screen"] = SCREEN_OPTIONS[2]
                     st.rerun()
 
     # 7. Autoload Demo Data for EV-16 Screenshots if requested
@@ -241,7 +263,7 @@ def main() -> None:
     elif active_screen == SCREEN_OPTIONS[1]:
         render_alert_center(api_client=api_client, profile=active_profile)
     elif active_screen == SCREEN_OPTIONS[2]:
-        render_chat_view(api_client=api_client, profile=active_profile)
+        render_chat_view(api_client=api_client, profile=active_profile, role=role)
     elif active_screen == SCREEN_OPTIONS[3]:
         render_actions_view(api_client=api_client, profile=active_profile)
     elif active_screen == SCREEN_OPTIONS[4]:

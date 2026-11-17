@@ -22,9 +22,65 @@ from app.core.security import can_access_kpi, kpi_domain
 from app.knowledge.loader import get_kpi, get_role_profile
 from app.services.kpi_service import (
     KpiComputationError,
+    KpiForbidden,
+    KpiNotFound,
     compute_kpi_series,
     compute_kpi_value,
+    series_warning_for_summary,
 )
+
+
+def row_to_alert_item(r: Any) -> AlertItem:
+    """Convert an app.alert_event row into an AlertItem schema object safely."""
+    try:
+        row_domain = kpi_domain(r.kpi_key)
+    except (KeyError, ValueError):
+        row_domain = None
+
+    created_str = r.created_at.isoformat() if isinstance(r.created_at, datetime) else str(r.created_at)
+    ack_str = (
+        r.acknowledged_at.isoformat()
+        if isinstance(r.acknowledged_at, datetime)
+        else (str(r.acknowledged_at) if r.acknowledged_at else None)
+    )
+    esc_str = (
+        r.escalated_at.isoformat()
+        if isinstance(r.escalated_at, datetime)
+        else (str(r.escalated_at) if r.escalated_at else None)
+    )
+
+    raw_ev = r.evidence
+    ev_dict: dict[str, Any] | None = None
+    if isinstance(raw_ev, str):
+        try:
+            parsed = json.loads(raw_ev)
+            if isinstance(parsed, dict):
+                ev_dict = parsed
+        except Exception:
+            ev_dict = None
+    elif isinstance(raw_ev, dict):
+        ev_dict = raw_ev
+
+    return AlertItem(
+        id=r.id,
+        rule_id=r.rule_id,
+        kpi_key=r.kpi_key,
+        severity=r.severity,
+        alert_level=r.severity,
+        message=r.message,
+        current_value=r.value,
+        threshold_value=r.threshold,
+        value=r.value,
+        threshold=r.threshold,
+        is_acknowledged=bool(r.is_acknowledged),
+        created_at=created_str,
+        acknowledged_at=ack_str,
+        acknowledged_by=r.acknowledged_by,
+        period=r.period,
+        evidence=ev_dict,
+        domain=row_domain,
+        escalated_at=esc_str,
+    )
 
 
 def build_briefing(
@@ -127,7 +183,7 @@ def build_briefing(
                 kpi_name = val_payload["kpi_name"]
             if val_payload.get("unit"):
                 unit = val_payload["unit"]
-        except (KpiComputationError, Exception) as exc:
+        except (KpiComputationError, KpiForbidden, KpiNotFound, sa.exc.SQLAlchemyError) as exc:
             card_error = str(exc)
 
         if card_error is None:
@@ -142,12 +198,12 @@ def build_briefing(
                 if summary is not None:
                     prev_val = summary.previous_value
                     delta_pct = summary.delta_pct
-                    series_warn = summary.warning
+                    series_warn = series_warning_for_summary(summary)
                     series_points = [
                         p.model_dump() if hasattr(p, "model_dump") else dict(p)
                         for p in summary.points
                     ]
-            except Exception:
+            except (KpiComputationError, KpiForbidden, KpiNotFound, sa.exc.SQLAlchemyError):
                 prev_val = None
                 delta_pct = None
                 series_points = []
@@ -188,62 +244,13 @@ def build_briefing(
         if not can_access_kpi(user.role, r.kpi_key):
             continue
 
-        try:
-            row_domain = kpi_domain(r.kpi_key)
-        except (KeyError, ValueError):
-            row_domain = None
-
         sev = (r.severity or "").strip().lower()
         if sev in ("nghiem_trong", "critical"):
             open_alerts_counts["nghiem_trong"] += 1
         elif sev in ("canh_bao", "warning"):
             open_alerts_counts["canh_bao"] += 1
 
-        created_str = r.created_at.isoformat() if isinstance(r.created_at, datetime) else str(r.created_at)
-        ack_str = (
-            r.acknowledged_at.isoformat()
-            if isinstance(r.acknowledged_at, datetime)
-            else (str(r.acknowledged_at) if r.acknowledged_at else None)
-        )
-        esc_str = (
-            r.escalated_at.isoformat()
-            if isinstance(r.escalated_at, datetime)
-            else (str(r.escalated_at) if r.escalated_at else None)
-        )
-
-        raw_ev = r.evidence
-        ev_dict = None
-        if isinstance(raw_ev, str):
-            try:
-                parsed = json.loads(raw_ev)
-                if isinstance(parsed, dict):
-                    ev_dict = parsed
-            except Exception:
-                ev_dict = None
-        elif isinstance(raw_ev, dict):
-            ev_dict = raw_ev
-
-        alert_item = AlertItem(
-            id=r.id,
-            rule_id=r.rule_id,
-            kpi_key=r.kpi_key,
-            severity=r.severity,
-            alert_level=r.severity,
-            message=r.message,
-            current_value=r.value,
-            threshold_value=r.threshold,
-            value=r.value,
-            threshold=r.threshold,
-            is_acknowledged=bool(r.is_acknowledged),
-            created_at=created_str,
-            acknowledged_at=ack_str,
-            acknowledged_by=r.acknowledged_by,
-            period=r.period,
-            evidence=ev_dict,
-            domain=row_domain,
-            escalated_at=esc_str,
-        )
-        filtered_alert_items.append(alert_item)
+        filtered_alert_items.append(row_to_alert_item(r))
 
     top_alerts = filtered_alert_items[:3]
 

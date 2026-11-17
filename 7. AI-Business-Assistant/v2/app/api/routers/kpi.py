@@ -19,6 +19,7 @@ from app.api.deps import (
     get_kpi_cache,
     get_metrics,
     get_request_id,
+    resolve_profile,
 )
 from app.api.schemas import KpiValueResponse
 from app.core.auth import UserPrincipal
@@ -31,6 +32,7 @@ from app.services.kpi_service import (
     KpiNotFound,
     compute_kpi_series,
     compute_kpi_value,
+    series_warning_for_summary,
 )
 from db.apply_db import get_app_engine
 
@@ -50,7 +52,7 @@ def get_kpi_value(
 ) -> KpiValueResponse:
     """Retrieve and calculate KPI value using deterministic Golden Queries, with optional time-series."""
     req_id = get_request_id(request)
-    target_profile = (profile or settings.data_profile).strip().lower()
+    target_profile = resolve_profile(profile, settings)
 
     # 1. Compute scalar KPI value
     try:
@@ -173,9 +175,8 @@ def get_kpi_value(
         res_data["series"] = [p.model_dump() for p in summary.points]
         res_data["previous_value"] = summary.previous_value
         res_data["delta_pct"] = summary.delta_pct
-        if len(summary.points) < 6:
-            res_data["series_warning"] = (
-                f"Chỉ có {len(summary.points)} tháng dữ liệu, chưa đủ để phân tích xu hướng"
-            )
+        warn = series_warning_for_summary(summary)
+        if warn:
+            res_data["series_warning"] = warn
 
     return KpiValueResponse(**res_data)

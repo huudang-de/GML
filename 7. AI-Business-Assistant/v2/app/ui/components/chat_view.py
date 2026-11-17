@@ -46,12 +46,13 @@ def render_assistant_response(
     sources = answer.get("sources") or []
     confidence = answer.get("confidence", 0.0)
 
-    effective_kpis = kpi_keys or answer.get("kpi_keys") or []
+    raw_kpis = list(kpi_keys or answer.get("kpi_keys") or [])
     # If kpi_keys still empty, check figures
-    if not effective_kpis and figures:
+    if not raw_kpis and figures:
         for f in figures:
             if isinstance(f, dict) and f.get("key"):
-                effective_kpis.append(f["key"])
+                raw_kpis.append(f["key"])
+    effective_kpis = list(dict.fromkeys(k for k in raw_kpis if k))
 
     # 1. Summary text
     if summary:
@@ -79,17 +80,20 @@ def render_assistant_response(
             df = pd.DataFrame(fig_rows)
             st.dataframe(df, use_container_width=True)
 
-    # 3. Pin buttons for KPIs
+    # 3. Pin buttons for KPIs (max 3 columns per row)
     if effective_kpis:
-        p_cols = st.columns(len(effective_kpis))
-        for p_idx, k_key in enumerate(effective_kpis):
-            with p_cols[p_idx]:
-                if st.button(f"📌 Ghim {k_key}", key=f"pin_{request_id}_{k_key}"):
-                    try:
-                        api_client.add_pin(kpi_key=k_key, profile=profile)
-                        st.success(f"Đã ghim `{k_key}` vào Tổng quan!")
-                    except Exception as e:
-                        st.error(f"Lỗi khi ghim: {e}")
+        for row_start in range(0, len(effective_kpis), 3):
+            chunk = effective_kpis[row_start : row_start + 3]
+            p_cols = st.columns(len(chunk))
+            for col_idx, k_key in enumerate(chunk):
+                p_idx = row_start + col_idx
+                with p_cols[col_idx]:
+                    if st.button(f"📌 Ghim {k_key}", key=f"pin_{request_id}_{p_idx}_{k_key}"):
+                        try:
+                            api_client.add_pin(kpi_key=k_key, profile=profile)
+                            st.success(f"Đã ghim `{k_key}` vào Tổng quan!")
+                        except Exception as e:
+                            st.error(f"Lỗi khi ghim: {e}")
 
     # 4. Trend (Directly displayed - NOT inside expander)
     if trend and isinstance(trend, dict):
@@ -131,7 +135,7 @@ def render_assistant_response(
                                         "source_type": "chat",
                                         "source_ref": str(request_id),
                                         "kpi_key": adv_kpi,
-                                        "level": "canh_bao",
+                                        "level": adv.get("level") or "canh_bao",
                                         "title": act,
                                     },
                                     profile=profile,
@@ -206,7 +210,7 @@ def render_assistant_response(
                 st.error(f"Lỗi gửi phản hồi: {e}")
 
 
-def render_chat_view(api_client: HttpApiClient, profile: str) -> None:
+def render_chat_view(api_client: HttpApiClient, profile: str, role: str | None = None) -> None:
     """Render the primary Chat screen."""
     st.header("💬 Trợ lý Hỏi đáp Nghiệp vụ AI")
 
@@ -215,9 +219,9 @@ def render_chat_view(api_client: HttpApiClient, profile: str) -> None:
 
     # Display chat message history
     for msg in st.session_state.messages:
-        role = msg.get("role", "assistant")
-        with st.chat_message(role):
-            if role == "user":
+        msg_role = msg.get("role", "assistant")
+        with st.chat_message(msg_role):
+            if msg_role == "user":
                 st.markdown(msg.get("content", ""))
             else:
                 answer = msg.get("content", {})
@@ -234,16 +238,19 @@ def render_chat_view(api_client: HttpApiClient, profile: str) -> None:
                 else:
                     st.markdown(str(answer))
 
-    # Suggested questions if chat is empty
+    # Suggested questions if chat is empty (cached per (role, profile))
     if not st.session_state.messages:
-        if "suggested_questions" not in st.session_state:
+        active_role = role or st.session_state.get("role_selector", "ceo")
+        cache_key = (active_role, profile)
+        sq_cache = st.session_state.setdefault("suggested_questions_cache", {})
+        if cache_key not in sq_cache:
             try:
                 ov = api_client.get_overview(profile=profile)
-                st.session_state["suggested_questions"] = ov.get("suggested_questions", [])
+                sq_cache[cache_key] = ov.get("suggested_questions", [])
             except Exception:
-                st.session_state["suggested_questions"] = []
+                sq_cache[cache_key] = []
 
-        suggested = st.session_state.get("suggested_questions", [])
+        suggested = sq_cache.get(cache_key, [])
         if suggested:
             st.markdown("💡 **Câu hỏi gợi ý:**")
             for idx, sq in enumerate(suggested):

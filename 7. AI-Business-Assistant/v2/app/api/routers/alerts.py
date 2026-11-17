@@ -6,7 +6,6 @@ Specifications:
 """
 
 from datetime import datetime, timezone
-import json
 from typing import Any, Literal
 from fastapi import APIRouter, Depends, Query, Request
 import sqlalchemy as sa
@@ -17,11 +16,13 @@ from app.api.deps import (
     check_rate_limit,
     get_current_user,
     get_request_id,
+    resolve_profile,
 )
 from app.api.schemas import AlertAckResponse, AlertItem, AlertListResponse
 from app.core.auth import UserPrincipal
 from app.core.config import Settings, get_settings
-from app.core.security import can_access_kpi, kpi_domain
+from app.core.security import can_access_kpi
+from app.services.briefing import row_to_alert_item
 from db.apply_db import get_app_engine
 
 router = APIRouter(prefix="/v1/alerts", tags=["Alerts"], dependencies=[Depends(check_rate_limit)])
@@ -39,7 +40,7 @@ def list_alerts(
 ) -> AlertListResponse:
     """Retrieve operational alerts strictly filtered by caller's role permissions (Review Focus #5)."""
     req_id = get_request_id(request)
-    target_profile = (profile or settings.data_profile).strip().lower()
+    target_profile = resolve_profile(profile, settings)
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
 
     where_clauses: list[str] = []
@@ -82,52 +83,11 @@ def list_alerts(
         if not can_access_kpi(user.role, r.kpi_key):
             continue  # Strictly hide unauthorized alert
 
-        # Critical Ruling #2 (uncatalogued alerts):
-        try:
-            row_domain = kpi_domain(r.kpi_key)
-        except (KeyError, ValueError):
-            row_domain = None
-
-        if domain is not None and row_domain != domain:
+        alert_item = row_to_alert_item(r)
+        if domain is not None and alert_item.domain != domain:
             continue
 
-        created_str = r.created_at.isoformat() if isinstance(r.created_at, datetime) else str(r.created_at)
-        ack_str = r.acknowledged_at.isoformat() if isinstance(r.acknowledged_at, datetime) else (str(r.acknowledged_at) if r.acknowledged_at else None)
-        esc_str = r.escalated_at.isoformat() if isinstance(r.escalated_at, datetime) else (str(r.escalated_at) if r.escalated_at else None)
-
-        raw_ev = r.evidence
-        if isinstance(raw_ev, str):
-            try:
-                ev_dict = json.loads(raw_ev)
-            except Exception:
-                ev_dict = None
-        elif isinstance(raw_ev, dict):
-            ev_dict = raw_ev
-        else:
-            ev_dict = None
-
-        items.append(
-            AlertItem(
-                id=r.id,
-                rule_id=r.rule_id,
-                kpi_key=r.kpi_key,
-                severity=r.severity,
-                alert_level=r.severity,
-                message=r.message,
-                current_value=r.value,
-                threshold_value=r.threshold,
-                value=r.value,
-                threshold=r.threshold,
-                is_acknowledged=bool(r.is_acknowledged),
-                created_at=created_str,
-                acknowledged_at=ack_str,
-                acknowledged_by=r.acknowledged_by,
-                period=r.period,
-                evidence=ev_dict,
-                domain=row_domain,
-                escalated_at=esc_str,
-            )
-        )
+        items.append(alert_item)
 
     warnings: list[str] = ["SYNTHETIC_DATA"] if target_profile == "synth" else []
 
@@ -152,7 +112,7 @@ def acknowledge_alert(
 ) -> AlertAckResponse:
     """Acknowledge an operational alert (enforces 403 on unauthorized view domain)."""
     req_id = get_request_id(request)
-    target_profile = (profile or settings.data_profile).strip().lower()
+    target_profile = resolve_profile(profile, settings)
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
 
     # 1. Fetch alert

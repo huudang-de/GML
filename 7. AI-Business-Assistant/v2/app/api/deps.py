@@ -42,6 +42,18 @@ _RATE_LIMITER: SlidingWindowRateLimiter | None = None
 _KPI_CACHE: ScopedTTLCache | None = None
 
 
+def resolve_profile(profile: str | None, settings: Settings) -> str:
+    """Resolve and validate the target data profile ('real' or 'synth')."""
+    target_profile = (profile or settings.data_profile).strip().lower()
+    if target_profile not in ("real", "synth"):
+        raise ApiException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message=f"Hồ sơ dữ liệu '{target_profile}' không hợp lệ (chỉ chấp nhận 'real' hoặc 'synth').",
+        )
+    return target_profile
+
+
 def reset_rate_limiter() -> None:
     """Reset global rate limiter singleton (for test isolation)."""
     global _RATE_LIMITER

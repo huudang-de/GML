@@ -16,6 +16,7 @@ from starlette.testclient import TestClient
 from streamlit.testing.v1 import AppTest
 
 from app.api import create_app
+from app.core.config import get_settings
 from app.ui.api_client import set_default_transport_for_testing
 from db.apply_db import get_app_engine
 
@@ -23,8 +24,10 @@ APP_PATH = str(Path(__file__).resolve().parent.parent.parent / "app" / "ui" / "s
 
 
 @pytest.fixture(autouse=True)
-def setup_api_transport():
+def setup_api_transport(monkeypatch: pytest.MonkeyPatch):
     """Wire Streamlit AppTest to in-process FastAPI application via httpx MockTransport."""
+    monkeypatch.setenv("GOOGLE_API_KEY", "mock_offline")
+    get_settings.cache_clear()
     app = create_app()
     tc = TestClient(app)
 
@@ -46,6 +49,7 @@ def setup_api_transport():
     set_default_transport_for_testing(mock_transport)
     yield mock_transport
     set_default_transport_for_testing(None)
+    get_settings.cache_clear()
 
 
 def test_tc_t6_01_chat_displays_dual_output():

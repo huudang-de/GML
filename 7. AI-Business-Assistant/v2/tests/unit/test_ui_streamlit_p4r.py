@@ -22,6 +22,7 @@ from starlette.testclient import TestClient
 from streamlit.testing.v1 import AppTest
 
 from app.api import create_app
+from app.core.config import get_settings
 from app.ui.api_client import set_default_transport_for_testing
 from db.apply_db import get_app_engine
 
@@ -57,8 +58,10 @@ def spy_requests():
 
 
 @pytest.fixture(autouse=True)
-def setup_api_transport(spy_requests: RequestSpy):
+def setup_api_transport(spy_requests: RequestSpy, monkeypatch: pytest.MonkeyPatch):
     """Wire Streamlit AppTest to in-process FastAPI application via httpx MockTransport with spy."""
+    monkeypatch.setenv("GOOGLE_API_KEY", "mock_offline")
+    get_settings.cache_clear()
     app = create_app()
     tc = TestClient(app)
 
@@ -81,6 +84,7 @@ def setup_api_transport(spy_requests: RequestSpy):
     set_default_transport_for_testing(mock_transport)
     yield mock_transport
     set_default_transport_for_testing(None)
+    get_settings.cache_clear()
 
 
 @pytest.fixture
@@ -323,3 +327,56 @@ def test_three_roles_render_cleanly_on_synth(app_test_factory):
             at = app_test_factory(role=r, profile="synth", screen=s)
             at.run(timeout=35)
             assert not at.exception, f"Failed rendering screen '{s}' for role '{r}' on synth"
+
+
+def test_chat_create_action_preserves_nghiem_trong_level(app_test_factory, spy_requests: RequestSpy):
+    """Critical #2: Clicking 'Tạo hành động' on a nghiem_trong advice item in Chat submits level='nghiem_trong' -> 201."""
+    engine = get_app_engine(profile="real")
+    at = app_test_factory(role="ceo", profile="real", screen="chat")
+    at.run(timeout=35)
+    assert not at.exception
+
+    # Query ty_le_su_dung_han_muc which exceeds nghiem_trong (>= 0.90) on real data
+    at.chat_input[0].set_value("Tỷ lệ sử dụng hạn mức?").run(timeout=35)
+    assert not at.exception
+
+    chat_action_btns = [b for b in at.button if b.key and b.key.startswith("create_chat_act_")]
+    assert len(chat_action_btns) > 0, "Expected 'Tạo hành động' button on nghiem_trong advice in Chat"
+
+    try:
+        chat_action_btns[0].click().run(timeout=35)
+        assert not at.exception
+
+        last_post = spy_requests.last("POST", "/v1/actions")
+        assert last_post is not None, "Expected POST /v1/actions call from Chat"
+        payload = json.loads(last_post.content)
+        assert payload["source_type"] == "chat"
+        assert payload["kpi_key"] == "ty_le_su_dung_han_muc"
+        assert payload["level"] == "nghiem_trong"
+
+        success_msgs = " ".join(s.value for s in at.success)
+        assert "Đã tạo hành động" in success_msgs
+        assert not at.error
+    finally:
+        with engine.begin() as conn:
+            conn.execute(sa.text("DELETE FROM app.action_item WHERE source_type = 'chat' AND kpi_key = 'ty_le_su_dung_han_muc'"))
+
+
+def test_cross_screen_navigation_persists_with_screen_query_param(app_test_factory):
+    """Important #2: With ?screen=overview set, navigating via chip and interacting on Chat stays on Chat."""
+    at = app_test_factory(role="ceo", profile="synth", screen="overview")
+    at.run(timeout=35)
+    assert not at.exception
+
+    chip_buttons = [b for b in at.button if b.key and b.key.startswith("overview_q_")]
+    assert len(chip_buttons) > 0
+
+    # Click chip -> navigates to Chat and executes pending_query
+    chip_buttons[0].click().run(timeout=35)
+    assert not at.exception
+    assert len(at.chat_input) > 0, "Expected navigation to Chat after clicking chip"
+
+    # Interact again on Chat (submit another question) while ?screen=overview is still in query_params
+    at.chat_input[0].set_value("Dư nợ ngắn hạn hiện tại là bao nhiêu?").run(timeout=35)
+    assert not at.exception
+    assert len(at.chat_input) > 0, "Must stay on Chat screen instead of reverting to ?screen=overview"

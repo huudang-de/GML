@@ -18,18 +18,21 @@ from fastapi.testclient import TestClient
 
 from app.api.deps import reset_kpi_cache, reset_rate_limiter
 from app.api.main import create_app
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from db.apply_db import get_app_engine
 
 
 @pytest.fixture(autouse=True)
-def clean_singletons():
-    """Reset rate limiter and cache singletons before each test."""
+def clean_singletons(monkeypatch: pytest.MonkeyPatch):
+    """Reset rate limiter, cache singletons, and force offline mock LLM before each test."""
+    monkeypatch.setenv("GOOGLE_API_KEY", "mock_offline")
+    get_settings.cache_clear()
     reset_rate_limiter()
     reset_kpi_cache()
     yield
     reset_rate_limiter()
     reset_kpi_cache()
+    get_settings.cache_clear()
 
 
 @pytest.fixture
@@ -854,6 +857,14 @@ def test_tc_t5_12_one_failing_kpi_does_not_break_overview(monkeypatch, client_ce
     assert "Simulated golden failure" in card["error"]
     assert any(c["value"] is not None for c in b["kpis"] if c["kpi_key"] != "dong_tien_rong")
 
+    # Critical #1: Non-failing KPI with series (du_no_ngan_han) must populate series, previous_value, delta_pct
+    du_no_card = next((c for c in b["kpis"] if c["kpi_key"] == "du_no_ngan_han"), None)
+    assert du_no_card is not None
+    assert du_no_card["error"] is None
+    assert len(du_no_card["series"]) > 0
+    assert du_no_card["previous_value"] is not None
+    assert du_no_card["delta_pct"] is not None
+
 
 def test_overview_role_scoping(client_kho_synth):
     r = client_kho_synth.get("/v1/overview?profile=synth")
@@ -1191,6 +1202,68 @@ def test_m14_every_new_endpoint_writes_one_audit_row(
         assert "236065233815" not in q, f"Financial number leaked in audit query: {q}"
         assert "CEO audit test note" not in q, f"Note leaked in audit query: {q}"
         assert "Unapproved random title" not in q, f"Title leaked in audit query: {q}"
+
+
+def test_alerts_non_dict_json_evidence_returns_none_cleanly(client_ceo):
+    """Important #3: Non-dict JSON evidence (e.g. '[]') returns evidence=None without 500."""
+    engine = get_app_engine(profile="real")
+    with engine.begin() as conn:
+        conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id = 'TEST_AL_ARRAY_EV'"))
+        row = conn.execute(
+            sa.text("""
+                INSERT INTO app.alert_event (
+                    rule_id, kpi_key, severity, message, value, threshold,
+                    is_acknowledged, period, evidence, created_at
+                )
+                VALUES (
+                    'TEST_AL_ARRAY_EV', 'du_no_ngan_han', 'warning',
+                    'Non-dict JSON evidence test', 100.0, 50.0,
+                    false, '2026-07', '[]'::jsonb, now()
+                )
+                RETURNING id;
+            """)
+        ).fetchone()
+        alert_id = row[0]
+
+    try:
+        res = client_ceo.get("/v1/alerts")
+        assert res.status_code == 200
+        alerts = res.json()["alerts"]
+        item = next((a for a in alerts if a["id"] == alert_id), None)
+        assert item is not None
+        assert item["evidence"] is None
+    finally:
+        with engine.begin() as conn:
+            conn.execute(sa.text("DELETE FROM app.alert_event WHERE id = :aid"), {"aid": alert_id})
+
+
+def test_invalid_profile_returns_422_across_routers(client_ceo):
+    """Important #4: ?profile=invalid returns 422 VALIDATION_ERROR consistently across all routers."""
+    endpoints = [
+        ("GET", "/v1/overview?profile=invalid"),
+        ("GET", "/v1/actions?profile=invalid"),
+        ("POST", "/v1/actions?profile=invalid", {
+            "source_type": "alert",
+            "source_ref": "1",
+            "kpi_key": "ty_le_su_dung_han_muc",
+            "level": "canh_bao",
+            "title": "Test",
+        }),
+        ("PATCH", "/v1/actions/1?profile=invalid", {"status": "done"}),
+        ("GET", "/v1/alerts?profile=invalid"),
+        ("POST", "/v1/alerts/1/ack?profile=invalid"),
+        ("GET", "/v1/kpi/du_no_ngan_han?profile=invalid"),
+        ("GET", "/v1/pins?profile=invalid"),
+        ("POST", "/v1/pins?profile=invalid", {"kpi_key": "du_no_ngan_han"}),
+        ("DELETE", "/v1/pins/du_no_ngan_han?profile=invalid"),
+    ]
+    for item in endpoints:
+        method, url = item[0], item[1]
+        body = item[2] if len(item) > 2 else None
+        resp = client_ceo.request(method, url, json=body) if body is not None else client_ceo.request(method, url)
+        assert resp.status_code == 422, f"Expected 422 for {method} {url}, got {resp.status_code}: {resp.text}"
+        err = resp.json().get("error", {})
+        assert err.get("code") == "VALIDATION_ERROR", f"Expected VALIDATION_ERROR for {method} {url}, got {err}"
 
 
 

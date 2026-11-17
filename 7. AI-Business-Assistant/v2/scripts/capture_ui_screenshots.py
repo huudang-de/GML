@@ -77,10 +77,11 @@ def seed_demo_database_state() -> None:
     ev_3 = build_alert_evidence("gia_tri_hang_ton_kho", "warning", 120000000000.0, trend_3).model_dump(mode="json")
 
     # 2. Seed alerts into both real and synth databases for consistent UI testing
-    for eng in (engine_real, engine_synth):
+    real_alert_ids: dict[str, int] = {}
+    for idx, eng in enumerate((engine_real, engine_synth)):
         with eng.begin() as conn:
             conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id IN ('AL-001', 'AL-002', 'AL-003')"))
-            conn.execute(
+            rows = conn.execute(
                 sa.text("""
                     INSERT INTO app.alert_event (
                         rule_id, kpi_key, severity, message, value, threshold,
@@ -108,12 +109,15 @@ def seed_demo_database_state() -> None:
                         120000000000, 100000000000, true, 'usr_ceo', now() - interval '10 minutes', now() - interval '3 hours',
                         '2026-07', 'AL-003:gia_tri_hang_ton_kho:2026-07:warning',
                         CAST(:ev_3 AS jsonb)
-                    );
+                    )
+                    RETURNING id, rule_id;
                 """),
                 {"ev_1": json.dumps(ev_1), "ev_2": json.dumps(ev_2), "ev_3": json.dumps(ev_3)},
-            )
+            ).fetchall()
+            if idx == 0:
+                real_alert_ids = {r.rule_id: int(r.id) for r in rows}
 
-    # 3. Seed demo actions in app.action_item
+    # 3. Seed demo actions in app.action_item using valid numeric alert_event.id source_ref values
     with engine_real.begin() as conn:
         conn.execute(sa.text("DELETE FROM app.action_item WHERE title LIKE 'Kích hoạt phương án%' OR title LIKE 'Tạm dừng giải ngân%'"))
         conn.execute(
@@ -125,15 +129,16 @@ def seed_demo_database_state() -> None:
                 VALUES
                 (
                     'Kích hoạt phương án khẩn cấp: ngừng toàn bộ các khoản giải ngân mới chưa cấp thiết.',
-                    'ty_le_su_dung_han_muc', 'nghiem_trong', 'alert', 'AL-001',
+                    'ty_le_su_dung_han_muc', 'nghiem_trong', 'alert', :ref_1,
                     'ceo', 'open', '2026-08-15', 'CEO phê duyệt khẩn cấp', 'usr_ceo', now() - interval '1 hour'
                 ),
                 (
                     'Tạm dừng giải ngân mới từ các ngân hàng có tỷ lệ sử dụng trên 80%.',
-                    'ty_le_su_dung_han_muc', 'canh_bao', 'alert', 'AL-002',
+                    'ty_le_su_dung_han_muc', 'canh_bao', 'alert', :ref_2,
                     'ke_toan_truong', 'in_progress', '2026-08-20', 'KTT đang làm việc với các ngân hàng', 'usr_ceo', now() - interval '30 minutes'
                 );
-            """)
+            """),
+            {"ref_1": str(real_alert_ids["AL-001"]), "ref_2": str(real_alert_ids["AL-002"])},
         )
 
     # 4. Seed demo pinned KPI in synth
@@ -198,7 +203,80 @@ def wait_for_http_ready(url: str, timeout_sec: float = 30.0, label: str = "Servi
     raise TimeoutError(f"{label} at {url} did not become ready within {timeout_sec}s.")
 
 
-async def capture_url_cdp(browser_exe: str, url: str, out_file: Path, wait_sec: float = 6.0) -> None:
+async def _cdp_call(ws, msg_id: int, method: str, params: dict | None = None) -> dict:
+    """Send a CDP command and await the matching response id."""
+    payload = {"id": msg_id, "method": method}
+    if params is not None:
+        payload["params"] = params
+    await ws.send(json.dumps(payload))
+    while True:
+        raw_res = await ws.recv()
+        res = json.loads(raw_res)
+        if res.get("id") == msg_id:
+            if "error" in res:
+                raise RuntimeError(f"CDP {method} failed: {res['error']}")
+            return res.get("result", {})
+
+
+async def _wait_streamlit_idle_and_text(
+    ws,
+    msg_id_counter: list[int],
+    expected_texts: list[str],
+    timeout_sec: float = 30.0,
+) -> None:
+    """Poll CDP DOM until Streamlit is idle (no running indicator/skeleton/spinner) and expected texts appear."""
+    expected_js = json.dumps(expected_texts)
+    js_expr = f"""
+    (() => {{
+        if (document.readyState !== 'complete') return {{ ready: false, reason: 'doc_loading' }};
+        const status = document.querySelector('[data-testid="stStatusWidget"]');
+        if (status) {{
+            const txt = (status.innerText || '').trim();
+            if (/stop|running/i.test(txt) || status.querySelector('button')) {{
+                return {{ ready: false, reason: 'streamlit_running' }};
+            }}
+        }}
+        if (document.querySelectorAll('[data-testid="stSkeleton"]').length > 0) {{
+            return {{ ready: false, reason: 'skeletons' }};
+        }}
+        if (document.querySelectorAll('[data-testid="stSpinner"]').length > 0) {{
+            return {{ ready: false, reason: 'spinners' }};
+        }}
+        const bodyText = document.body ? (document.body.innerText || '') : '';
+        if (!bodyText.trim()) return {{ ready: false, reason: 'empty_body' }};
+        for (const s of {expected_js}) {{
+            if (!bodyText.includes(s)) return {{ ready: false, reason: 'missing:' + s }};
+        }}
+        return {{ ready: true }};
+    }})()
+    """
+    start = time.time()
+    last_reason = "init"
+    while time.time() - start < timeout_sec:
+        msg_id_counter[0] += 1
+        res = await _cdp_call(
+            ws,
+            msg_id_counter[0],
+            "Runtime.evaluate",
+            {"expression": js_expr, "returnByValue": True},
+        )
+        val = (res.get("result") or {}).get("value") or {}
+        if val.get("ready"):
+            return
+        last_reason = val.get("reason", "unknown")
+        await asyncio.sleep(0.4)
+    raise TimeoutError(f"Streamlit UI did not settle within {timeout_sec}s (last reason: {last_reason})")
+
+
+async def capture_url_cdp(
+    browser_exe: str,
+    url: str,
+    out_file: Path,
+    expected_texts: list[str],
+    click_button_text: str | None = None,
+    post_click_texts: list[str] | None = None,
+    timeout_sec: float = 30.0,
+) -> None:
     """Capture pixel-perfect screenshot via Chrome DevTools Protocol after Streamlit completes rendering."""
     cdp_port = find_free_port()
     user_data_dir = tempfile.mkdtemp(prefix="headless_browser_")
@@ -237,17 +315,74 @@ async def capture_url_cdp(browser_exe: str, url: str, out_file: Path, wait_sec: 
             raise RuntimeError(f"Could not connect to CDP at port {cdp_port}")
 
         async with websockets.connect(ws_url, max_size=25 * 1024 * 1024) as ws:
-            # Allow Streamlit websocket communication and DOM rendering to finish
-            await asyncio.sleep(wait_sec)
-            await ws.send(json.dumps({"id": 1, "method": "Page.captureScreenshot"}))
-            while True:
-                raw_res = await ws.recv()
-                res = json.loads(raw_res)
-                if res.get("id") == 1 and "result" in res:
-                    img_data = base64.b64decode(res["result"]["data"])
-                    with open(out_file, "wb") as f:
-                        f.write(img_data)
-                    break
+            msg_id = [0]
+            msg_id[0] += 1
+            await _cdp_call(ws, msg_id[0], "Runtime.enable")
+
+            await _wait_streamlit_idle_and_text(ws, msg_id, expected_texts, timeout_sec=timeout_sec)
+
+            if click_button_text:
+                btn_js = json.dumps(click_button_text)
+                click_expr = f"""
+                (() => {{
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const target = buttons.find(b => (b.innerText || '').includes({btn_js}));
+                    if (!target) return false;
+                    target.click();
+                    return true;
+                }})()
+                """
+                msg_id[0] += 1
+                click_res = await _cdp_call(
+                    ws,
+                    msg_id[0],
+                    "Runtime.evaluate",
+                    {"expression": click_expr, "returnByValue": True},
+                )
+                clicked = (click_res.get("result") or {}).get("value")
+                if not clicked:
+                    raise RuntimeError(f"Could not find button containing {click_button_text!r} on {url}")
+                await asyncio.sleep(0.5)
+                await _wait_streamlit_idle_and_text(
+                    ws,
+                    msg_id,
+                    post_click_texts or expected_texts,
+                    timeout_sec=timeout_sec,
+                )
+
+            # Scroll main viewport to top so header, banners, and primary content are visible
+            msg_id[0] += 1
+            await _cdp_call(
+                ws,
+                msg_id[0],
+                "Runtime.evaluate",
+                {
+                    "expression": """
+                    (() => {
+                        window.scrollTo(0, 0);
+                        document.querySelectorAll('[data-testid="stMain"], [data-testid="stAppViewContainer"], section.main').forEach(el => {
+                            el.scrollTop = 0;
+                        });
+                    })()
+                    """,
+                    "returnByValue": True,
+                },
+            )
+
+            # Brief layout/chart paint settle pause, then re-verify idle before capturing
+            await asyncio.sleep(1.5)
+            await _wait_streamlit_idle_and_text(
+                ws,
+                msg_id,
+                post_click_texts if (click_button_text and post_click_texts) else expected_texts,
+                timeout_sec=10.0,
+            )
+
+            msg_id[0] += 1
+            shot = await _cdp_call(ws, msg_id[0], "Page.captureScreenshot", {"format": "png"})
+            img_data = base64.b64decode(shot["data"])
+            with open(out_file, "wb") as f:
+                f.write(img_data)
     finally:
         if proc.poll() is None:
             proc.terminate()
@@ -318,22 +453,73 @@ def capture_screens() -> None:
 
         # 3. Capture the 7 target screens (EV-16)
         targets = [
-            ("01_chat_real.png", f"http://127.0.0.1:{st_port}/?screen=chat&profile=real&autoload_last=1", 5.0),
-            ("02_chat_synth.png", f"http://127.0.0.1:{st_port}/?screen=chat&profile=synth&autoload_last=1", 5.0),
-            ("03_alert_center.png", f"http://127.0.0.1:{st_port}/?screen=alerts&profile=real", 4.0),
-            ("04_history.png", f"http://127.0.0.1:{st_port}/?screen=history&profile=real", 4.0),
-            ("05_overview.png", f"http://127.0.0.1:{st_port}/?screen=overview&profile=synth", 5.0),
-            ("06_alert_detail.png", f"http://127.0.0.1:{st_port}/?screen=alerts&profile=real", 4.0),
-            ("07_actions.png", f"http://127.0.0.1:{st_port}/?screen=actions&profile=real", 4.0),
+            (
+                "01_chat_real.png",
+                f"http://127.0.0.1:{st_port}/?screen=chat&profile=real&autoload_last=1",
+                ["Trợ lý Hỏi đáp Nghiệp vụ AI", "Dư nợ ngắn hạn", "Request ID"],
+                None,
+                None,
+            ),
+            (
+                "02_chat_synth.png",
+                f"http://127.0.0.1:{st_port}/?screen=chat&profile=synth&autoload_last=1",
+                ["DỮ LIỆU MÔ PHỎNG", "Trợ lý Hỏi đáp Nghiệp vụ AI", "Dư nợ ngắn hạn", "Request ID"],
+                None,
+                None,
+            ),
+            (
+                "03_alert_center.png",
+                f"http://127.0.0.1:{st_port}/?screen=alerts&profile=real",
+                ["Trung tâm Cảnh báo Nghiệp vụ", "[AL-001]", "Hành động đề xuất đã phê duyệt", "Giá trị ghi nhận"],
+                None,
+                None,
+            ),
+            (
+                "04_history.png",
+                f"http://127.0.0.1:{st_port}/?screen=history&profile=real",
+                ["Lịch sử Hội thoại", "Tổng số lượt hỏi đáp đã lưu"],
+                None,
+                None,
+            ),
+            (
+                "05_overview.png",
+                f"http://127.0.0.1:{st_port}/?screen=overview&profile=synth",
+                ["DỮ LIỆU MÔ PHỎNG", "Chỉ số trọng yếu", "Phát hiện hôm nay", "Câu hỏi gợi ý"],
+                None,
+                None,
+            ),
+            (
+                "06_alert_detail.png",
+                f"http://127.0.0.1:{st_port}/?screen=alerts&profile=real",
+                ["Trung tâm Cảnh báo Nghiệp vụ", "[AL-001]", "[AL-002]"],
+                "[AL-002]",
+                ["[AL-002] Dư nợ ngắn hạn đạt đỉnh", "236.07 tỷ", "Diễn biến chuỗi thời gian"],
+            ),
+            (
+                "07_actions.png",
+                f"http://127.0.0.1:{st_port}/?screen=actions&profile=real",
+                ["Quản lý Hành động Nghiệp vụ", "Tổng số hành động ghi nhận", "Kích hoạt phương án khẩn cấp"],
+                None,
+                None,
+            ),
         ]
 
-        for filename, url, wait_time in targets:
+        for filename, url, expected_texts, click_btn, post_click_texts in targets:
             out_file = SCREENSHOTS_DIR / filename
             if out_file.exists():
                 out_file.unlink()
 
             print(f"Capturing {filename} from {url}...", flush=True)
-            asyncio.run(capture_url_cdp(browser_exe, url, out_file, wait_sec=wait_time))
+            asyncio.run(
+                capture_url_cdp(
+                    browser_exe,
+                    url,
+                    out_file,
+                    expected_texts=expected_texts,
+                    click_button_text=click_btn,
+                    post_click_texts=post_click_texts,
+                )
+            )
 
             if not out_file.exists():
                 raise FileNotFoundError(f"Failed to generate screenshot: {out_file}")

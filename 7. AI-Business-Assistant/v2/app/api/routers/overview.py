@@ -16,6 +16,7 @@ from app.api.deps import (
     get_current_user,
     get_kpi_cache,
     get_request_id,
+    resolve_profile,
 )
 from app.api.schemas import OverviewResponse
 from app.core.auth import UserPrincipal
@@ -38,7 +39,7 @@ def get_overview(
 ) -> OverviewResponse:
     """Retrieve executive overview tailored for the authenticated user's role and data profile."""
     req_id = get_request_id(request)
-    target_profile = (profile or settings.data_profile).strip().lower()
+    target_profile = resolve_profile(profile, settings)
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
 
     start_time = time.perf_counter()

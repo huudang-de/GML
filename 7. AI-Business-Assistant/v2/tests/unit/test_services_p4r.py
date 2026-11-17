@@ -163,7 +163,7 @@ def test_series_cache_does_not_collide_with_value(cache, settings):
 
 from app.api.schemas import OverviewKpiCard, OverviewResponse
 from app.core.auth import UserPrincipal
-from app.services.briefing import build_briefing
+from app.services.briefing import build_briefing, row_to_alert_item
 from db.apply_db import get_app_engine
 import sqlalchemy as sa
 
@@ -189,6 +189,14 @@ def test_build_briefing_direct_structure_and_counts(cache, settings):
     for c in resp.kpis:
         assert isinstance(c, OverviewKpiCard)
         assert c.domain is not None
+
+    # Critical #1 regression guard: series, previous_value, and delta_pct must be populated
+    du_no_card = next((c for c in resp.kpis if c.kpi_key == "du_no_ngan_han"), None)
+    assert du_no_card is not None
+    assert du_no_card.error is None
+    assert len(du_no_card.series) > 0
+    assert du_no_card.previous_value is not None
+    assert du_no_card.delta_pct is not None
 
 
 def test_build_briefing_one_failing_kpi_isolated(cache, settings, monkeypatch):
@@ -236,4 +244,29 @@ def test_build_briefing_uncatalogued_alert_safety(cache, settings):
     resp = build_briefing(user=user, profile="synth", settings=settings, cache=cache, app_engine=app_engine)
     assert isinstance(resp, OverviewResponse)
     assert resp.open_alerts["nghiem_trong"] >= 1
+
+
+def test_row_to_alert_item_handles_non_dict_json_evidence():
+    from types import SimpleNamespace
+    from datetime import datetime, timezone
+
+    row = SimpleNamespace(
+        id=999,
+        rule_id="AL-NONDICT",
+        kpi_key="du_no_ngan_han",
+        severity="warning",
+        message="Test non-dict evidence",
+        value=10.0,
+        threshold=5.0,
+        is_acknowledged=False,
+        acknowledged_by=None,
+        acknowledged_at=None,
+        created_at=datetime.now(timezone.utc),
+        period="2026-07",
+        evidence="[]",
+        escalated_at=None,
+    )
+    item = row_to_alert_item(row)
+    assert item.evidence is None
+    assert item.domain == "no_vay"
 

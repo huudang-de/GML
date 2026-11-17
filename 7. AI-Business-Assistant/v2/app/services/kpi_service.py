@@ -201,3 +201,12 @@ def compute_kpi_series(
     summary = summarize_series(series_points, limit=limit)
     cache.set(series_cache_key, summary)
     return summary
+
+
+def series_warning_for_summary(summary: SeriesSummary | None) -> str | None:
+    """Return a data-coverage warning when a time-series has fewer than 6 points."""
+    if summary is None:
+        return None
+    if len(summary.points) < 6:
+        return f"Chỉ có {len(summary.points)} tháng dữ liệu, chưa đủ để phân tích xu hướng"
+    return None
