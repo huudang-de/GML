@@ -5,7 +5,7 @@ Specifications:
 - Unified Error Envelope: {"error": {"code": str, "message": str, "request_id": str}}
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 from pydantic import BaseModel, Field
 
@@ -43,6 +43,7 @@ class ChatResponse(BaseModel):
     intent: str | None = None
     data_profile: str = "real"
     trace: list[dict[str, Any]] = Field(default_factory=list)
+    kpi_keys: list[str] = Field(default_factory=list)
 
 
 # ==============================================================================
@@ -59,6 +60,10 @@ class KpiValueResponse(BaseModel):
     sql_executed: str
     warnings: list[str] = Field(default_factory=list)
     cached: bool = False
+    series: list[dict[str, Any]] | None = None
+    previous_value: float | None = None
+    delta_pct: float | None = None
+    series_warning: str | None = None
 
 
 # ==============================================================================
@@ -80,11 +85,16 @@ class AlertItem(BaseModel):
     created_at: str | datetime
     acknowledged_at: str | datetime | None = None
     acknowledged_by: str | None = None
+    period: str | None = None
+    evidence: dict[str, Any] | None = None
+    domain: str | None = None
+    escalated_at: str | None = None
 
 
 class AlertListResponse(BaseModel):
     alerts: list[AlertItem]
     total: int
+    warnings: list[str] = Field(default_factory=list)
 
 
 class AlertAckResponse(BaseModel):
@@ -149,3 +159,106 @@ class ReadyResponse(BaseModel):
     profile: str
     details: dict[str, Any] = Field(default_factory=dict)
     error: ApiErrorDetail | None = None
+
+
+# ==============================================================================
+# Action Schemas
+# ==============================================================================
+
+class ActionCreateRequest(BaseModel):
+    source_type: Literal["alert", "chat"]
+    source_ref: str
+    kpi_key: str
+    level: Literal["canh_bao", "nghiem_trong"]
+    title: str
+    due_date: date | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class ActionItem(BaseModel):
+    id: int
+    title: str
+    kpi_key: str
+    level: str
+    domain: str
+    source_type: str
+    source_ref: str
+    assigned_role: str
+    status: str
+    due_date: date | None = None
+    note: str | None = None
+    created_by: str
+    created_at: str | datetime
+    updated_at: str | datetime
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ActionListResponse(BaseModel):
+    actions: list[ActionItem]
+    total: int
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ActionUpdateRequest(BaseModel):
+    status: Literal["open", "in_progress", "done", "dismissed"] | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+
+# ==============================================================================
+# Pin Schemas
+# ==============================================================================
+
+class PinRequest(BaseModel):
+    kpi_key: str
+
+
+class PinItem(BaseModel):
+    kpi_key: str
+    position: int
+    created_at: str | datetime
+    warnings: list[str] = Field(default_factory=list)
+
+
+class PinListResponse(BaseModel):
+    pins: list[PinItem]
+    total: int
+    warnings: list[str] = Field(default_factory=list)
+
+
+class PinDeleteResponse(BaseModel):
+    deleted: int
+    warnings: list[str] = Field(default_factory=list)
+
+
+# ==============================================================================
+# Overview Schemas
+# ==============================================================================
+
+class OverviewKpiCard(BaseModel):
+    kpi_key: str
+    kpi_name: str | None = None
+    unit: str | None = None
+    domain: str
+    value: float | None = None
+    previous_value: float | None = None
+    delta_pct: float | None = None
+    series: list[dict[str, Any]] = Field(default_factory=list)
+    pinned: bool = False
+    error: str | None = None
+    series_warning: str | None = None
+
+
+class OverviewResponse(BaseModel):
+    greeting_title: str
+    data_profile: str
+    as_of_date: str
+    last_alert_job_at: str | None = None
+    open_alerts: dict[str, int] = Field(default_factory=dict)
+    open_actions: int = 0
+    kpis: list[OverviewKpiCard] = Field(default_factory=list)
+    top_alerts: list[AlertItem] = Field(default_factory=list)
+    suggested_questions: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+

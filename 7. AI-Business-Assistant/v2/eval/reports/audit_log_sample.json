@@ -1,65 +1,36 @@
 [
   {
-    "id": 85,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "DELETE /v1/history (session_id=sess-9d6ad61b3037)",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-4f1a6fe9d8dc",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:14:42.596805"
-  },
-  {
-    "id": 86,
+    "id": 416,
     "user_id": "usr_kho",
     "role": "quan_ly_kho",
-    "query": "GET /v1/kpi/du_no_ngan_han",
+    "query": "GET /v1/overview",
     "sql_executed": null,
     "views_accessed": [
-      "ai_v_no_vay"
+      "ai_v_ton_kho"
     ],
-    "request_id": "req-audit-test-403",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:16.000010"
+    "request_id": "req-f62e3f516890",
+    "execution_time_ms": 957.88,
+    "created_at": "2026-11-16T19:06:33.851747"
   },
   {
-    "id": 87,
+    "id": 1464,
     "user_id": "usr_ceo",
     "role": "ceo",
-    "query": "GET /v1/history (session_id=None, limit=50)",
+    "query": "GET /v1/overview",
     "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-11b7ab54d9ac",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:16.402419"
-  },
-  {
-    "id": 88,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "GET /v1/history (session_id=None, limit=50)",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-12d190b4cc3b",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:16.516092"
-  },
-  {
-    "id": 89,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "GET /v1/kpi/du_no_ngan_han",
-    "sql_executed": "SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND rn = 1 LIMIT 1000",
     "views_accessed": [
-      "ai_v_no_vay"
+      "ai_v_bctc",
+      "ai_v_cong_no",
+      "ai_v_dong_tien",
+      "ai_v_no_vay",
+      "ai_v_ton_kho"
     ],
-    "request_id": "req-9e6d917559d6",
-    "execution_time_ms": 143.2,
-    "created_at": "2026-11-08T16:15:17.016056"
+    "request_id": "req-2e60ae3b37cc",
+    "execution_time_ms": 3055.82,
+    "created_at": "2026-11-16T18:40:56.608422"
   },
   {
-    "id": 90,
+    "id": 1622,
     "user_id": "usr_ceo",
     "role": "ceo",
     "query": "Dư nợ ngắn hạn hiện tại là bao nhiêu?",
@@ -68,22 +39,22 @@
       "ai_v_no_vay"
     ],
     "request_id": "req-chat-valid-001",
-    "execution_time_ms": 8631.21,
-    "created_at": "2026-11-08T16:15:30.210287"
+    "execution_time_ms": 4731.71,
+    "created_at": "2026-11-16T19:05:35.167682"
   },
   {
-    "id": 91,
+    "id": 1623,
     "user_id": "usr_ceo",
     "role": "ceo",
     "query": "Xoá bảng nợ vay",
     "sql_executed": null,
     "views_accessed": [],
     "request_id": "req-chat-blocked-002",
-    "execution_time_ms": 149.87,
-    "created_at": "2026-11-08T16:15:30.398043"
+    "execution_time_ms": 87.78,
+    "created_at": "2026-11-16T19:05:35.274366"
   },
   {
-    "id": 92,
+    "id": 1624,
     "user_id": "usr_ceo",
     "role": "ceo",
     "query": "Tỷ lệ sử dụng hạn mức?",
@@ -91,12 +62,144 @@
     "views_accessed": [
       "ai_v_no_vay"
     ],
-    "request_id": "req-a26f9ff72e0b",
-    "execution_time_ms": 7435.41,
-    "created_at": "2026-11-08T16:15:38.188541"
+    "request_id": "req-1b2aa418e33b",
+    "execution_time_ms": 4526.05,
+    "created_at": "2026-11-16T19:05:40.103768"
   },
   {
-    "id": 93,
+    "id": 1643,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "POST /v1/actions kpi=ty_le_su_dung_han_muc source=chat:req-chat-test-ceo-b49eaa39",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-test-ceo-chat-201-0d99d252",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-16T19:06:23.858105"
+  },
+  {
+    "id": 1656,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/actions status=open",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-4c72ade36200",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-16T19:06:26.296498"
+  },
+  {
+    "id": 1670,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/actions",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-act-get-200-18c0b789",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-16T19:06:43.801517"
+  },
+  {
+    "id": 1672,
+    "user_id": "usr_kho",
+    "role": "quan_ly_kho",
+    "query": "POST /v1/actions kpi=ty_le_su_dung_han_muc source=alert:800",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-act-post-403-50839789",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-16T19:06:44.009137"
+  },
+  {
+    "id": 1673,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "POST /v1/actions kpi=kpi_unknown_nonexistent source=alert:800",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-act-post-404-de9bcfcc",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-16T19:06:44.073353"
+  },
+  {
+    "id": 1675,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "POST /v1/actions kpi=ty_le_su_dung_han_muc source=alert:800",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-act-post-422-45e5c330",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-16T19:06:44.283763"
+  },
+  {
+    "id": 1676,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "PATCH /v1/actions/137",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-act-patch-200-d46e95d0",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-16T19:06:44.380951"
+  },
+  {
+    "id": 1678,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/pins",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-pins-get-200-3b95b7d2",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-16T19:06:44.546641"
+  },
+  {
+    "id": 1680,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "POST /v1/pins kpi=gia_tri_phai_tra",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-pins-post-200-662c9d69",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-16T19:06:44.761769"
+  },
+  {
+    "id": 1681,
+    "user_id": "usr_kho",
+    "role": "quan_ly_kho",
+    "query": "POST /v1/pins kpi=du_no_ngan_han",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-pins-post-403-74ed9cf0",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-16T19:06:44.848582"
+  },
+  {
+    "id": 1682,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "POST /v1/pins kpi=kpi_unknown_nonexistent",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-pins-post-404-903dc90e",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-16T19:06:44.897551"
+  },
+  {
+    "id": 1684,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "DELETE /v1/pins/gia_tri_phai_tra",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-pins-del-0-889da8d7",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-16T19:06:45.032262"
+  },
+  {
+    "id": 1685,
     "user_id": "usr_ceo",
     "role": "ceo",
     "query": "GET /v1/kpi/du_no_ngan_han",
@@ -104,56 +207,23 @@
     "views_accessed": [
       "ai_v_no_vay"
     ],
-    "request_id": "req-cd74882e0a12",
-    "execution_time_ms": 134.48,
-    "created_at": "2026-11-08T16:15:38.461505"
+    "request_id": "req-audit-kpi-series-200-c876bb82",
+    "execution_time_ms": 112.58,
+    "created_at": "2026-11-16T19:06:45.489756"
   },
   {
-    "id": 94,
+    "id": 1686,
     "user_id": "usr_ceo",
     "role": "ceo",
     "query": "GET /v1/alerts",
     "sql_executed": null,
     "views_accessed": [],
-    "request_id": "req-bf656902f5f1",
+    "request_id": "req-audit-alerts-200-e710d980",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:39.401922"
+    "created_at": "2026-11-16T19:06:45.648555"
   },
   {
-    "id": 95,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "POST /v1/feedback (rating=up, target_request_id=req-fb-contract)",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-4162af0fa663",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:39.574620"
-  },
-  {
-    "id": 96,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "GET /v1/history (session_id=sess-224dad9e89dc, limit=50)",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-8be8bdb80e34",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:39.658731"
-  },
-  {
-    "id": 97,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "DELETE /v1/history (session_id=sess-224dad9e89dc)",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-97aed7ef6bb2",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:39.732719"
-  },
-  {
-    "id": 98,
+    "id": 1687,
     "user_id": "usr_ceo",
     "role": "ceo",
     "query": "GET /v1/kpi/du_no_ngan_han",
@@ -161,12 +231,12 @@
     "views_accessed": [
       "ai_v_no_vay"
     ],
-    "request_id": "req-61b854d8827b",
-    "execution_time_ms": 145.57,
-    "created_at": "2026-11-08T16:15:40.170464"
+    "request_id": "req-a3d2dd5b3d60",
+    "execution_time_ms": 90.58,
+    "created_at": "2026-11-16T19:06:46.953989"
   },
   {
-    "id": 99,
+    "id": 1689,
     "user_id": "usr_kho",
     "role": "quan_ly_kho",
     "query": "GET /v1/kpi/du_no_ngan_han",
@@ -174,124 +244,63 @@
     "views_accessed": [
       "ai_v_no_vay"
     ],
-    "request_id": "req-f338eadc835b",
+    "request_id": "req-db02b2c98241",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:40.360290"
+    "created_at": "2026-11-16T19:06:47.420849"
   },
   {
-    "id": 100,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "GET /v1/kpi/du_no_ngan_han",
-    "sql_executed": "[CACHE_HIT]",
-    "views_accessed": [
-      "ai_v_no_vay"
-    ],
-    "request_id": "req-4d539a8b966e",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:40.994214"
-  },
-  {
-    "id": 101,
-    "user_id": "usr_kho",
-    "role": "quan_ly_kho",
-    "query": "GET /v1/kpi/du_no_ngan_han",
-    "sql_executed": null,
-    "views_accessed": [
-      "ai_v_no_vay"
-    ],
-    "request_id": "req-9a20a606a25a",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:41.207198"
-  },
-  {
-    "id": 102,
+    "id": 1690,
     "user_id": "usr_kho",
     "role": "quan_ly_kho",
     "query": "GET /v1/alerts",
     "sql_executed": null,
     "views_accessed": [],
-    "request_id": "req-811028debff1",
+    "request_id": "req-720830fc1c71",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:42.623711"
+    "created_at": "2026-11-16T19:06:50.345483"
   },
   {
-    "id": 103,
-    "user_id": "usr_kho",
-    "role": "quan_ly_kho",
-    "query": "POST /v1/alerts/15/ack",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-bed122de2c19",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:42.940472"
-  },
-  {
-    "id": 104,
+    "id": 1692,
     "user_id": "usr_ceo",
     "role": "ceo",
-    "query": "POST /v1/alerts/15/ack",
+    "query": "POST /v1/alerts/804/ack",
     "sql_executed": null,
     "views_accessed": [],
-    "request_id": "req-59072438613d",
+    "request_id": "req-997dbc3955fd",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:43.450158"
+    "created_at": "2026-11-16T19:06:50.542268"
   },
   {
-    "id": 105,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "SELECT * FROM ai_v_no_vay WHERE [REDACTED_DATABASE_URI]",
-    "sql_executed": "SELECT principal_balance FROM ai_v_no_vay LIMIT 10",
-    "views_accessed": [
-      "ai_v_no_vay"
-    ],
-    "request_id": "test-audit-req-12345",
-    "execution_time_ms": 12.5,
-    "created_at": "2026-11-08T16:15:47.722445"
-  },
-  {
-    "id": 106,
+    "id": 1694,
     "user_id": "usr_ceo",
     "role": "ceo",
     "query": "POST /v1/feedback (rating=up, target_request_id=req-feedback-test-1)",
     "sql_executed": null,
     "views_accessed": [],
-    "request_id": "req-41df7497e664",
+    "request_id": "req-0f5c6cfa9ca1",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:47.867539"
+    "created_at": "2026-11-16T19:06:54.881690"
   },
   {
-    "id": 107,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "GET /v1/history (session_id=shared-session-test, limit=50)",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-781133741824",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:48.056873"
-  },
-  {
-    "id": 108,
+    "id": 1696,
     "user_id": "usr_kho",
     "role": "quan_ly_kho",
     "query": "DELETE /v1/history (session_id=shared-session-test)",
     "sql_executed": null,
     "views_accessed": [],
-    "request_id": "req-ee45a2aae51f",
+    "request_id": "req-ca256c749c88",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:48.134635"
+    "created_at": "2026-11-16T19:06:55.103713"
   },
   {
-    "id": 109,
+    "id": 1697,
     "user_id": "usr_ceo",
     "role": "ceo",
     "query": "GET /v1/history (session_id=shared-session-test, limit=50)",
     "sql_executed": null,
     "views_accessed": [],
-    "request_id": "req-afc81606671d",
+    "request_id": "req-b4bd03cc965a",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-08T16:15:48.201294"
+    "created_at": "2026-11-16T19:06:55.182055"
   }
 ]

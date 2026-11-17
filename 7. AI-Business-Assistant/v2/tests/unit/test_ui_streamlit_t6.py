@@ -16,6 +16,7 @@ from starlette.testclient import TestClient
 from streamlit.testing.v1 import AppTest
 
 from app.api import create_app
+from app.core.config import get_settings
 from app.ui.api_client import set_default_transport_for_testing
 from db.apply_db import get_app_engine
 
@@ -23,8 +24,10 @@ APP_PATH = str(Path(__file__).resolve().parent.parent.parent / "app" / "ui" / "s
 
 
 @pytest.fixture(autouse=True)
-def setup_api_transport():
+def setup_api_transport(monkeypatch: pytest.MonkeyPatch):
     """Wire Streamlit AppTest to in-process FastAPI application via httpx MockTransport."""
+    monkeypatch.setenv("GOOGLE_API_KEY", "mock_offline")
+    get_settings.cache_clear()
     app = create_app()
     tc = TestClient(app)
 
@@ -46,11 +49,13 @@ def setup_api_transport():
     set_default_transport_for_testing(mock_transport)
     yield mock_transport
     set_default_transport_for_testing(None)
+    get_settings.cache_clear()
 
 
 def test_tc_t6_01_chat_displays_dual_output():
     """TC-T6-01: User submits query in AppTest; verifies dual output: summary text, figures table, SQL expander, sources, and confidence badge."""
     at = AppTest.from_file(APP_PATH)
+    at.query_params["screen"] = "chat"
     at.run(timeout=35)
     assert not at.exception
 
@@ -81,6 +86,7 @@ def test_tc_t6_01_chat_displays_dual_output():
 def test_tc_t6_02_synthetic_profile_always_renders_simulation_banner():
     """TC-T6-02: Profile synth (or URL param profile=synth) ALWAYS renders warning banner containing exact substring 'DỮ LIỆU MÔ PHỎNG'."""
     at = AppTest.from_file(APP_PATH)
+    at.query_params["screen"] = "chat"
     at.query_params["profile"] = "synth"
     at.run(timeout=35)
     assert not at.exception
@@ -133,6 +139,7 @@ def test_tc_t6_03_alert_center_ack_calls_post_ack_and_updates_status():
 def test_tc_t6_04_thumbs_down_feedback_persists_to_app_feedback_with_request_id():
     """TC-T6-04: Clicking 👎 + entering feedback note + submitting calls POST /v1/feedback and inserts row in app.feedback."""
     at = AppTest.from_file(APP_PATH)
+    at.query_params["screen"] = "chat"
     at.run(timeout=35)
     assert not at.exception
 

@@ -6,6 +6,7 @@ Specifications:
 """
 
 from datetime import datetime, timezone
+from typing import Any, Literal
 from fastapi import APIRouter, Depends, Query, Request
 import sqlalchemy as sa
 
@@ -15,11 +16,13 @@ from app.api.deps import (
     check_rate_limit,
     get_current_user,
     get_request_id,
+    resolve_profile,
 )
 from app.api.schemas import AlertAckResponse, AlertItem, AlertListResponse
 from app.core.auth import UserPrincipal
 from app.core.config import Settings, get_settings
 from app.core.security import can_access_kpi
+from app.services.briefing import row_to_alert_item
 from db.apply_db import get_app_engine
 
 router = APIRouter(prefix="/v1/alerts", tags=["Alerts"], dependencies=[Depends(check_rate_limit)])
@@ -28,52 +31,65 @@ router = APIRouter(prefix="/v1/alerts", tags=["Alerts"], dependencies=[Depends(c
 @router.get("", response_model=AlertListResponse)
 def list_alerts(
     request: Request,
+    domain: str | None = Query(default=None),
+    severity: str | None = Query(default=None),
+    status: Literal["open", "acked"] | None = Query(default=None),
     profile: str | None = Query(default=None),
     user: UserPrincipal = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> AlertListResponse:
     """Retrieve operational alerts strictly filtered by caller's role permissions (Review Focus #5)."""
     req_id = get_request_id(request)
-    target_profile = (profile or settings.data_profile).strip().lower()
+    target_profile = resolve_profile(profile, settings)
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
 
-    stmt = sa.text("""
+    where_clauses: list[str] = []
+    params: dict[str, Any] = {}
+
+    if status == "open":
+        where_clauses.append("is_acknowledged = FALSE")
+    elif status == "acked":
+        where_clauses.append("is_acknowledged = TRUE")
+
+    if severity is not None:
+        sev_norm = severity.strip().lower()
+        if sev_norm in ("canh_bao", "warning"):
+            where_clauses.append("severity IN ('canh_bao', 'warning')")
+        elif sev_norm in ("nghiem_trong", "critical"):
+            where_clauses.append("severity IN ('nghiem_trong', 'critical')")
+        else:
+            where_clauses.append("severity = :severity")
+            params["severity"] = severity
+
+    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+    stmt = sa.text(f"""
         SELECT id, rule_id, kpi_key, severity, message, value, threshold,
-               is_acknowledged, acknowledged_by, acknowledged_at, created_at
+               is_acknowledged, acknowledged_by, acknowledged_at, created_at,
+               period, evidence, escalated_at
         FROM app.alert_event
-        ORDER BY created_at DESC, id DESC
+        {where_sql}
+        ORDER BY is_acknowledged ASC,
+                 CASE WHEN severity IN ('nghiem_trong', 'critical') THEN 0 ELSE 1 END ASC,
+                 created_at DESC, id DESC
         LIMIT 100;
     """)
 
     with app_engine.connect() as conn:
-        rows = conn.execute(stmt).fetchall()
+        rows = conn.execute(stmt, params).fetchall()
 
     items: list[AlertItem] = []
     for r in rows:
         if not can_access_kpi(user.role, r.kpi_key):
             continue  # Strictly hide unauthorized alert
 
-        created_str = r.created_at.isoformat() if isinstance(r.created_at, datetime) else str(r.created_at)
-        ack_str = r.acknowledged_at.isoformat() if isinstance(r.acknowledged_at, datetime) else (str(r.acknowledged_at) if r.acknowledged_at else None)
+        alert_item = row_to_alert_item(r)
+        if domain is not None and alert_item.domain != domain:
+            continue
 
-        items.append(
-            AlertItem(
-                id=r.id,
-                rule_id=r.rule_id,
-                kpi_key=r.kpi_key,
-                severity=r.severity,
-                alert_level=r.severity,
-                message=r.message,
-                current_value=r.value,
-                threshold_value=r.threshold,
-                value=r.value,
-                threshold=r.threshold,
-                is_acknowledged=bool(r.is_acknowledged),
-                created_at=created_str,
-                acknowledged_at=ack_str,
-                acknowledged_by=r.acknowledged_by,
-            )
-        )
+        items.append(alert_item)
+
+    warnings: list[str] = ["SYNTHETIC_DATA"] if target_profile == "synth" else []
 
     write_audit_log(
         engine=app_engine,
@@ -83,7 +99,7 @@ def list_alerts(
         query="GET /v1/alerts",
     )
 
-    return AlertListResponse(alerts=items, total=len(items))
+    return AlertListResponse(alerts=items, total=len(items), warnings=warnings)
 
 
 @router.post("/{alert_id}/ack", response_model=AlertAckResponse)
@@ -96,7 +112,7 @@ def acknowledge_alert(
 ) -> AlertAckResponse:
     """Acknowledge an operational alert (enforces 403 on unauthorized view domain)."""
     req_id = get_request_id(request)
-    target_profile = (profile or settings.data_profile).strip().lower()
+    target_profile = resolve_profile(profile, settings)
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
 
     # 1. Fetch alert

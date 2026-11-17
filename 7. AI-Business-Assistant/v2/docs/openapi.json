@@ -1,6 +1,248 @@
 {
   "components": {
     "schemas": {
+      "ActionCreateRequest": {
+        "properties": {
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "kpi_key": {
+            "title": "Kpi Key",
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "canh_bao",
+              "nghiem_trong"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "source_ref": {
+            "title": "Source Ref",
+            "type": "string"
+          },
+          "source_type": {
+            "enum": [
+              "alert",
+              "chat"
+            ],
+            "title": "Source Type",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_type",
+          "source_ref",
+          "kpi_key",
+          "level",
+          "title"
+        ],
+        "title": "ActionCreateRequest",
+        "type": "object"
+      },
+      "ActionItem": {
+        "properties": {
+          "assigned_role": {
+            "title": "Assigned Role",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "date-time",
+                "type": "string"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kpi_key": {
+            "title": "Kpi Key",
+            "type": "string"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "source_ref": {
+            "title": "Source Ref",
+            "type": "string"
+          },
+          "source_type": {
+            "title": "Source Type",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "date-time",
+                "type": "string"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "kpi_key",
+          "level",
+          "domain",
+          "source_type",
+          "source_ref",
+          "assigned_role",
+          "status",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ActionItem",
+        "type": "object"
+      },
+      "ActionListResponse": {
+        "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ActionItem"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "actions",
+          "total"
+        ],
+        "title": "ActionListResponse",
+        "type": "object"
+      },
+      "ActionUpdateRequest": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "open",
+                  "in_progress",
+                  "done",
+                  "dismissed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "ActionUpdateRequest",
+        "type": "object"
+      },
       "AlertAckResponse": {
         "properties": {
           "acknowledged_at": {
@@ -93,6 +335,40 @@
             ],
             "title": "Current Value"
           },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "escalated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escalated At"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -109,6 +385,17 @@
           "message": {
             "title": "Message",
             "type": "string"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
           },
           "rule_id": {
             "anyOf": [
@@ -181,6 +468,13 @@
           "total": {
             "title": "Total",
             "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
           }
         },
         "required": [
@@ -274,6 +568,13 @@
               }
             ],
             "title": "Intent"
+          },
+          "kpi_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Kpi Keys",
+            "type": "array"
           },
           "request_id": {
             "title": "Request Id",
@@ -537,6 +838,17 @@
             "title": "Data Profile",
             "type": "string"
           },
+          "delta_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Pct"
+          },
           "kpi_key": {
             "title": "Kpi Key",
             "type": "string"
@@ -544,6 +856,43 @@
           "kpi_name": {
             "title": "Kpi Name",
             "type": "string"
+          },
+          "previous_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Value"
+          },
+          "series": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series"
+          },
+          "series_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Warning"
           },
           "sql_executed": {
             "title": "Sql Executed",
@@ -575,6 +924,287 @@
           "sql_executed"
         ],
         "title": "KpiValueResponse",
+        "type": "object"
+      },
+      "OverviewKpiCard": {
+        "properties": {
+          "delta_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Pct"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "kpi_key": {
+            "title": "Kpi Key",
+            "type": "string"
+          },
+          "kpi_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kpi Name"
+          },
+          "pinned": {
+            "default": false,
+            "title": "Pinned",
+            "type": "boolean"
+          },
+          "previous_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Value"
+          },
+          "series": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Series",
+            "type": "array"
+          },
+          "series_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Warning"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "kpi_key",
+          "domain"
+        ],
+        "title": "OverviewKpiCard",
+        "type": "object"
+      },
+      "OverviewResponse": {
+        "properties": {
+          "as_of_date": {
+            "title": "As Of Date",
+            "type": "string"
+          },
+          "data_profile": {
+            "title": "Data Profile",
+            "type": "string"
+          },
+          "greeting_title": {
+            "title": "Greeting Title",
+            "type": "string"
+          },
+          "kpis": {
+            "items": {
+              "$ref": "#/components/schemas/OverviewKpiCard"
+            },
+            "title": "Kpis",
+            "type": "array"
+          },
+          "last_alert_job_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Alert Job At"
+          },
+          "open_actions": {
+            "default": 0,
+            "title": "Open Actions",
+            "type": "integer"
+          },
+          "open_alerts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Open Alerts",
+            "type": "object"
+          },
+          "suggested_questions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Suggested Questions",
+            "type": "array"
+          },
+          "top_alerts": {
+            "items": {
+              "$ref": "#/components/schemas/AlertItem"
+            },
+            "title": "Top Alerts",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "greeting_title",
+          "data_profile",
+          "as_of_date"
+        ],
+        "title": "OverviewResponse",
+        "type": "object"
+      },
+      "PinDeleteResponse": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "PinDeleteResponse",
+        "type": "object"
+      },
+      "PinItem": {
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "date-time",
+                "type": "string"
+              }
+            ],
+            "title": "Created At"
+          },
+          "kpi_key": {
+            "title": "Kpi Key",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kpi_key",
+          "position",
+          "created_at"
+        ],
+        "title": "PinItem",
+        "type": "object"
+      },
+      "PinListResponse": {
+        "properties": {
+          "pins": {
+            "items": {
+              "$ref": "#/components/schemas/PinItem"
+            },
+            "title": "Pins",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pins",
+          "total"
+        ],
+        "title": "PinListResponse",
+        "type": "object"
+      },
+      "PinRequest": {
+        "properties": {
+          "kpi_key": {
+            "title": "Kpi Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kpi_key"
+        ],
+        "title": "PinRequest",
         "type": "object"
       },
       "ReadyResponse": {
@@ -788,11 +1418,310 @@
         ]
       }
     },
+    "/v1/actions": {
+      "get": {
+        "description": "List operational action items filtered by role visibility and optional status.",
+        "operationId": "list_actions_v1_actions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "in_progress",
+                    "done",
+                    "dismissed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Actions",
+        "tags": [
+          "Actions"
+        ]
+      },
+      "post": {
+        "description": "Create an operational action item from an alert or chat turn.",
+        "operationId": "create_action_v1_actions_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Action",
+        "tags": [
+          "Actions"
+        ]
+      }
+    },
+    "/v1/actions/{action_id}": {
+      "patch": {
+        "description": "Update action item status or note (enforces visibility; returns 404 if unauthorized).",
+        "operationId": "update_action_v1_actions__action_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "action_id",
+            "required": true,
+            "schema": {
+              "title": "Action Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Action",
+        "tags": [
+          "Actions"
+        ]
+      }
+    },
     "/v1/alerts": {
       "get": {
         "description": "Retrieve operational alerts strictly filtered by caller's role permissions (Review Focus #5).",
         "operationId": "list_alerts_v1_alerts_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Domain"
+            }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "acked"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
           {
             "in": "query",
             "name": "profile",
@@ -1241,7 +2170,7 @@
     },
     "/v1/kpi/{key}": {
       "get": {
-        "description": "Retrieve and calculate KPI value using deterministic Golden Queries.",
+        "description": "Retrieve and calculate KPI value using deterministic Golden Queries, with optional time-series.",
         "operationId": "get_kpi_value_v1_kpi__key__get",
         "parameters": [
           {
@@ -1267,6 +2196,23 @@
                 }
               ],
               "title": "Profile"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "series",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Include"
             }
           },
           {
@@ -1311,6 +2257,287 @@
         "summary": "Get Kpi Value",
         "tags": [
           "KPI"
+        ]
+      }
+    },
+    "/v1/overview": {
+      "get": {
+        "description": "Retrieve executive overview tailored for the authenticated user's role and data profile.",
+        "operationId": "get_overview_v1_overview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Overview",
+        "tags": [
+          "Overview"
+        ]
+      }
+    },
+    "/v1/pins": {
+      "get": {
+        "description": "Retrieve pinned KPIs scoped by user and profile, filtering out revoked permissions.",
+        "operationId": "list_pins_v1_pins_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Pins",
+        "tags": [
+          "Pins"
+        ]
+      },
+      "post": {
+        "description": "Pin a KPI to the user's dashboard (idempotent; 201 for new, 200 for already pinned).",
+        "operationId": "pin_kpi_v1_pins_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pin Kpi",
+        "tags": [
+          "Pins"
+        ]
+      }
+    },
+    "/v1/pins/{kpi_key}": {
+      "delete": {
+        "description": "Remove a pinned KPI for the user and profile.",
+        "operationId": "delete_pin_v1_pins__kpi_key__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kpi_key",
+            "required": true,
+            "schema": {
+              "title": "Kpi Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinDeleteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Pin",
+        "tags": [
+          "Pins"
         ]
       }
     }
