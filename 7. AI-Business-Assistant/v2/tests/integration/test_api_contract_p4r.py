@@ -954,6 +954,21 @@ NEW_ENDPOINTS = [
     ("GET", "/v1/pins"),
     ("POST", "/v1/pins"),
     ("DELETE", "/v1/pins/{kpi_key}"),
+    ("POST", "/v1/auth/login"),
+    ("POST", "/v1/auth/logout"),
+    ("GET", "/v1/auth/me"),
+    ("POST", "/v1/auth/change-password"),
+    ("GET", "/v1/admin/users"),
+    ("POST", "/v1/admin/users"),
+    ("PATCH", "/v1/admin/users/{user_id}"),
+    ("POST", "/v1/admin/users/{user_id}/reset-password"),
+    ("POST", "/v1/admin/users/{user_id}/unlock"),
+    ("POST", "/v1/admin/users/{user_id}/revoke-sessions"),
+    ("GET", "/v1/admin/sessions"),
+    ("DELETE", "/v1/admin/sessions/{session_id}"),
+    ("GET", "/v1/admin/auth-events"),
+    ("GET", "/v1/admin/simulation/status"),
+    ("POST", "/v1/admin/simulation/run"),
 ]
 
 
@@ -961,7 +976,7 @@ def test_m13_new_endpoints_in_openapi_snapshot():
     assert DOCS_OPENAPI_PATH.exists(), f"OpenAPI snapshot file {DOCS_OPENAPI_PATH} must exist"
     spec = json.loads(DOCS_OPENAPI_PATH.read_text(encoding="utf-8"))
 
-    # 1. Verify 7 new endpoints exist in snapshot
+    # 1. Verify all new endpoints exist in snapshot
     for m, p in NEW_ENDPOINTS:
         assert p in spec["paths"], f"Endpoint path {p} missing from openapi.json"
         assert m.lower() in spec["paths"][p], f"Method {m} missing from openapi.json for {p}"
@@ -1202,6 +1217,235 @@ def test_m14_every_new_endpoint_writes_one_audit_row(
         assert "236065233815" not in q, f"Financial number leaked in audit query: {q}"
         assert "CEO audit test note" not in q, f"Note leaked in audit query: {q}"
         assert "Unapproved random title" not in q, f"Title leaked in audit query: {q}"
+
+
+def test_m14_iam_auth_and_admin_endpoints_write_one_audit_row(
+    monkeypatch: pytest.MonkeyPatch, client_ceo, client_admin
+):
+    """M-14: Every /v1/auth/* (mutating) and /v1/admin/* endpoint writes one sanitized audit row."""
+    from fastapi.testclient import TestClient
+    from app.api import deps
+    from app.api.routers import admin as admin_router
+    from app.services.iam_service import create_user
+    from db.apply_db import get_admin_engine, get_iam_engine
+
+    deps.reset_login_rate_limiter()
+    monkeypatch.setattr(
+        admin_router,
+        "generate_synthetic_warehouse",
+        lambda seed=42, **_kw: {f"synthetic.tbl_{i}": f"sha_{i}" for i in range(20)},
+    )
+
+    iam_eng = get_iam_engine()
+    admin_eng = get_admin_engine(profile="real")
+    test_usernames = ["m14_iam_user", "m14_admin_created"]
+    initial_pw = "M14InitialPass@2026"
+    updated_pw = "M14UpdatedPass@2026"
+    anon_client = TestClient(create_app())
+    tokens_seen: list[str] = []
+    cases: list[tuple[str, str]] = []
+
+    def _cleanup():
+        with admin_eng.begin() as conn:
+            conn.execute(
+                sa.text(
+                    "DELETE FROM iam.user_session WHERE user_id IN ("
+                    "  SELECT user_id FROM iam.app_user WHERE lower(username) = ANY(:names)"
+                    ")"
+                ),
+                {"names": test_usernames},
+            )
+            conn.execute(
+                sa.text(
+                    "DELETE FROM iam.auth_event WHERE lower(coalesce(username_attempted, '')) = ANY(:names) "
+                    "OR user_id IN (SELECT user_id FROM iam.app_user WHERE lower(username) = ANY(:names)) "
+                    "OR (event_type = 'simulation_triggered' AND actor_user_id = 'usr_admin')"
+                ),
+                {"names": test_usernames},
+            )
+            conn.execute(
+                sa.text("DELETE FROM iam.app_user WHERE lower(username) = ANY(:names)"),
+                {"names": test_usernames},
+            )
+            conn.execute(sa.text("DELETE FROM app.job_heartbeat WHERE job_name = 'monthly_simulation'"))
+
+    _cleanup()
+    try:
+        create_user(
+            iam_eng,
+            username="m14_iam_user",
+            display_name="M14 IAM User",
+            role="ceo",
+            password=initial_pw,
+            must_change_password=False,
+        )
+
+        # 1. POST /v1/auth/login -> 200
+        rid = f"req-m14-login-{uuid.uuid4().hex[:8]}"
+        r_login = anon_client.post(
+            "/v1/auth/login",
+            json={"username": "m14_iam_user", "password": initial_pw},
+            headers={"X-Request-ID": rid},
+        )
+        assert r_login.status_code == 200
+        user_tok = r_login.json()["access_token"]
+        tokens_seen.append(user_tok)
+        user_hdr = {"Authorization": f"Bearer {user_tok}"}
+        cases.append((rid, "POST"))
+
+        # 2. POST /v1/auth/change-password -> 200
+        rid = f"req-m14-cp-{uuid.uuid4().hex[:8]}"
+        r_cp = anon_client.post(
+            "/v1/auth/change-password",
+            json={"current_password": initial_pw, "new_password": updated_pw},
+            headers={**user_hdr, "X-Request-ID": rid},
+        )
+        assert r_cp.status_code == 200
+        cases.append((rid, "POST"))
+
+        # 3. POST /v1/auth/logout -> 200
+        rid = f"req-m14-logout-{uuid.uuid4().hex[:8]}"
+        r_logout = anon_client.post(
+            "/v1/auth/logout",
+            headers={**user_hdr, "X-Request-ID": rid},
+        )
+        assert r_logout.status_code == 200
+        cases.append((rid, "POST"))
+
+        # 4. GET /v1/admin/users -> 200 and 403
+        rid = f"req-m14-adm-users-200-{uuid.uuid4().hex[:8]}"
+        assert client_admin.get("/v1/admin/users", headers={"X-Request-ID": rid}).status_code == 200
+        cases.append((rid, "GET"))
+
+        rid = f"req-m14-adm-users-403-{uuid.uuid4().hex[:8]}"
+        assert client_ceo.get("/v1/admin/users", headers={"X-Request-ID": rid}).status_code == 403
+        cases.append((rid, "GET"))
+
+        # 5. POST /v1/admin/users -> 201 and 409
+        rid = f"req-m14-adm-create-201-{uuid.uuid4().hex[:8]}"
+        r_create = client_admin.post(
+            "/v1/admin/users",
+            json={"username": "m14_admin_created", "display_name": "Created", "role": "quan_ly_kho"},
+            headers={"X-Request-ID": rid},
+        )
+        assert r_create.status_code == 201
+        target_uid = r_create.json()["user"]["user_id"]
+        temp_pw = r_create.json()["temporary_password"]
+        cases.append((rid, "POST"))
+
+        rid = f"req-m14-adm-create-409-{uuid.uuid4().hex[:8]}"
+        r_dup = client_admin.post(
+            "/v1/admin/users",
+            json={"username": "m14_admin_created", "display_name": "Dup", "role": "quan_ly_kho"},
+            headers={"X-Request-ID": rid},
+        )
+        assert r_dup.status_code == 409
+        cases.append((rid, "POST"))
+
+        # 6. PATCH /v1/admin/users/{user_id} -> 200 and 404
+        rid = f"req-m14-adm-patch-200-{uuid.uuid4().hex[:8]}"
+        assert (
+            client_admin.patch(
+                f"/v1/admin/users/{target_uid}",
+                json={"display_name": "Created Updated"},
+                headers={"X-Request-ID": rid},
+            ).status_code
+            == 200
+        )
+        cases.append((rid, "PATCH"))
+
+        rid = f"req-m14-adm-patch-404-{uuid.uuid4().hex[:8]}"
+        assert (
+            client_admin.patch(
+                "/v1/admin/users/u_missing_m14",
+                json={"display_name": "Missing"},
+                headers={"X-Request-ID": rid},
+            ).status_code
+            == 404
+        )
+        cases.append((rid, "PATCH"))
+
+        # 7. POST /v1/admin/users/{user_id}/reset-password -> 200
+        rid = f"req-m14-adm-reset-{uuid.uuid4().hex[:8]}"
+        r_reset = client_admin.post(
+            f"/v1/admin/users/{target_uid}/reset-password",
+            headers={"X-Request-ID": rid},
+        )
+        assert r_reset.status_code == 200
+        reset_pw = r_reset.json()["temporary_password"]
+        cases.append((rid, "POST"))
+
+        # 8. POST /v1/admin/users/{user_id}/unlock -> 200
+        rid = f"req-m14-adm-unlock-{uuid.uuid4().hex[:8]}"
+        assert (
+            client_admin.post(
+                f"/v1/admin/users/{target_uid}/unlock",
+                headers={"X-Request-ID": rid},
+            ).status_code
+            == 200
+        )
+        cases.append((rid, "POST"))
+
+        # 9. POST /v1/admin/users/{user_id}/revoke-sessions -> 200
+        rid = f"req-m14-adm-rev-user-{uuid.uuid4().hex[:8]}"
+        assert (
+            client_admin.post(
+                f"/v1/admin/users/{target_uid}/revoke-sessions",
+                headers={"X-Request-ID": rid},
+            ).status_code
+            == 200
+        )
+        cases.append((rid, "POST"))
+
+        # 10. GET /v1/admin/sessions -> 200 & DELETE /v1/admin/sessions/{session_id} -> 200 and 404
+        from app.services.iam_service import create_session
+
+        temp_tok, sess_rec = create_session(iam_eng, user_id=target_uid)
+        tokens_seen.append(temp_tok)
+        target_sid = sess_rec["session_id"]
+
+        rid = f"req-m14-adm-sess-list-{uuid.uuid4().hex[:8]}"
+        assert client_admin.get("/v1/admin/sessions", headers={"X-Request-ID": rid}).status_code == 200
+        cases.append((rid, "GET"))
+
+        rid = f"req-m14-adm-sess-del-200-{uuid.uuid4().hex[:8]}"
+        assert client_admin.delete(f"/v1/admin/sessions/{target_sid}", headers={"X-Request-ID": rid}).status_code == 200
+        cases.append((rid, "DELETE"))
+
+        rid = f"req-m14-adm-sess-del-404-{uuid.uuid4().hex[:8]}"
+        assert client_admin.delete("/v1/admin/sessions/9999999", headers={"X-Request-ID": rid}).status_code == 404
+        cases.append((rid, "DELETE"))
+
+        # 11. GET /v1/admin/auth-events -> 200
+        rid = f"req-m14-adm-events-{uuid.uuid4().hex[:8]}"
+        assert client_admin.get("/v1/admin/auth-events", headers={"X-Request-ID": rid}).status_code == 200
+        cases.append((rid, "GET"))
+
+        # 12. GET /v1/admin/simulation/status & POST /v1/admin/simulation/run -> 200
+        rid = f"req-m14-adm-sim-status-{uuid.uuid4().hex[:8]}"
+        assert client_admin.get("/v1/admin/simulation/status", headers={"X-Request-ID": rid}).status_code == 200
+        cases.append((rid, "GET"))
+
+        rid = f"req-m14-adm-sim-run-{uuid.uuid4().hex[:8]}"
+        assert client_admin.post("/v1/admin/simulation/run", headers={"X-Request-ID": rid}).status_code == 200
+        cases.append((rid, "POST"))
+
+        # Verify every audited call produced exactly 1 sanitized audit row
+        eng = get_app_engine(profile="real")
+        for req_id, expected_method in cases:
+            with eng.connect() as conn:
+                rows = conn.execute(
+                    sa.text("SELECT query FROM app.audit_log WHERE request_id = :rid"),
+                    {"rid": req_id},
+                ).fetchall()
+            assert len(rows) == 1, f"Expected 1 audit row for {req_id}, got {len(rows)}"
+            q = rows[0].query or ""
+            assert expected_method in q
+            for secret in (initial_pw, updated_pw, temp_pw, reset_pw, *tokens_seen):
+                assert secret not in q, f"Secret leaked into audit query for {req_id}"
+    finally:
+        _cleanup()
+        deps.reset_login_rate_limiter()
 
 
 def test_alerts_non_dict_json_evidence_returns_none_cleanly(client_ceo):

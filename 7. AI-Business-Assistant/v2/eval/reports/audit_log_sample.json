@@ -1,20 +1,200 @@
 [
   {
-    "id": 416,
-    "user_id": "usr_kho",
-    "role": "quan_ly_kho",
-    "query": "GET /v1/overview",
+    "id": 3620,
+    "user_id": "usr_admin",
+    "role": "quan_tri_he_thong",
+    "query": "POST /v1/auth/login username=demo.admin",
     "sql_executed": null,
-    "views_accessed": [
-      "ai_v_ton_kho"
-    ],
-    "request_id": "req-f62e3f516890",
-    "execution_time_ms": 957.88,
-    "created_at": "2026-11-16T19:06:33.851747"
+    "views_accessed": [],
+    "request_id": "req-490a64c6f75c",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T14:58:54.758012"
   },
   {
-    "id": 1464,
+    "id": 3636,
     "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "Dư nợ ngắn hạn hiện tại là bao nhiêu?",
+    "sql_executed": "SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND rn = 1 LIMIT 1000",
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-chat-valid-001",
+    "execution_time_ms": 6079.27,
+    "created_at": "2026-11-18T15:02:58.533301"
+  },
+  {
+    "id": 3637,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "Xoá bảng nợ vay",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-chat-blocked-002",
+    "execution_time_ms": 238.22,
+    "created_at": "2026-11-18T15:02:58.845821"
+  },
+  {
+    "id": 3638,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "Tỷ lệ sử dụng hạn mức?",
+    "sql_executed": "SELECT SUM(principal_balance) / NULLIF(SUM(granted_limit), 0) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit' LIMIT 1000",
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-e1d365aa240d",
+    "execution_time_ms": 5486.33,
+    "created_at": "2026-11-18T15:03:06.073420"
+  },
+  {
+    "id": 3641,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "POST /v1/feedback (rating=up, target_request_id=req-fb-contract)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-25d5f8cd352f",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:03:07.586667"
+  },
+  {
+    "id": 3642,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/history (session_id=sess-32bbf6509d56, limit=50)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-c3a9b34c38f3",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:03:07.687862"
+  },
+  {
+    "id": 3643,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "DELETE /v1/history (session_id=sess-32bbf6509d56)",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-a7c46803fd5b",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:03:07.801928"
+  },
+  {
+    "id": 3684,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/actions",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-act-get-200-7bca3503",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:04:09.255400"
+  },
+  {
+    "id": 3686,
+    "user_id": "usr_kho",
+    "role": "quan_ly_kho",
+    "query": "POST /v1/actions kpi=ty_le_su_dung_han_muc source=alert:1540",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-act-post-403-ee0583f0",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:04:09.777423"
+  },
+  {
+    "id": 3689,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "POST /v1/actions kpi=ty_le_su_dung_han_muc source=alert:1540",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-act-post-422-69e9f70e",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:04:10.374411"
+  },
+  {
+    "id": 3691,
+    "user_id": "usr_ktt",
+    "role": "ke_toan_truong",
+    "query": "PATCH /v1/actions/371",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-act-patch-404-09123792",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:04:10.926525"
+  },
+  {
+    "id": 3692,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/pins",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-pins-get-200-1fd9e2c8",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:04:11.030696"
+  },
+  {
+    "id": 3698,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "DELETE /v1/pins/gia_tri_phai_tra",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-audit-pins-del-0-b48bcd5d",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:04:11.879935"
+  },
+  {
+    "id": 3699,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/kpi/du_no_ngan_han",
+    "sql_executed": "SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND rn = 1 LIMIT 1000",
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-audit-kpi-series-200-8a408a3e",
+    "execution_time_ms": 151.94,
+    "created_at": "2026-11-18T15:04:13.092323"
+  },
+  {
+    "id": 3722,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "POST /v1/alerts/1547/ack",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-33335c1346a9",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:04:31.660724"
+  },
+  {
+    "id": 3724,
+    "user_id": "usr_ceo",
+    "role": "ceo",
+    "query": "GET /v1/alerts",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-32348357e480",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:04:32.326555"
+  },
+  {
+    "id": 3726,
+    "user_id": "u_312775fc",
+    "role": "ceo",
+    "query": "POST /v1/auth/logout",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-t2-logout-4990baa7",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:04:33.340997"
+  },
+  {
+    "id": 3729,
+    "user_id": "u_9062d88c",
     "role": "ceo",
     "query": "GET /v1/overview",
     "sql_executed": null,
@@ -25,282 +205,175 @@
       "ai_v_no_vay",
       "ai_v_ton_kho"
     ],
-    "request_id": "req-2e60ae3b37cc",
-    "execution_time_ms": 3055.82,
-    "created_at": "2026-11-16T18:40:56.608422"
+    "request_id": "req-8849a227a380",
+    "execution_time_ms": 4746.36049999981,
+    "created_at": "2026-11-18T15:04:42.017495"
   },
   {
-    "id": 1622,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "Dư nợ ngắn hạn hiện tại là bao nhiêu?",
-    "sql_executed": "SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND rn = 1 LIMIT 1000",
-    "views_accessed": [
-      "ai_v_no_vay"
-    ],
-    "request_id": "req-chat-valid-001",
-    "execution_time_ms": 4731.71,
-    "created_at": "2026-11-16T19:05:35.167682"
-  },
-  {
-    "id": 1623,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "Xoá bảng nợ vay",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-chat-blocked-002",
-    "execution_time_ms": 87.78,
-    "created_at": "2026-11-16T19:05:35.274366"
-  },
-  {
-    "id": 1624,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "Tỷ lệ sử dụng hạn mức?",
-    "sql_executed": "SELECT SUM(principal_balance) / NULLIF(SUM(granted_limit), 0) FROM ai_views.ai_v_no_vay WHERE record_type = 'credit_limit' LIMIT 1000",
-    "views_accessed": [
-      "ai_v_no_vay"
-    ],
-    "request_id": "req-1b2aa418e33b",
-    "execution_time_ms": 4526.05,
-    "created_at": "2026-11-16T19:05:40.103768"
-  },
-  {
-    "id": 1643,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "POST /v1/actions kpi=ty_le_su_dung_han_muc source=chat:req-chat-test-ceo-b49eaa39",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-test-ceo-chat-201-0d99d252",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:23.858105"
-  },
-  {
-    "id": 1656,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "GET /v1/actions status=open",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-4c72ade36200",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:26.296498"
-  },
-  {
-    "id": 1670,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "GET /v1/actions",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-audit-act-get-200-18c0b789",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:43.801517"
-  },
-  {
-    "id": 1672,
-    "user_id": "usr_kho",
+    "id": 3735,
+    "user_id": "u_7773e22a",
     "role": "quan_ly_kho",
-    "query": "POST /v1/actions kpi=ty_le_su_dung_han_muc source=alert:800",
+    "query": "GET /v1/kpi/du_no_ngan_han",
     "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-audit-act-post-403-50839789",
+    "views_accessed": [
+      "ai_v_no_vay"
+    ],
+    "request_id": "req-88b48b69b69c",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:44.009137"
+    "created_at": "2026-11-18T15:04:52.980940"
   },
   {
-    "id": 1673,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "POST /v1/actions kpi=kpi_unknown_nonexistent source=alert:800",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-audit-act-post-404-de9bcfcc",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:44.073353"
-  },
-  {
-    "id": 1675,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "POST /v1/actions kpi=ty_le_su_dung_han_muc source=alert:800",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-audit-act-post-422-45e5c330",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:44.283763"
-  },
-  {
-    "id": 1676,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "PATCH /v1/actions/137",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-audit-act-patch-200-d46e95d0",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:44.380951"
-  },
-  {
-    "id": 1678,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "GET /v1/pins",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-audit-pins-get-200-3b95b7d2",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:44.546641"
-  },
-  {
-    "id": 1680,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "POST /v1/pins kpi=gia_tri_phai_tra",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-audit-pins-post-200-662c9d69",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:44.761769"
-  },
-  {
-    "id": 1681,
-    "user_id": "usr_kho",
+    "id": 3736,
+    "user_id": "u_7773e22a",
     "role": "quan_ly_kho",
     "query": "POST /v1/pins kpi=du_no_ngan_han",
     "sql_executed": null,
     "views_accessed": [],
-    "request_id": "req-audit-pins-post-403-74ed9cf0",
+    "request_id": "req-ef862f050d7f",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:44.848582"
+    "created_at": "2026-11-18T15:04:53.181355"
   },
   {
-    "id": 1682,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "POST /v1/pins kpi=kpi_unknown_nonexistent",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-audit-pins-post-404-903dc90e",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:44.897551"
-  },
-  {
-    "id": 1684,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "DELETE /v1/pins/gia_tri_phai_tra",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-audit-pins-del-0-889da8d7",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:45.032262"
-  },
-  {
-    "id": 1685,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "GET /v1/kpi/du_no_ngan_han",
-    "sql_executed": "SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND rn = 1 LIMIT 1000",
-    "views_accessed": [
-      "ai_v_no_vay"
-    ],
-    "request_id": "req-audit-kpi-series-200-c876bb82",
-    "execution_time_ms": 112.58,
-    "created_at": "2026-11-16T19:06:45.489756"
-  },
-  {
-    "id": 1686,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "GET /v1/alerts",
-    "sql_executed": null,
-    "views_accessed": [],
-    "request_id": "req-audit-alerts-200-e710d980",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:45.648555"
-  },
-  {
-    "id": 1687,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "GET /v1/kpi/du_no_ngan_han",
-    "sql_executed": "SELECT SUM(credit_balance) FROM ai_views.ai_v_no_vay WHERE record_type = 'ledger_balance' AND (account_no LIKE '34111%' OR account_no LIKE '34113%' OR account_no LIKE '34114%') AND rn = 1 LIMIT 1000",
-    "views_accessed": [
-      "ai_v_no_vay"
-    ],
-    "request_id": "req-a3d2dd5b3d60",
-    "execution_time_ms": 90.58,
-    "created_at": "2026-11-16T19:06:46.953989"
-  },
-  {
-    "id": 1689,
-    "user_id": "usr_kho",
+    "id": 3737,
+    "user_id": "u_7773e22a",
     "role": "quan_ly_kho",
-    "query": "GET /v1/kpi/du_no_ngan_han",
-    "sql_executed": null,
-    "views_accessed": [
-      "ai_v_no_vay"
-    ],
-    "request_id": "req-db02b2c98241",
-    "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:47.420849"
-  },
-  {
-    "id": 1690,
-    "user_id": "usr_kho",
-    "role": "quan_ly_kho",
-    "query": "GET /v1/alerts",
+    "query": "GET /v1/admin/users error_code=FORBIDDEN",
     "sql_executed": null,
     "views_accessed": [],
-    "request_id": "req-720830fc1c71",
+    "request_id": "req-3bd3e1cfca05",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:50.345483"
+    "created_at": "2026-11-18T15:04:53.357967"
   },
   {
-    "id": 1692,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "POST /v1/alerts/804/ack",
+    "id": 3773,
+    "user_id": "u_87139204",
+    "role": "quan_tri_he_thong",
+    "query": "POST /v1/admin/users user_id=u_1e02622e role=ke_toan_truong",
     "sql_executed": null,
     "views_accessed": [],
-    "request_id": "req-997dbc3955fd",
+    "request_id": "req-6b6d33abf0a3",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:50.542268"
+    "created_at": "2026-11-18T15:05:09.281806"
   },
   {
-    "id": 1694,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "POST /v1/feedback (rating=up, target_request_id=req-feedback-test-1)",
+    "id": 3778,
+    "user_id": "u_1e02622e",
+    "role": "ke_toan_truong",
+    "query": "POST /v1/auth/change-password",
     "sql_executed": null,
     "views_accessed": [],
-    "request_id": "req-0f5c6cfa9ca1",
+    "request_id": "req-673eb4d39ddd",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:54.881690"
+    "created_at": "2026-11-18T15:05:10.226483"
   },
   {
-    "id": 1696,
-    "user_id": "usr_kho",
-    "role": "quan_ly_kho",
-    "query": "DELETE /v1/history (session_id=shared-session-test)",
+    "id": 3780,
+    "user_id": "u_87139204",
+    "role": "quan_tri_he_thong",
+    "query": "POST /v1/admin/users/u_1e02622e/unlock",
     "sql_executed": null,
     "views_accessed": [],
-    "request_id": "req-ca256c749c88",
+    "request_id": "req-3e0c07f32bf1",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:55.103713"
+    "created_at": "2026-11-18T15:05:11.361461"
   },
   {
-    "id": 1697,
-    "user_id": "usr_ceo",
-    "role": "ceo",
-    "query": "GET /v1/history (session_id=shared-session-test, limit=50)",
+    "id": 3783,
+    "user_id": "u_87139204",
+    "role": "quan_tri_he_thong",
+    "query": "DELETE /v1/admin/sessions/161",
     "sql_executed": null,
     "views_accessed": [],
-    "request_id": "req-b4bd03cc965a",
+    "request_id": "req-21cb36cc6f8f",
     "execution_time_ms": 0.0,
-    "created_at": "2026-11-16T19:06:55.182055"
+    "created_at": "2026-11-18T15:05:11.921783"
+  },
+  {
+    "id": 3785,
+    "user_id": "u_87139204",
+    "role": "quan_tri_he_thong",
+    "query": "POST /v1/admin/users/u_1e02622e/revoke-sessions revoked_count=1",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-fd32a7b83f48",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:05:12.561036"
+  },
+  {
+    "id": 3786,
+    "user_id": "u_87139204",
+    "role": "quan_tri_he_thong",
+    "query": "POST /v1/admin/users/u_1e02622e/reset-password",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-f79be5cfe330",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:05:13.349713"
+  },
+  {
+    "id": 3788,
+    "user_id": "u_87139204",
+    "role": "quan_tri_he_thong",
+    "query": "PATCH /v1/admin/users/u_da29ec05 role=quan_tri_he_thong",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-4c0bc880a4c3",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:05:13.900217"
+  },
+  {
+    "id": 3796,
+    "user_id": "usr_admin",
+    "role": "quan_tri_he_thong",
+    "query": "POST /v1/admin/simulation/run seed=99 tables=20",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-081059561428",
+    "execution_time_ms": 0.02,
+    "created_at": "2026-11-18T15:05:15.882139"
+  },
+  {
+    "id": 3799,
+    "user_id": "usr_admin",
+    "role": "quan_tri_he_thong",
+    "query": "GET /v1/admin/simulation/status",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-ad9cf347839a",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:05:16.841528"
+  },
+  {
+    "id": 3803,
+    "user_id": "usr_admin",
+    "role": "quan_tri_he_thong",
+    "query": "GET /v1/admin/users count=1",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-fc363040db2a",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:05:17.931473"
+  },
+  {
+    "id": 3804,
+    "user_id": "usr_admin",
+    "role": "quan_tri_he_thong",
+    "query": "GET /v1/admin/sessions count=0",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-be9818048a42",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:05:18.122168"
+  },
+  {
+    "id": 3805,
+    "user_id": "usr_admin",
+    "role": "quan_tri_he_thong",
+    "query": "GET /v1/admin/auth-events count=3",
+    "sql_executed": null,
+    "views_accessed": [],
+    "request_id": "req-f3ae1f686fd3",
+    "execution_time_ms": 0.0,
+    "created_at": "2026-11-18T15:05:18.406072"
   }
 ]

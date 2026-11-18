@@ -1,10 +1,15 @@
 """Capture UI screenshots for EV-16 Gate Evidence using headless Edge/Chrome.
 
-Generates 4 high-resolution PNG screen captures (> 15 KB each):
+Generates 9 high-resolution PNG screen captures (> 15 KB each):
 - 01_chat_real.png (?screen=chat&profile=real&autoload_last=1)
 - 02_chat_synth.png (?screen=chat&profile=synth&autoload_last=1)
 - 03_alert_center.png (?screen=alerts&profile=real)
 - 04_history.png (?screen=history&profile=real)
+- 05_overview.png (?screen=overview&profile=synth)
+- 06_alert_detail.png (?screen=alerts&profile=real -> click [AL-002])
+- 07_actions.png (?screen=actions&profile=real)
+- 08_login.png (unauthenticated login gate)
+- 09_admin_panel.png (4-tab IAM & Simulation Admin Panel as quan_tri_he_thong)
 """
 
 import asyncio
@@ -28,7 +33,8 @@ sys.path.insert(0, str(V2_DIR))
 from app.memory.session_store import SessionStore
 from app.agents.series_tools import build_alert_evidence
 from app.agents.trend_agent import analyze_kpi_trend
-from db.apply_db import get_app_engine, get_ro_engine
+from app.services.iam_service import create_session, revoke_session, seed_default_demo_users
+from db.apply_db import get_admin_engine, get_app_engine, get_iam_engine, get_ro_engine
 
 SCREENSHOTS_DIR = V2_DIR / "eval" / "reports" / "ui_screens"
 
@@ -59,8 +65,12 @@ def get_browser_executable() -> str:
     raise RuntimeError("No headless Chromium browser (Edge or Chrome) found on system.")
 
 
-def seed_demo_database_state() -> None:
-    """Seed representative operational alerts, actions, and history turns into PostgreSQL."""
+def seed_demo_database_state() -> list[str]:
+    """Seed representative operational alerts, actions, and history turns into PostgreSQL.
+
+    Returns the list of temporary IAM demo user_ids newly created by this run so
+    they can be cleaned up in ``finally`` without leaving stale admin rows.
+    """
     print("Seeding demo database state...")
     engine_real = get_app_engine(profile="real")
     engine_synth = get_app_engine(profile="synth")
@@ -184,7 +194,53 @@ def seed_demo_database_state() -> None:
         confidence=0.89,
         request_id="req-demo-003",
     )
+
+    # 6. Seed deterministic IAM demo users (usr_ceo, usr_ktt, usr_kho, usr_admin)
+    iam_eng = get_iam_engine()
+    demo_ids = ("usr_ceo", "usr_ktt", "usr_kho", "usr_admin")
+    with iam_eng.connect() as conn:
+        pre_existing = {
+            r[0]
+            for r in conn.execute(
+                sa.text("SELECT user_id FROM iam.app_user WHERE user_id = ANY(:ids)"),
+                {"ids": list(demo_ids)},
+            ).fetchall()
+        }
+    seed_default_demo_users(iam_eng)
+    created_demo_ids = [uid for uid in demo_ids if uid not in pre_existing]
     print("Demo database state seeded successfully.")
+    return created_demo_ids
+
+
+def _obtain_session_token(
+    api_port: int,
+    username: str,
+    user_id: str,
+    password: str = "DemoPass@2026",
+) -> str:
+    """Obtain a live DB-backed session token via /v1/auth/login (with create_session fallback)."""
+    login_url = f"http://127.0.0.1:{api_port}/v1/auth/login"
+    payload = json.dumps({"username": username, "password": password}).encode("utf-8")
+    req = urllib.request.Request(
+        login_url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if data.get("access_token"):
+                return str(data["access_token"])
+    except Exception:
+        pass
+    tok, _ = create_session(
+        get_iam_engine(),
+        user_id=user_id,
+        client_ip="127.0.0.1",
+        user_agent="ev16-capture-script",
+    )
+    return tok
 
 
 def wait_for_http_ready(url: str, timeout_sec: float = 30.0, label: str = "Service") -> None:
@@ -275,6 +331,7 @@ async def capture_url_cdp(
     expected_texts: list[str],
     click_button_text: str | None = None,
     post_click_texts: list[str] | None = None,
+    session_token: str | None = None,
     timeout_sec: float = 45.0,
 ) -> None:
     """Capture pixel-perfect screenshot via Chrome DevTools Protocol after Streamlit completes rendering."""
@@ -291,7 +348,7 @@ async def capture_url_cdp(
         "--no-sandbox",
         "--disable-gpu",
         "--disable-dev-shm-usage",
-        url,
+        "about:blank",
     ]
     proc = subprocess.Popen(browser_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
@@ -316,8 +373,27 @@ async def capture_url_cdp(
 
         async with websockets.connect(ws_url, max_size=25 * 1024 * 1024) as ws:
             msg_id = [0]
+            for domain_cmd in ("Runtime.enable", "Page.enable", "Network.enable"):
+                msg_id[0] += 1
+                await _cdp_call(ws, msg_id[0], domain_cmd)
+
+            if session_token:
+                msg_id[0] += 1
+                await _cdp_call(
+                    ws,
+                    msg_id[0],
+                    "Network.setCookie",
+                    {
+                        "name": "gml_session",
+                        "value": session_token,
+                        "url": url,
+                        "path": "/",
+                        "sameSite": "Lax",
+                    },
+                )
+
             msg_id[0] += 1
-            await _cdp_call(ws, msg_id[0], "Runtime.enable")
+            await _cdp_call(ws, msg_id[0], "Page.navigate", {"url": url})
 
             await _wait_streamlit_idle_and_text(ws, msg_id, expected_texts, timeout_sec=timeout_sec)
 
@@ -394,12 +470,12 @@ async def capture_url_cdp(
 
 
 def capture_screens() -> None:
-    """Launch services, capture 7 UI screenshots, and verify file sizes."""
+    """Launch services, capture 9 UI screenshots (including login & admin), and verify file sizes."""
     SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     browser_exe = get_browser_executable()
     print(f"Using browser: {browser_exe}")
 
-    seed_demo_database_state()
+    created_demo_ids = seed_demo_database_state()
 
     api_port = find_free_port()
     st_port = find_free_port()
@@ -411,9 +487,11 @@ def capture_screens() -> None:
     env["API_BASE_URL"] = f"http://127.0.0.1:{api_port}"
     env["LLM_PROVIDER"] = "heuristic"
     env["GOOGLE_API_KEY"] = "mock_offline"
+    env["REQUIRE_LOGIN_FOR_TESTING"] = "1"
 
     api_proc: subprocess.Popen | None = None
     st_proc: subprocess.Popen | None = None
+    issued_tokens: list[str] = []
 
     try:
         # 1. Start FastAPI backend
@@ -433,6 +511,11 @@ def capture_screens() -> None:
         api_proc = subprocess.Popen(api_cmd, cwd=str(V2_DIR), env=env)
         wait_for_http_ready(f"http://127.0.0.1:{api_port}/health", timeout_sec=45.0, label="FastAPI")
 
+        # Obtain live DB-backed session tokens via /v1/auth/login
+        ceo_token = _obtain_session_token(api_port, username="demo.ceo", user_id="usr_ceo")
+        admin_token = _obtain_session_token(api_port, username="demo.admin", user_id="usr_admin")
+        issued_tokens.extend([ceo_token, admin_token])
+
         # 2. Start Streamlit frontend
         print(f"Starting Streamlit on port {st_port}...")
         st_cmd = [
@@ -451,14 +534,29 @@ def capture_screens() -> None:
         st_proc = subprocess.Popen(st_cmd, cwd=str(V2_DIR), env=env)
         wait_for_http_ready(f"http://127.0.0.1:{st_port}/_stcore/health", timeout_sec=30.0, label="Streamlit")
 
-        # 3. Capture the 7 target screens (EV-16)
+        # 3. Capture all 9 target screens (EV-16)
         targets = [
+            (
+                "08_login.png",
+                f"http://127.0.0.1:{st_port}/",
+                [
+                    "GỖ MINH LONG · TRỢ LÝ ĐIỀU HÀNH AI",
+                    "Đăng nhập hệ thống quản trị",
+                    "Tên đăng nhập",
+                    "Mật khẩu",
+                    "Đăng nhập",
+                ],
+                None,
+                None,
+                None,
+            ),
             (
                 "01_chat_real.png",
                 f"http://127.0.0.1:{st_port}/?screen=chat&profile=real&autoload_last=1",
                 ["Trợ lý Hỏi đáp Nghiệp vụ AI", "Dư nợ ngắn hạn", "Request ID"],
                 None,
                 None,
+                ceo_token,
             ),
             (
                 "02_chat_synth.png",
@@ -466,6 +564,7 @@ def capture_screens() -> None:
                 ["DỮ LIỆU MÔ PHỎNG", "Trợ lý Hỏi đáp Nghiệp vụ AI", "Dư nợ ngắn hạn", "Request ID"],
                 None,
                 None,
+                ceo_token,
             ),
             (
                 "03_alert_center.png",
@@ -473,6 +572,7 @@ def capture_screens() -> None:
                 ["Trung tâm Cảnh báo Nghiệp vụ", "[AL-001]", "Hành động đề xuất đã phê duyệt", "Giá trị ghi nhận"],
                 None,
                 None,
+                ceo_token,
             ),
             (
                 "04_history.png",
@@ -480,6 +580,7 @@ def capture_screens() -> None:
                 ["Lịch sử Hội thoại", "Tổng số lượt hỏi đáp đã lưu"],
                 None,
                 None,
+                ceo_token,
             ),
             (
                 "05_overview.png",
@@ -494,6 +595,7 @@ def capture_screens() -> None:
                 ],
                 None,
                 None,
+                ceo_token,
             ),
             (
                 "06_alert_detail.png",
@@ -501,6 +603,7 @@ def capture_screens() -> None:
                 ["Trung tâm Cảnh báo Nghiệp vụ", "[AL-001]", "[AL-002]"],
                 "[AL-002]",
                 ["[AL-002] Dư nợ ngắn hạn đạt đỉnh", "236,07 tỷ", "Diễn biến chuỗi thời gian"],
+                ceo_token,
             ),
             (
                 "07_actions.png",
@@ -508,10 +611,25 @@ def capture_screens() -> None:
                 ["Quản lý Hành động Nghiệp vụ", "Tổng số hành động ghi nhận", "Kích hoạt phương án khẩn cấp"],
                 None,
                 None,
+                ceo_token,
+            ),
+            (
+                "09_admin_panel.png",
+                f"http://127.0.0.1:{st_port}/",
+                [
+                    "Quản trị Hệ thống & Phân quyền IAM",
+                    "Quản lý Tài khoản Người dùng",
+                    "Chi tiết & Thao tác tài khoản",
+                    "Phiên đăng nhập",
+                    "Nhật ký Truy cập",
+                ],
+                None,
+                None,
+                admin_token,
             ),
         ]
 
-        for filename, url, expected_texts, click_btn, post_click_texts in targets:
+        for filename, url, expected_texts, click_btn, post_click_texts, sess_tok in targets:
             out_file = SCREENSHOTS_DIR / filename
             if out_file.exists():
                 out_file.unlink()
@@ -525,6 +643,7 @@ def capture_screens() -> None:
                     expected_texts=expected_texts,
                     click_button_text=click_btn,
                     post_click_texts=post_click_texts,
+                    session_token=sess_tok,
                 )
             )
 
@@ -541,6 +660,34 @@ def capture_screens() -> None:
         print(f"\nAll {len(targets)} EV-16 UI screenshots captured and verified successfully!")
 
     finally:
+        if issued_tokens:
+            try:
+                iam_eng = get_iam_engine()
+                for tok in issued_tokens:
+                    revoke_session(iam_eng, raw_token=tok, reason="capture_cleanup")
+            except Exception as exc:
+                print(f"Warning: failed to revoke capture sessions: {exc}")
+        if created_demo_ids:
+            try:
+                admin_eng = get_admin_engine(profile="real")
+                with admin_eng.begin() as conn:
+                    conn.execute(
+                        sa.text("DELETE FROM iam.user_session WHERE user_id = ANY(:ids)"),
+                        {"ids": created_demo_ids},
+                    )
+                    conn.execute(
+                        sa.text(
+                            "DELETE FROM iam.auth_event WHERE user_id = ANY(:ids) "
+                            "OR actor_user_id = ANY(:ids)"
+                        ),
+                        {"ids": created_demo_ids},
+                    )
+                    conn.execute(
+                        sa.text("DELETE FROM iam.app_user WHERE user_id = ANY(:ids)"),
+                        {"ids": created_demo_ids},
+                    )
+            except Exception as exc:
+                print(f"Warning: failed to clean up temporary demo users: {exc}")
         print("Cleaning up background processes...")
         for proc, name in [(st_proc, "Streamlit"), (api_proc, "FastAPI")]:
             if proc and proc.poll() is None:
