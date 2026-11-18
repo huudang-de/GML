@@ -4,6 +4,7 @@ from typing import Any
 import streamlit as st
 
 from app.ui.api_client import HttpApiClient
+from app.ui.theme import format_vi_datetime
 
 
 def render_history_view(api_client: HttpApiClient, profile: str) -> None:
@@ -38,7 +39,7 @@ def render_history_view(api_client: HttpApiClient, profile: str) -> None:
         turn_id = t.get("turn_id", "")
         query = t.get("query", "")
         summary = t.get("answer_summary") or "Không có tóm tắt"
-        created_at = t.get("created_at", "")
+        created_at = format_vi_datetime(t.get("created_at"))
         intent = t.get("intent", "kpi_query")
 
         with st.container(border=True):

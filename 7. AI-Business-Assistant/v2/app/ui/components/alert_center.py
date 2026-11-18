@@ -10,33 +10,42 @@ Specifications:
 
 import json
 from typing import Any
-import pandas as pd
 import streamlit as st
 
 from app.ui.api_client import HttpApiClient
+from app.ui.theme import (
+    DOMAIN_LABELS_VI,
+    ML_CRIMSON,
+    ML_NAVY,
+    build_trend_plotly,
+    format_vi_datetime,
+    format_vi_number,
+    format_vi_period,
+)
 
 DOMAIN_OPTIONS = ["Tất cả", "no_vay", "kho", "cong_no", "tien_gui", "dong_tien"]
 SEVERITY_OPTIONS = ["Tất cả", "nghiem_trong", "canh_bao"]
 STATUS_OPTIONS = ["Tất cả", "open", "acked"]
 
 
-def _format_metric_val(val: Any) -> str:
-    """Format numeric values with thousand commas or percentages."""
-    if val is None:
-        return "N/A"
-    try:
-        fval = float(val)
-        if abs(fval) <= 1.0 and fval != 0:
-            return f"{fval * 100:.1f}%"
-        if abs(fval) >= 1_000_000_000:
-            return f"{fval / 1_000_000_000:,.2f} tỷ"
-        if abs(fval) >= 1_000_000:
-            return f"{fval / 1_000_000:,.2f} tr"
-        if fval.is_integer():
-            return f"{int(fval):,}"
-        return f"{fval:,.2f}"
-    except (ValueError, TypeError):
-        return str(val)
+def _infer_alert_unit(kpi_key: Any, val: Any) -> str | None:
+    """Infer '%' unit for ratio/percentage KPIs when alert payload omits explicit unit."""
+    key_str = str(kpi_key or "").lower()
+    if any(tok in key_str for tok in ("ty_le", "phan_tram", "rate", "ratio")):
+        return "%"
+    if val is not None:
+        try:
+            fval = float(val)
+            if 0 < abs(fval) <= 1.0 and not any(tok in key_str for tok in ("vong", "ngay", "so_", "he_so")):
+                return "%"
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
+def _format_metric_val(val: Any, unit: str | None = None) -> str:
+    """Format numeric values with Vietnamese locale formatting."""
+    return format_vi_number(val, unit=unit)
 
 
 def render_alert_center(api_client: HttpApiClient, profile: str) -> None:
@@ -50,7 +59,12 @@ def render_alert_center(api_client: HttpApiClient, profile: str) -> None:
         st.markdown("##### 🔍 Bộ lọc")
         f_dom, f_sev, f_sta = st.columns(3)
         with f_dom:
-            sel_dom = st.selectbox("Lĩnh vực", DOMAIN_OPTIONS, index=0)
+            sel_dom = st.selectbox(
+                "Lĩnh vực",
+                DOMAIN_OPTIONS,
+                format_func=lambda d: "Tất cả" if d == "Tất cả" else DOMAIN_LABELS_VI.get(d, d),
+                index=0,
+            )
         with f_sev:
             sel_sev = st.selectbox(
                 "Mức độ",
@@ -99,12 +113,14 @@ def render_alert_center(api_client: HttpApiClient, profile: str) -> None:
             msg = alert.get("message", "")
             sev = str(alert.get("severity", "")).lower()
             is_ack = bool(alert.get("is_acknowledged", False))
+            occ_count = int(alert.get("occurrence_count", 1) or 1)
 
             sev_icon = "🔴" if sev in ("critical", "nghiem_trong") else "🟡"
             ack_icon = "✅" if is_ack else "⏳"
             msg_snippet = msg[:24] + "..." if len(msg) > 24 else msg
+            occ_badge = f" · ×{occ_count} lần" if occ_count > 1 else ""
 
-            btn_label = f"{sev_icon} [{rule_id}] {msg_snippet} {ack_icon}"
+            btn_label = f"{sev_icon} [{rule_id}] {msg_snippet}{occ_badge} {ack_icon}"
             is_active = (aid == selected_id)
 
             if st.button(
@@ -130,22 +146,28 @@ def render_alert_center(api_client: HttpApiClient, profile: str) -> None:
         is_ack = bool(cur_alert.get("is_acknowledged", False))
         ack_by = cur_alert.get("acknowledged_by")
         ack_at = cur_alert.get("acknowledged_at")
+        occ_count = int(cur_alert.get("occurrence_count", 1) or 1)
+        alert_unit = cur_alert.get("unit") or _infer_alert_unit(kpi_key, val)
 
-        sev_badge = "🔴 NGHIÊM TRỌNG" if sev in ("critical", "nghiem_trong") else "🟡 CẢNH BÁO"
+        is_critical = sev in ("critical", "nghiem_trong")
+        sev_badge = "🔴 NGHIÊM TRỌNG" if is_critical else "🟡 CẢNH BÁO"
         status_badge = "🟢 Đã xác nhận" if is_ack else "⏳ Chưa xác nhận"
+        occ_header_suffix = f" · ×{occ_count} lần" if occ_count > 1 else ""
 
-        st.markdown(f"### [{rule_id}] {msg}")
+        st.markdown(f"### [{rule_id}] {msg}{occ_header_suffix}")
         sub_info = f"Chỉ số: `{kpi_key}` | Mức độ: **{sev_badge}** | Trạng thái: **{status_badge}**"
+        if occ_count > 1:
+            sub_info += f" | Tần suất: **×{occ_count} lần**"
         if is_ack and ack_by:
-            sub_info += f" (bởi `{ack_by}` vào lúc `{ack_at}`)"
+            sub_info += f" (bởi `{ack_by}` vào lúc `{format_vi_datetime(ack_at)}`)"
         st.caption(sub_info)
         st.divider()
 
         # 3 Metrics (Giá trị, Ngưỡng, Kỳ)
         m1, m2, m3 = st.columns(3)
-        m1.metric("Giá trị ghi nhận", _format_metric_val(val))
-        m2.metric("Ngưỡng quy tắc", _format_metric_val(threshold))
-        m3.metric("Kỳ / Thời điểm", str(period)[:10] if period else "N/A")
+        m1.metric("Giá trị ghi nhận", _format_metric_val(val, unit=alert_unit))
+        m2.metric("Ngưỡng quy tắc", _format_metric_val(threshold, unit=alert_unit))
+        m3.metric("Kỳ / Thời điểm", format_vi_period(period))
         st.divider()
 
         # Evidence
@@ -160,15 +182,24 @@ def render_alert_center(api_client: HttpApiClient, profile: str) -> None:
         else:
             evidence = {}
 
-        # Evidence Series Line Chart
+        # Evidence Series Line Chart (Plotly Simplifica)
         series = evidence.get("series") or []
         if series:
             st.markdown("##### 📈 Diễn biến chuỗi thời gian")
             try:
-                ev_df = pd.DataFrame(series)
-                if "period" in ev_df.columns and "value" in ev_df.columns:
-                    ev_df = ev_df.set_index("period")
-                    st.line_chart(ev_df["value"])
+                th_num = float(threshold) if threshold is not None else None
+            except (ValueError, TypeError):
+                th_num = None
+            try:
+                fig = build_trend_plotly(
+                    series=series,
+                    unit=alert_unit,
+                    line_color=ML_CRIMSON if is_critical else ML_NAVY,
+                    threshold=th_num,
+                    height=260,
+                )
+                if fig.data:
+                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
             except Exception:
                 pass
 

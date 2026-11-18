@@ -402,3 +402,91 @@ def test_http_api_client_chat_timeout_and_friendly_error():
     assert "Hết thời gian chờ phản hồi từ Trợ lý AI" in str(exc_info.value)
     assert observed_timeouts == [60.0]
 
+
+def test_vietnamese_formatters_and_logo_in_theme():
+    """Verify pure Vietnamese locale formatters and embedded Logo GML loader in theme.py."""
+    from app.ui.theme import (
+        DOMAIN_LABELS_VI,
+        ROLE_SHORT_VI,
+        STATUS_LABELS_VI,
+        format_vi_date,
+        format_vi_datetime,
+        format_vi_delta,
+        format_vi_number,
+        format_vi_period,
+        get_logo_base64,
+    )
+
+    assert format_vi_number(236_070_000_000, "VNĐ") == "236,07 tỷ VNĐ"
+    assert format_vi_number(236_070_000_000, "tỷ VNĐ") == "236,07 tỷ VNĐ"
+    assert format_vi_number(341_690_000_000) == "341,69 tỷ"
+    assert format_vi_number(12_500_000, "VNĐ") == "12,50 tr VNĐ"
+    assert format_vi_number(26824) == "26.824"
+    assert format_vi_number(1234.5) == "1.234,50"
+    assert format_vi_number(0.885, "%") == "88,5%"
+    assert format_vi_number(0.0, "%") == "0,0%"
+    assert format_vi_number(None) == "Chưa có dữ liệu"
+
+    assert format_vi_delta(-0.168) == "-16,8%"
+    assert format_vi_delta(0.052) == "+5,2%"
+    assert format_vi_delta(0.0) == "0,0%"
+    assert format_vi_delta(None) is None
+
+    assert format_vi_date("2026-07-31") == "31/07/2026"
+    assert format_vi_date("2026-07") == "T07/2026"
+    assert format_vi_date("") == "—"
+    assert format_vi_datetime("2026-11-17T08:00:00") == "08:00 · 17/11/2026"
+    assert format_vi_period("2026-07") == "T07/2026"
+
+    assert DOMAIN_LABELS_VI["no_vay"] == "Hoạt động Tài chính"
+    assert STATUS_LABELS_VI["open"] == "Chờ xử lý"
+    assert ROLE_SHORT_VI["ceo"] == "Tổng Giám đốc"
+
+    logo_b64 = get_logo_base64()
+    assert isinstance(logo_b64, str) and len(logo_b64) > 100
+
+
+def test_alert_center_renders_occurrence_count_badge(app_test_factory):
+    """Alert Center renders '×N lần' badge in list and detail when grouped occurrence_count > 1."""
+    engine = get_app_engine(profile="real")
+    with engine.begin() as conn:
+        conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id = 'AL-DUP-UX'"))
+        for _ in range(3):
+            conn.execute(
+                sa.text("""
+                    INSERT INTO app.alert_event (
+                        rule_id, kpi_key, severity, message, value, threshold,
+                        is_acknowledged, period, created_at
+                    ) VALUES (
+                        'AL-DUP-UX', 'ty_le_su_dung_han_muc', 'critical',
+                        'Cảnh báo trùng lặp hạn mức tín dụng',
+                        0.92, 0.85, false, '2026-07', now()
+                    )
+                """)
+            )
+
+    try:
+        at = app_test_factory(screen="alerts")
+        at.run(timeout=35)
+        assert not at.exception
+
+        dup_buttons = [b for b in at.button if "AL-DUP-UX" in b.label]
+        assert len(dup_buttons) == 1, f"Expected deduplicated single button for AL-DUP-UX, got {len(dup_buttons)}"
+        assert "×3 lần" in dup_buttons[0].label
+
+        # Click the button to inspect detail header and formatted metrics
+        dup_buttons[0].click().run(timeout=35)
+        assert not at.exception
+        all_md = " ".join(m.value for m in at.markdown)
+        all_cap = " ".join(c.value for c in at.caption)
+        assert "×3 lần" in all_md
+        assert "×3 lần" in all_cap
+        metric_vals = [m.value for m in at.metric]
+        assert "92,0%" in metric_vals
+        assert "85,0%" in metric_vals
+        assert "T07/2026" in metric_vals
+    finally:
+        with engine.begin() as conn:
+            conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id = 'AL-DUP-UX'"))
+
+

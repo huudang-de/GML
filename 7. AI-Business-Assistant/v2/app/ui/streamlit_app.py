@@ -20,6 +20,11 @@ from app.ui.components import (
     render_history_view,
     render_overview,
 )
+from app.ui.theme import (
+    ROLE_SHORT_VI,
+    get_logo_base64,
+    inject_minh_long_theme,
+)
 
 ROLE_TOKENS = {
     "ceo": "gml-dev-token-ceo",
@@ -85,11 +90,13 @@ def _resolve_profile_index(profile_param: str | None) -> int:
 def main() -> None:
     """Main Streamlit application entry point."""
     st.set_page_config(
-        page_title="Gỗ Minh Long AI Assistant",
+        page_title="Gỗ Minh Long · Trợ lý Điều hành AI",
         page_icon="🪵",
         layout="wide",
         initial_sidebar_state="expanded",
     )
+    inject_minh_long_theme()
+    logo_b64 = get_logo_base64()
 
     # 1. Initialize session variables
     if "session_id" not in st.session_state:
@@ -118,9 +125,23 @@ def main() -> None:
 
     # 3. Sidebar Configuration
     with st.sidebar:
-        st.title("🪵 Gỗ Minh Long AI Assistant v2.0")
-        st.caption("Trợ lý Giám đốc & Phân tích Dữ liệu Doanh nghiệp")
-        st.divider()
+        logo_img_html = (
+            f'<img src="data:image/jpeg;base64,{logo_b64}" alt="Logo Gỗ Minh Long" />'
+            if logo_b64
+            else '<span style="font-size:24px;">🪵</span>'
+        )
+        st.markdown(
+            f"""
+            <div class="gml-sidebar-brand">
+                {logo_img_html}
+                <div>
+                    <div class="gml-sidebar-brand-title">GỖ MINH LONG · AI ASSISTANT</div>
+                    <div class="gml-sidebar-brand-sub">Trợ lý Điều hành & Dữ liệu Doanh nghiệp</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         role_options = list(ROLE_TOKENS.keys())
         if "role_selector" not in st.session_state:
@@ -131,7 +152,7 @@ def main() -> None:
         role = st.selectbox(
             "👤 Vai trò người dùng",
             options=role_options,
-            format_func=lambda r: f"{ROLE_LABELS.get(r, r)} ({r})",
+            format_func=lambda r: f"{ROLE_LABELS.get(r, r)} · {ROLE_SHORT_VI.get(r, r)}",
             key="role_selector",
         )
 
@@ -192,6 +213,37 @@ def main() -> None:
     api_url = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
     token = ROLE_TOKENS.get(role, "gml-dev-token-ceo")
     api_client = HttpApiClient(base_url=api_url, token=token)
+
+    # Top Masthead Bar
+    masthead_logo = (
+        f'<img src="data:image/jpeg;base64,{logo_b64}" alt="Logo Gỗ Minh Long" />'
+        if logo_b64
+        else '<span style="font-size:22px;">🪵</span>'
+    )
+    role_vi = ROLE_SHORT_VI.get(role, role)
+    profile_badge = (
+        '<span class="gml-badge gml-badge-warning">Dữ liệu Mô phỏng</span>'
+        if active_profile == "synth"
+        else '<span class="gml-badge gml-badge-navy">Dữ liệu Thực tế</span>'
+    )
+    st.markdown(
+        f"""
+        <div class="gml-masthead">
+            <div class="gml-masthead-left">
+                {masthead_logo}
+                <div>
+                    <div class="gml-masthead-title">GỖ MINH LONG · TRỢ LÝ ĐIỀU HÀNH AI</div>
+                    <div class="gml-masthead-sub">Báo cáo Quản trị Thông minh · Power BI Simplifica</div>
+                </div>
+            </div>
+            <div class="gml-masthead-pills">
+                <span class="gml-badge gml-badge-count">{role_vi}</span>
+                {profile_badge}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # 5. Persistent Synthetic Data Warning Banner (TC-T6-02)
     has_synth_warning = any(
