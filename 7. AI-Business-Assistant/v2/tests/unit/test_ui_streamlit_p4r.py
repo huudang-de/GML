@@ -490,3 +490,58 @@ def test_alert_center_renders_occurrence_count_badge(app_test_factory):
             conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id = 'AL-DUP-UX'"))
 
 
+def test_overview_powerbi_simplifica_plotly_and_vi_formatting(app_test_factory):
+    """Overview renders Power BI Simplifica Plotly charts, Vietnamese numbers ('236,07 tỷ'), and date ('31/07/2026')."""
+    at = app_test_factory(role="ceo", profile="real", screen="overview")
+    at.run(timeout=35)
+    assert not at.exception
+
+    # Executive greeting + formatted Vietnamese date
+    all_captions = " ".join(c.value for c in at.caption)
+    assert "31/07/2026" in all_captions, f"Expected Vietnamese date '31/07/2026' in captions, got: {all_captions}"
+
+    # Vietnamese formatted numbers in st.metric (e.g. '236,07 tỷ')
+    metric_values = " ".join(str(m.value) for m in at.metric)
+    assert "236,07 tỷ" in metric_values, f"Expected '236,07 tỷ' in Overview metrics, got: {metric_values}"
+
+    # Interactive Plotly charts rendered (card sparklines + asymmetric combo chart)
+    plotly_charts = at.get("plotly_chart")
+    assert len(plotly_charts) >= 1, "Expected at least 1 interactive Plotly chart on Overview"
+
+    # Comparison table rendered in right asymmetric column
+    assert len(at.dataframe) >= 1, "Expected period comparison dataframe on Overview"
+
+
+def test_overview_chapter_navigator_filters_kpis_and_preserves_kho_count(app_test_factory):
+    """Power BI Chapter Navigator filters KPIs by domain and restores full set on '📊 Tổng hợp điều hành'."""
+    # 1. Verify quan_ly_kho keeps exact 3 metrics + Plotly charts
+    at_kho = app_test_factory(role="quan_ly_kho", profile="synth", screen="overview")
+    at_kho.run(timeout=35)
+    assert not at_kho.exception
+    assert len(at_kho.metric) == 3
+    assert len(at_kho.get("plotly_chart")) >= 1
+
+    # 2. Verify CEO chapter filtering narrows KPIs and returns cleanly to all-chapters view
+    at_ceo = app_test_factory(role="ceo", profile="real", screen="overview")
+    at_ceo.run(timeout=35)
+    assert not at_ceo.exception
+    total_metrics = len(at_ceo.metric)
+    assert total_metrics > 1
+
+    chap_radio = next((r for r in at_ceo.radio if r.key == "overview_chapter_selector"), None)
+    assert chap_radio is not None, "Expected overview_chapter_selector radio"
+    assert "📊 Tổng hợp điều hành" in chap_radio.options
+    assert "🏦 Hoạt động Tài chính" in chap_radio.options
+
+    chap_radio.set_value("🏦 Hoạt động Tài chính").run(timeout=35)
+    assert not at_ceo.exception
+    filtered_metrics = len(at_ceo.metric)
+    assert 1 <= filtered_metrics < total_metrics
+
+    chap_radio_after = next((r for r in at_ceo.radio if r.key == "overview_chapter_selector"), None)
+    chap_radio_after.set_value("📊 Tổng hợp điều hành").run(timeout=35)
+    assert not at_ceo.exception
+    assert len(at_ceo.metric) == total_metrics
+
+
+
