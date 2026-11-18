@@ -89,6 +89,13 @@ def get_app_engine(app_uri: str | None = None, profile: str | None = None) -> En
     return sa.create_engine(uri, pool_pre_ping=True)
 
 
+def get_iam_engine(app_uri: str | None = None) -> Engine:
+    """Return SQLAlchemy engine for internal IAM state on the primary 'real' database."""
+    settings = _get_settings()
+    uri = app_uri or settings.get_app_uri(profile="real")
+    return sa.create_engine(uri, pool_pre_ping=True)
+
+
 # ==============================================================================
 # GOLD_UAT_QUERIES (13 golden metrics G-01..G-13 from Spec §6)
 # ==============================================================================
