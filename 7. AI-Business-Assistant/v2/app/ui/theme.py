@@ -562,7 +562,7 @@ def build_trend_plotly(
             pass
 
     fig.update_layout(
-        title=dict(text=title, font=dict(size=13, color=ML_NAVY)) if title else None,
+        title=dict(text=title, font=dict(size=13, color=ML_NAVY)) if title else dict(text=""),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Be Vietnam Pro, Segoe UI, sans-serif", color=ML_TEXT, size=12),

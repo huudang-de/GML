@@ -484,7 +484,14 @@ def capture_screens() -> None:
             (
                 "05_overview.png",
                 f"http://127.0.0.1:{st_port}/?screen=overview&profile=synth",
-                ["DỮ LIỆU MÔ PHỎNG", "Chỉ số trọng yếu", "Phát hiện hôm nay", "Câu hỏi gợi ý"],
+                [
+                    "DỮ LIỆU MÔ PHỎNG",
+                    "Tổng hợp điều hành",
+                    "Chỉ số trọng yếu",
+                    "Xu hướng & Biến động theo kỳ",
+                    "Phát hiện hôm nay",
+                    "Câu hỏi gợi ý",
+                ],
                 None,
                 None,
             ),
@@ -493,7 +500,7 @@ def capture_screens() -> None:
                 f"http://127.0.0.1:{st_port}/?screen=alerts&profile=real",
                 ["Trung tâm Cảnh báo Nghiệp vụ", "[AL-001]", "[AL-002]"],
                 "[AL-002]",
-                ["[AL-002] Dư nợ ngắn hạn đạt đỉnh", "236.07 tỷ", "Diễn biến chuỗi thời gian"],
+                ["[AL-002] Dư nợ ngắn hạn đạt đỉnh", "236,07 tỷ", "Diễn biến chuỗi thời gian"],
             ),
             (
                 "07_actions.png",

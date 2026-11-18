@@ -386,6 +386,11 @@
             "title": "Message",
             "type": "string"
           },
+          "occurrence_count": {
+            "default": 1,
+            "title": "Occurrence Count",
+            "type": "integer"
+          },
           "period": {
             "anyOf": [
               {
@@ -1736,6 +1741,16 @@
                 }
               ],
               "title": "Profile"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dedup",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Dedup",
+              "type": "boolean"
             }
           },
           {
