@@ -298,4 +298,122 @@ class ChangePasswordResponse(BaseModel):
     message: str
 
 
+# ==============================================================================
+# Admin & Simulation Schemas (/v1/admin/*)
+# ==============================================================================
+
+class AdminUserItem(BaseModel):
+    user_id: str
+    username: str
+    display_name: str
+    email: str | None = None
+    role: str
+    allowed_profiles: list[str]
+    is_active: bool
+    must_change_password: bool
+    failed_login_count: int = 0
+    locked_until: datetime | None = None
+    last_login_at: datetime | None = None
+    password_changed_at: datetime | None = None
+    created_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminUserListResponse(BaseModel):
+    users: list[AdminUserItem]
+    total: int
+
+
+class AdminUserCreateRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=64)
+    display_name: str = Field(..., min_length=1, max_length=200)
+    email: str | None = Field(default=None, max_length=200)
+    role: Literal["ceo", "ke_toan_truong", "quan_ly_kho", "quan_tri_he_thong"]
+    allowed_profiles: list[Literal["real", "synth"]] | None = None
+    password: str | None = None
+    must_change_password: bool = True
+
+
+class AdminUserCreateResponse(BaseModel):
+    user: AdminUserItem
+    temporary_password: str
+
+
+class AdminUserUpdateRequest(BaseModel):
+    display_name: str | None = Field(default=None, max_length=200)
+    email: str | None = Field(default=None, max_length=200)
+    role: Literal["ceo", "ke_toan_truong", "quan_ly_kho", "quan_tri_he_thong"] | None = None
+    allowed_profiles: list[Literal["real", "synth"]] | None = None
+    is_active: bool | None = None
+
+
+class AdminResetPasswordResponse(BaseModel):
+    user_id: str
+    temporary_password: str
+
+
+class AdminRevokeSessionsResponse(BaseModel):
+    user_id: str
+    revoked_count: int
+
+
+class AdminSessionItem(BaseModel):
+    session_id: int
+    user_id: str
+    username: str
+    display_name: str
+    role: str
+    created_at: datetime
+    expires_at: datetime
+    last_seen_at: datetime
+    client_ip: str | None = None
+    user_agent: str | None = None
+
+
+class AdminSessionListResponse(BaseModel):
+    sessions: list[AdminSessionItem]
+    total: int
+
+
+class AdminSessionDeleteResponse(BaseModel):
+    revoked: bool = True
+
+
+class AuthEventItem(BaseModel):
+    id: int
+    event_type: str
+    user_id: str | None = None
+    username_attempted: str | None = None
+    actor_user_id: str | None = None
+    detail: dict[str, Any] | None = None
+    client_ip: str | None = None
+    created_at: datetime
+
+
+class AuthEventListResponse(BaseModel):
+    events: list[AuthEventItem]
+    total: int
+
+
+class SimulationStatusResponse(BaseModel):
+    last_run_at: str | None = None
+    last_status: str | None = None
+    last_message: str | None = None
+    checksum_file_exists: bool
+
+
+class SimulationRunRequest(BaseModel):
+    seed: int = 42
+
+
+class SimulationRunResponse(BaseModel):
+    status: str
+    tables_generated: int
+    duration_ms: float
+    run_at: str
+    message: str
+
+
+
 
