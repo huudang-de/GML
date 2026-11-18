@@ -52,7 +52,7 @@ def get_kpi_value(
 ) -> KpiValueResponse:
     """Retrieve and calculate KPI value using deterministic Golden Queries, with optional time-series."""
     req_id = get_request_id(request)
-    target_profile = resolve_profile(profile, settings)
+    target_profile = resolve_profile(profile, settings, user=user)
 
     # 1. Compute scalar KPI value
     try:

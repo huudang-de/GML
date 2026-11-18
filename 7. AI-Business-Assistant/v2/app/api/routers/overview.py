@@ -39,7 +39,7 @@ def get_overview(
 ) -> OverviewResponse:
     """Retrieve executive overview tailored for the authenticated user's role and data profile."""
     req_id = get_request_id(request)
-    target_profile = resolve_profile(profile, settings)
+    target_profile = resolve_profile(profile, settings, user=user)
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
 
     start_time = time.perf_counter()

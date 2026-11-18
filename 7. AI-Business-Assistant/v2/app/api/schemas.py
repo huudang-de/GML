@@ -262,4 +262,40 @@ class OverviewResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+# ==============================================================================
+# Authentication Schemas (/v1/auth/*)
+# ==============================================================================
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AuthenticatedUserInfo(BaseModel):
+    user_id: str
+    username: str | None = None
+    display_name: str
+    email: str | None = None
+    role: str
+    allowed_profiles: list[str]
+    must_change_password: bool = False
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_at: str
+    user: AuthenticatedUserInfo
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class ChangePasswordResponse(BaseModel):
+    status: str = "ok"
+    message: str
+
+
 

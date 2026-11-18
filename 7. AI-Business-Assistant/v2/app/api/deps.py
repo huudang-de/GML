@@ -18,7 +18,7 @@ from app.core.cache import ScopedTTLCache
 from app.core.logging import request_id_ctx
 from app.core.metrics import MetricsRegistry, get_metrics_registry
 from app.core.rate_limit import SlidingWindowRateLimiter
-from db.apply_db import get_app_engine, get_ro_engine
+from db.apply_db import get_app_engine, get_iam_engine, get_ro_engine
 
 
 class ApiException(HTTPException):
@@ -39,11 +39,16 @@ class ApiException(HTTPException):
 
 # Global singletons
 _RATE_LIMITER: SlidingWindowRateLimiter | None = None
+_LOGIN_RATE_LIMITER: SlidingWindowRateLimiter | None = None
 _KPI_CACHE: ScopedTTLCache | None = None
 
 
-def resolve_profile(profile: str | None, settings: Settings) -> str:
-    """Resolve and validate the target data profile ('real' or 'synth')."""
+def resolve_profile(
+    profile: str | None,
+    settings: Settings,
+    user: UserPrincipal | None = None,
+) -> str:
+    """Resolve and validate the target data profile ('real' or 'synth') and caller access."""
     target_profile = (profile or settings.data_profile).strip().lower()
     if target_profile not in ("real", "synth"):
         raise ApiException(
@@ -51,6 +56,14 @@ def resolve_profile(profile: str | None, settings: Settings) -> str:
             code="VALIDATION_ERROR",
             message=f"Hồ sơ dữ liệu '{target_profile}' không hợp lệ (chỉ chấp nhận 'real' hoặc 'synth').",
         )
+    if user is not None:
+        allowed = user.allowed_profiles or ["real"]
+        if target_profile not in allowed:
+            raise ApiException(
+                status_code=403,
+                code="PROFILE_FORBIDDEN",
+                message=f"Tài khoản không có quyền truy cập nguồn dữ liệu '{target_profile}'.",
+            )
     return target_profile
 
 
@@ -60,15 +73,40 @@ def reset_rate_limiter() -> None:
     _RATE_LIMITER = None
 
 
+def reset_login_rate_limiter() -> None:
+    """Reset global login rate limiter singleton (for test isolation)."""
+    global _LOGIN_RATE_LIMITER
+    _LOGIN_RATE_LIMITER = None
+
+
 def reset_kpi_cache() -> None:
     """Reset global KPI cache singleton (for test isolation)."""
     global _KPI_CACHE
     _KPI_CACHE = None
 
 
-def get_token_verifier(settings: Settings = Depends(get_settings)) -> TokenAuthVerifier:
+def get_iam_db_engine(settings: Settings = Depends(get_settings)) -> Engine:
+    """Return database engine for internal IAM state pinned to 'real' database."""
+    return get_iam_engine(app_uri=settings.get_app_uri(profile="real"))
+
+
+def get_token_verifier(
+    settings: Settings = Depends(get_settings),
+    iam_engine: Engine = Depends(get_iam_db_engine),
+) -> TokenAuthVerifier:
     """Return configured TokenAuthVerifier."""
-    return TokenAuthVerifier(settings)
+    return TokenAuthVerifier(settings, iam_engine=iam_engine)
+
+
+def get_login_rate_limiter() -> SlidingWindowRateLimiter:
+    """Return singleton per-IP SlidingWindowRateLimiter for /v1/auth/login (10 req/60s)."""
+    global _LOGIN_RATE_LIMITER
+    if _LOGIN_RATE_LIMITER is None:
+        _LOGIN_RATE_LIMITER = SlidingWindowRateLimiter(
+            max_requests=10,
+            window_seconds=60,
+        )
+    return _LOGIN_RATE_LIMITER
 
 
 def get_rate_limiter(settings: Settings = Depends(get_settings)) -> SlidingWindowRateLimiter:
@@ -144,13 +182,22 @@ def get_current_user(
 
     raw_token = parts[1]
     try:
-        return verifier.verify_bearer_token(raw_token)
+        principal = verifier.verify_bearer_token(raw_token)
     except AuthenticationError as e:
         raise ApiException(
             status_code=e.status_code,
             code="UNAUTHORIZED",
             message=e.message,
         ) from e
+
+    if principal.must_change_password and not request.url.path.startswith("/v1/auth"):
+        raise ApiException(
+            status_code=403,
+            code="PASSWORD_CHANGE_REQUIRED",
+            message="Bạn phải đổi mật khẩu tạm trước khi sử dụng hệ thống.",
+        )
+
+    return principal
 
 
 def check_rate_limit(

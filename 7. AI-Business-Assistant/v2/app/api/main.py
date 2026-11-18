@@ -23,6 +23,7 @@ from app.api.deps import (
 from app.api.routers import (
     actions,
     alerts,
+    auth,
     chat,
     feedback,
     health,
@@ -169,6 +170,7 @@ def create_app(
 
     # 3. Mount Routers
     app.include_router(health.router)
+    app.include_router(auth.router)
     app.include_router(chat.router)
     app.include_router(kpi.router)
     app.include_router(alerts.router)

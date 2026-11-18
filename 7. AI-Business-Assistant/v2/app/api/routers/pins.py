@@ -50,7 +50,7 @@ def pin_kpi(
 ) -> JSONResponse:
     """Pin a KPI to the user's dashboard (idempotent; 201 for new, 200 for already pinned)."""
     req_id = get_request_id(request)
-    target_profile = resolve_profile(profile, settings)
+    target_profile = resolve_profile(profile, settings, user=user)
 
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
     audit_query = f"POST /v1/pins kpi={payload.kpi_key}"
@@ -186,7 +186,7 @@ def list_pins(
 ) -> PinListResponse:
     """Retrieve pinned KPIs scoped by user and profile, filtering out revoked permissions."""
     req_id = get_request_id(request)
-    target_profile = resolve_profile(profile, settings)
+    target_profile = resolve_profile(profile, settings, user=user)
 
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
     audit_query = "GET /v1/pins"
@@ -241,7 +241,7 @@ def delete_pin(
 ) -> PinDeleteResponse:
     """Remove a pinned KPI for the user and profile."""
     req_id = get_request_id(request)
-    target_profile = resolve_profile(profile, settings)
+    target_profile = resolve_profile(profile, settings, user=user)
 
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
     audit_query = f"DELETE /v1/pins/{kpi_key}"

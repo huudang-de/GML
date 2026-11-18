@@ -20,6 +20,7 @@ from app.api.deps import (
     get_current_user,
     get_metrics,
     get_request_id,
+    resolve_profile,
 )
 from app.api.schemas import ChatRequest, ChatResponse
 from app.core.auth import UserPrincipal
@@ -52,7 +53,7 @@ def chat_turn(
     req_id = get_request_id(request)
 
     # 1. Resolve data profile and session ID
-    effective_profile = (payload.data_profile or settings.data_profile).strip().lower()
+    effective_profile = resolve_profile(payload.data_profile, settings, user=user)
     session_id = payload.session_id.strip() if payload.session_id and payload.session_id.strip() else f"sess-{uuid.uuid4().hex[:12]}"
 
     # 2. Setup engines and session memory

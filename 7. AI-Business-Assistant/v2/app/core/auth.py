@@ -12,10 +12,13 @@ import hashlib
 import hmac
 import json
 from typing import Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import Settings
 from app.core.security import Role
+from app.services.iam_service import verify_session_token
 
 
 class AuthenticationError(Exception):
@@ -33,6 +36,11 @@ class UserPrincipal(BaseModel):
     role: Role
     display_name: str
     expires_at: datetime | None = None
+    username: str | None = None
+    email: str | None = None
+    allowed_profiles: list[str] = Field(default_factory=lambda: ["real", "synth"])
+    must_change_password: bool = False
+    session_id: int | None = None
 
 
 def _hash_token(raw_token: str) -> str:
@@ -43,8 +51,9 @@ def _hash_token(raw_token: str) -> str:
 class TokenAuthVerifier:
     """Verifies bearer tokens using SHA-256 digests and manages token identities."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, iam_engine: Engine | None = None) -> None:
         self.settings = settings
+        self.iam_engine = iam_engine
         self._tokens_by_hash: dict[str, UserPrincipal] = {}
         self._load_tokens()
 
@@ -67,31 +76,30 @@ class TokenAuthVerifier:
         if tokens_json:
             try:
                 parsed = json.loads(tokens_json)
+                def _build_static_principal(item: dict[str, Any]) -> UserPrincipal:
+                    exp = item.get("expires_at")
+                    exp_dt = datetime.fromisoformat(exp) if exp else None
+                    profiles = item.get("allowed_profiles")
+                    return UserPrincipal(
+                        user_id=item["user_id"],
+                        username=item.get("username"),
+                        email=item.get("email"),
+                        role=item["role"],
+                        display_name=item.get("display_name", item["user_id"]),
+                        expires_at=exp_dt,
+                        allowed_profiles=list(profiles) if profiles is not None else ["real", "synth"],
+                        must_change_password=bool(item.get("must_change_password", False)),
+                    )
+
                 if isinstance(parsed, list):
                     for item in parsed:
                         raw_tok = item.get("token")
                         if not raw_tok:
                             continue
-                        exp = item.get("expires_at")
-                        exp_dt = datetime.fromisoformat(exp) if exp else None
-                        principal = UserPrincipal(
-                            user_id=item["user_id"],
-                            role=item["role"],
-                            display_name=item.get("display_name", item["user_id"]),
-                            expires_at=exp_dt,
-                        )
-                        self._tokens_by_hash[_hash_token(raw_tok)] = principal
+                        self._tokens_by_hash[_hash_token(raw_tok)] = _build_static_principal(item)
                 elif isinstance(parsed, dict):
                     for raw_tok, item in parsed.items():
-                        exp = item.get("expires_at")
-                        exp_dt = datetime.fromisoformat(exp) if exp else None
-                        principal = UserPrincipal(
-                            user_id=item["user_id"],
-                            role=item["role"],
-                            display_name=item.get("display_name", item["user_id"]),
-                            expires_at=exp_dt,
-                        )
-                        self._tokens_by_hash[_hash_token(raw_tok)] = principal
+                        self._tokens_by_hash[_hash_token(raw_tok)] = _build_static_principal(item)
             except Exception as e:
                 # If production and auth_tokens_json fails to parse, error will surface
                 if is_prod:
@@ -110,17 +118,51 @@ class TokenAuthVerifier:
                 matched_principal = principal
                 break
 
-        if matched_principal is None:
+        if matched_principal is not None:
+            current_time = now or datetime.now(timezone.utc)
+            if matched_principal.expires_at is not None:
+                exp_time = matched_principal.expires_at
+                if exp_time.tzinfo is None:
+                    exp_time = exp_time.replace(tzinfo=timezone.utc)
+                if current_time.tzinfo is None:
+                    current_time = current_time.replace(tzinfo=timezone.utc)
+                if current_time >= exp_time:
+                    raise AuthenticationError("Token đã hết hạn (401 UNAUTHORIZED).")
+            return matched_principal
+
+        # 2. Fall back to stateful PostgreSQL IAM session lookup
+        engine = self.iam_engine
+        created_engine = False
+        if engine is None:
+            try:
+                from db.apply_db import get_iam_engine
+
+                engine = get_iam_engine(app_uri=self.settings.get_app_uri(profile="real"))
+                created_engine = True
+            except Exception:
+                engine = None
+
+        session_data: dict[str, Any] | None = None
+        if engine is not None:
+            try:
+                session_data = verify_session_token(engine, raw_token, now=now)
+            except SQLAlchemyError:
+                session_data = None
+            finally:
+                if created_engine and hasattr(engine, "dispose"):
+                    engine.dispose()
+
+        if session_data is None:
             raise AuthenticationError("Token không hợp lệ hoặc không tồn tại (401 UNAUTHORIZED).")
 
-        current_time = now or datetime.now(timezone.utc)
-        if matched_principal.expires_at is not None:
-            exp_time = matched_principal.expires_at
-            if exp_time.tzinfo is None:
-                exp_time = exp_time.replace(tzinfo=timezone.utc)
-            if current_time.tzinfo is None:
-                current_time = current_time.replace(tzinfo=timezone.utc)
-            if current_time >= exp_time:
-                raise AuthenticationError("Token đã hết hạn (401 UNAUTHORIZED).")
-
-        return matched_principal
+        return UserPrincipal(
+            user_id=session_data["user_id"],
+            username=session_data.get("username"),
+            email=session_data.get("email"),
+            role=session_data["role"],
+            display_name=session_data["display_name"],
+            expires_at=session_data.get("expires_at"),
+            allowed_profiles=list(session_data.get("allowed_profiles") or ["real"]),
+            must_change_password=bool(session_data.get("must_change_password", False)),
+            session_id=session_data.get("session_id"),
+        )

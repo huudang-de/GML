@@ -41,7 +41,7 @@ def list_alerts(
 ) -> AlertListResponse:
     """Retrieve operational alerts strictly filtered by caller's role permissions (Review Focus #5)."""
     req_id = get_request_id(request)
-    target_profile = resolve_profile(profile, settings)
+    target_profile = resolve_profile(profile, settings, user=user)
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
 
     where_clauses: list[str] = []
@@ -141,7 +141,7 @@ def acknowledge_alert(
 ) -> AlertAckResponse:
     """Acknowledge an operational alert (enforces 403 on unauthorized view domain)."""
     req_id = get_request_id(request)
-    target_profile = resolve_profile(profile, settings)
+    target_profile = resolve_profile(profile, settings, user=user)
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
 
     # 1. Fetch alert

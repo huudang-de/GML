@@ -93,7 +93,7 @@ def create_action(
 ) -> ActionItem:
     """Create an operational action item from an alert or chat turn."""
     req_id = get_request_id(request)
-    target_profile = resolve_profile(profile, settings)
+    target_profile = resolve_profile(profile, settings, user=user)
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
 
     # Audit privacy constraint: NEVER include title or note in audit log query!
@@ -289,7 +289,7 @@ def list_actions(
 ) -> ActionListResponse:
     """List operational action items filtered by role visibility and optional status."""
     req_id = get_request_id(request)
-    target_profile = resolve_profile(profile, settings)
+    target_profile = resolve_profile(profile, settings, user=user)
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
 
     where_clauses: list[str] = []
@@ -342,7 +342,7 @@ def update_action(
 ) -> ActionItem:
     """Update action item status or note (enforces visibility; returns 404 if unauthorized)."""
     req_id = get_request_id(request)
-    target_profile = resolve_profile(profile, settings)
+    target_profile = resolve_profile(profile, settings, user=user)
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
     audit_query = f"PATCH /v1/actions/{action_id}"
 
