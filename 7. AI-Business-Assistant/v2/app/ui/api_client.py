@@ -49,6 +49,12 @@ class ApiClientError(httpx.HTTPError):
         return str(self)
 
 
+def raise_if_unauthorized(exc: BaseException) -> None:
+    """Re-raise 401 ApiClientError so top-level app can clear session and redirect to login."""
+    if isinstance(exc, ApiClientError) and exc.status_code == 401:
+        raise exc
+
+
 def set_default_transport_for_testing(transport: httpx.BaseTransport | None) -> None:
     """Set process-wide mock transport for in-process testing."""
     global _DEFAULT_TEST_TRANSPORT

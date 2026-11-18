@@ -438,3 +438,70 @@ def test_ui_layer_still_has_zero_server_imports():
                         pytest.fail(f"File {py_file} imports forbidden db module: {alias.name}")
                     if parts[0] == "app" and len(parts) > 1 and parts[1] in forbidden_app_modules:
                         pytest.fail(f"File {py_file} imports forbidden server layer: {alias.name}")
+
+
+def test_mid_session_401_on_business_screen_triggers_session_expired_and_login(
+    auth_app_test,
+    iam_user_factory,
+    spy_requests: RequestSpy,
+):
+    """Mid-session 401 on a business view propagates to _handle_session_expired() and redirects to login."""
+    _, pw = iam_user_factory(
+        username="t4_ktt_user",
+        display_name="Trần Thị Mid401",
+        role="ke_toan_truong",
+        allowed_profiles=["real"],
+        must_change_password=False,
+    )
+
+    at = auth_app_test()
+    at.run(timeout=35)
+    assert not at.exception
+
+    _submit_login(at, "t4_ktt_user", pw)
+    assert not at.exception
+    token = at.session_state["auth_token"]
+    assert token
+    assert any(r.key == "screen_selector" for r in at.radio)
+
+    # Revoke session server-side while UI still holds the token in session_state
+    eng = get_iam_engine()
+    iam_service.revoke_session(eng, raw_token=token, reason="admin_revoked")
+    spy_requests.clear()
+
+    # Next business screen render hits 401 on /v1/overview -> must expire session and show login
+    at.run(timeout=35)
+    assert not at.exception
+    assert spy_requests.last("GET", "/v1/overview") is not None
+    assert "auth_token" not in at.session_state or not at.session_state["auth_token"]
+    assert any("Đăng nhập" in b.label for b in at.button)
+    err_msgs = " ".join(e.value for e in at.error)
+    assert "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại." in err_msgs
+
+
+def test_f5_get_me_503_preserves_cookie_and_shows_transient_error(
+    auth_app_test,
+    cookie_jar: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Non-401 ApiClientError (503/504) from /v1/auth/me preserves gml_session cookie and shows transient error."""
+    cookie_jar[COOKIE_NAME] = "transient-503-cookie-token"
+    clear_calls: list[str] = []
+
+    import app.ui.streamlit_app as streamlit_app_mod
+    from app.ui.api_client import ApiClientError, HttpApiClient
+
+    monkeypatch.setattr(streamlit_app_mod, "clear_session_cookie", lambda: clear_calls.append("cleared"))
+
+    def _raise_503(self):
+        raise ApiClientError("Service Unavailable", status_code=503)
+
+    monkeypatch.setattr(HttpApiClient, "get_me", _raise_503)
+
+    at = auth_app_test()
+    at.run(timeout=35)
+    assert not at.exception
+    assert clear_calls == []
+    assert "_pending_cookie_action" not in at.session_state or at.session_state["_pending_cookie_action"] != ("clear", None)
+    err_msgs = " ".join(e.value for e in at.error)
+    assert "Không thể kết nối máy chủ xác thực" in err_msgs

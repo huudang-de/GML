@@ -18,7 +18,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from app.ui.api_client import ApiClientError, HttpApiClient
+from app.ui.api_client import ApiClientError, HttpApiClient, raise_if_unauthorized
 from app.ui.theme import ROLE_SHORT_VI, format_vi_datetime
 
 ROLE_OPTIONS = ["ceo", "ke_toan_truong", "quan_ly_kho", "quan_tri_he_thong"]
@@ -41,12 +41,6 @@ AUTH_EVENT_TYPES = [
     "sessions_revoked",
     "simulation_triggered",
 ]
-
-
-def _raise_if_unauthorized(exc: Exception) -> None:
-    """Propagate 401 ApiClientError so main app clears session and redirects to login."""
-    if isinstance(exc, ApiClientError) and exc.status_code == 401:
-        raise exc
 
 
 def _format_user_status(user: dict[str, Any]) -> str:
@@ -137,7 +131,7 @@ def _render_users_tab(api_client: HttpApiClient, current_user: dict[str, Any]) -
                         must_change_password=new_must_change,
                     )
                 except Exception as exc:
-                    _raise_if_unauthorized(exc)
+                    raise_if_unauthorized(exc)
                     msg = exc.detail_message if isinstance(exc, ApiClientError) else str(exc)
                     st.error(msg)
                 else:
@@ -185,7 +179,7 @@ def _render_users_tab(api_client: HttpApiClient, current_user: dict[str, Any]) -
             is_active=is_active_param,
         )
     except Exception as exc:
-        _raise_if_unauthorized(exc)
+        raise_if_unauthorized(exc)
         msg = exc.detail_message if isinstance(exc, ApiClientError) else str(exc)
         st.error(f"Không tải được danh sách người dùng: {msg}")
         return
@@ -278,7 +272,7 @@ def _render_users_tab(api_client: HttpApiClient, current_user: dict[str, Any]) -
                         is_active=edit_active if not is_self else None,
                     )
                 except Exception as exc:
-                    _raise_if_unauthorized(exc)
+                    raise_if_unauthorized(exc)
                     st.error(exc.detail_message if isinstance(exc, ApiClientError) else str(exc))
                 else:
                     st.session_state["admin_user_flash"] = f"Đã cập nhật tài khoản '{target.get('username')}'."
@@ -289,7 +283,7 @@ def _render_users_tab(api_client: HttpApiClient, current_user: dict[str, Any]) -
                 try:
                     res = api_client.admin_reset_password(selected_uid)
                 except Exception as exc:
-                    _raise_if_unauthorized(exc)
+                    raise_if_unauthorized(exc)
                     st.error(exc.detail_message if isinstance(exc, ApiClientError) else str(exc))
                 else:
                     st.session_state["admin_temp_password_banner"] = {
@@ -303,7 +297,7 @@ def _render_users_tab(api_client: HttpApiClient, current_user: dict[str, Any]) -
                 try:
                     api_client.admin_unlock_user(selected_uid)
                 except Exception as exc:
-                    _raise_if_unauthorized(exc)
+                    raise_if_unauthorized(exc)
                     st.error(exc.detail_message if isinstance(exc, ApiClientError) else str(exc))
                 else:
                     st.session_state["admin_user_flash"] = f"Đã mở khoá tài khoản '{target.get('username')}'."
@@ -314,7 +308,7 @@ def _render_users_tab(api_client: HttpApiClient, current_user: dict[str, Any]) -
                 try:
                     res = api_client.admin_revoke_user_sessions(selected_uid)
                 except Exception as exc:
-                    _raise_if_unauthorized(exc)
+                    raise_if_unauthorized(exc)
                     st.error(exc.detail_message if isinstance(exc, ApiClientError) else str(exc))
                 else:
                     cnt = res.get("revoked_count", 0)
@@ -335,7 +329,7 @@ def _render_sessions_tab(api_client: HttpApiClient) -> None:
     try:
         sessions = api_client.admin_list_sessions()
     except Exception as exc:
-        _raise_if_unauthorized(exc)
+        raise_if_unauthorized(exc)
         st.error(exc.detail_message if isinstance(exc, ApiClientError) else str(exc))
         return
 
@@ -368,7 +362,7 @@ def _render_sessions_tab(api_client: HttpApiClient) -> None:
                     try:
                         api_client.admin_revoke_session(int(sid))
                     except Exception as exc:
-                        _raise_if_unauthorized(exc)
+                        raise_if_unauthorized(exc)
                         st.error(exc.detail_message if isinstance(exc, ApiClientError) else str(exc))
                     else:
                         st.session_state["admin_session_flash"] = f"Đã thu hồi phiên #{sid} ({uname})."
@@ -379,10 +373,14 @@ def _render_simulation_tab(api_client: HttpApiClient) -> None:
     """Render Tab 3: ⚙️ Dữ liệu Mô phỏng & Dự báo (`synth`)."""
     st.subheader("⚙️ Dữ liệu Mô phỏng & Dự báo Tháng (`synth`)")
 
+    sim_flash = st.session_state.pop("admin_sim_flash", None)
+    if sim_flash:
+        st.success(sim_flash)
+
     try:
         status_info = api_client.admin_get_simulation_status()
     except Exception as exc:
-        _raise_if_unauthorized(exc)
+        raise_if_unauthorized(exc)
         st.error(exc.detail_message if isinstance(exc, ApiClientError) else str(exc))
         return
 
@@ -419,13 +417,14 @@ def _render_simulation_tab(api_client: HttpApiClient) -> None:
             try:
                 res = api_client.admin_run_simulation(seed=int(seed_val))
             except Exception as exc:
-                _raise_if_unauthorized(exc)
+                raise_if_unauthorized(exc)
                 st.error(exc.detail_message if isinstance(exc, ApiClientError) else str(exc))
             else:
-                st.success(
+                st.session_state["admin_sim_flash"] = (
                     f"{res.get('message', 'Đã chạy xong.')} "
                     f"(Thời gian: {res.get('duration_ms', 0)} ms · Lúc {format_vi_datetime(res.get('run_at'))})"
                 )
+                st.rerun()
 
 
 def _render_audit_events_tab(api_client: HttpApiClient) -> None:
@@ -452,7 +451,7 @@ def _render_audit_events_tab(api_client: HttpApiClient) -> None:
             event_type=None if event_type_filter == "Tất cả" else event_type_filter,
         )
     except Exception as exc:
-        _raise_if_unauthorized(exc)
+        raise_if_unauthorized(exc)
         st.error(exc.detail_message if isinstance(exc, ApiClientError) else str(exc))
         return
 

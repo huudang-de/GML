@@ -431,17 +431,20 @@ def _run_legacy_test_mode(api_url: str, logo_b64: str | None) -> None:
 
     token = ROLE_TOKENS.get(role, "gml-dev-token-ceo")
     api_client = HttpApiClient(base_url=api_url, token=token)
-    _render_business_main(
-        api_client=api_client,
-        role=role,
-        active_profile=active_profile,
-        active_screen=active_screen,
-        query_dashboard=query_dashboard,
-        query_kpi=query_kpi,
-        autoload_last=autoload_last,
-        logo_b64=logo_b64,
-        handle_401=False,
-    )
+    try:
+        _render_business_main(
+            api_client=api_client,
+            role=role,
+            active_profile=active_profile,
+            active_screen=active_screen,
+            query_dashboard=query_dashboard,
+            query_kpi=query_kpi,
+            autoload_last=autoload_last,
+            logo_b64=logo_b64,
+            handle_401=False,
+        )
+    finally:
+        api_client.close()
 
 
 def _run_authenticated_app(api_url: str, logo_b64: str | None) -> None:
@@ -459,13 +462,19 @@ def _run_authenticated_app(api_url: str, logo_b64: str | None) -> None:
             me_client = HttpApiClient(base_url=api_url, token=cookie_tok)
             try:
                 user_info = me_client.get_me()
-            except ApiClientError:
-                clear_session_cookie()
-                st.session_state.pop("auth_token", None)
-                st.session_state.pop("auth_user", None)
-                st.session_state["auth_flash_error"] = "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại."
-            except Exception:
-                st.session_state["auth_flash_error"] = "Không thể xác thực phiên đăng nhập, vui lòng đăng nhập lại."
+            except ApiClientError as exc:
+                if exc.status_code == 401:
+                    clear_session_cookie()
+                    st.session_state.pop("auth_token", None)
+                    st.session_state.pop("auth_user", None)
+                    st.session_state["_logged_out_flag"] = True
+                    st.session_state["auth_flash_error"] = "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại."
+                else:
+                    st.error(f"Không thể kết nối máy chủ xác thực: {exc}")
+                    return
+            except Exception as exc:
+                st.error(f"Không thể kết nối máy chủ xác thực: {exc}")
+                return
             else:
                 st.session_state["auth_token"] = cookie_tok
                 st.session_state["auth_user"] = user_info
@@ -481,169 +490,172 @@ def _run_authenticated_app(api_url: str, logo_b64: str | None) -> None:
         return
 
     api_client = HttpApiClient(base_url=api_url, token=str(auth_token))
-    role = str(auth_user.get("role") or "")
+    try:
+        role = str(auth_user.get("role") or "")
 
-    # 3. Forced Password Change Gate (must_change_password=True)
-    if auth_user.get("must_change_password"):
+        # 3. Forced Password Change Gate (must_change_password=True)
+        if auth_user.get("must_change_password"):
+            with st.sidebar:
+                _render_sidebar_brand(logo_b64)
+                _render_sidebar_user_card(auth_user)
+                st.divider()
+                if st.button("↩ Đăng xuất", key="sidebar_logout_btn", use_container_width=True):
+                    _handle_logout(api_client)
+            _render_masthead(
+                logo_b64=logo_b64,
+                role=role,
+                extra_badge='<span class="gml-badge gml-badge-warning">Đổi mật khẩu bắt buộc</span>',
+            )
+            try:
+                render_change_password_view(api_client, auth_user, forced=True)
+            except ApiClientError as exc:
+                if exc.status_code == 401:
+                    _handle_session_expired()
+                raise
+            return
+
+        # 4. System Administrator Mode (quan_tri_he_thong -> 4-tab Admin Panel ONLY)
+        if role == "quan_tri_he_thong":
+            with st.sidebar:
+                _render_sidebar_brand(logo_b64)
+                _render_sidebar_user_card(auth_user)
+                st.divider()
+                if st.button("🔑 Đổi mật khẩu", key="sidebar_change_pw_btn", use_container_width=True):
+                    st.session_state["show_change_password"] = True
+                    st.rerun()
+                if st.button("↩ Đăng xuất", key="sidebar_logout_btn", use_container_width=True):
+                    _handle_logout(api_client)
+
+            _render_masthead(
+                logo_b64=logo_b64,
+                role=role,
+                extra_badge='<span class="gml-badge gml-badge-navy">Quản trị IAM</span>',
+            )
+            flash_ok = st.session_state.pop("auth_flash_success", None)
+            if flash_ok:
+                st.success(flash_ok)
+
+            try:
+                if st.session_state.get("show_change_password"):
+                    render_change_password_view(api_client, auth_user, forced=False)
+                else:
+                    render_admin_panel(api_client, auth_user)
+            except ApiClientError as exc:
+                if exc.status_code == 401:
+                    _handle_session_expired()
+                raise
+            return
+
+        # 5. Authenticated Business Roles (ceo, ke_toan_truong, quan_ly_kho) — Role Locked!
+        query_profile = qp.get("profile")
+        query_screen = qp.get("screen")
+        query_dashboard = qp.get("dashboard")
+        query_kpi = qp.get("kpi")
+        autoload_last = qp.get("autoload_last")
+        has_kpi_or_dashboard = bool(query_dashboard or query_kpi)
+
+        raw_allowed = auth_user.get("allowed_profiles") or ["real"]
+        allowed_profiles = [p for p in raw_allowed if p in ("real", "synth")] or ["real"]
+
+        current_qp = {
+            "profile": query_profile,
+            "screen": query_screen,
+            "dashboard": query_dashboard,
+            "kpi": query_kpi,
+        }
+        prev_qp = st.session_state.get("_applied_qp") or {}
+
         with st.sidebar:
             _render_sidebar_brand(logo_b64)
             _render_sidebar_user_card(auth_user)
-            st.divider()
-            if st.button("↩ Đăng xuất", key="sidebar_logout_btn", use_container_width=True):
-                _handle_logout(api_client)
-        _render_masthead(
-            logo_b64=logo_b64,
-            role=role,
-            extra_badge='<span class="gml-badge gml-badge-warning">Đổi mật khẩu bắt buộc</span>',
-        )
-        try:
-            render_change_password_view(api_client, auth_user, forced=True)
-        except ApiClientError as exc:
-            if exc.status_code == 401:
-                _handle_session_expired()
-            raise
-        return
 
-    # 4. System Administrator Mode (quan_tri_he_thong -> 4-tab Admin Panel ONLY)
-    if role == "quan_tri_he_thong":
-        with st.sidebar:
-            _render_sidebar_brand(logo_b64)
-            _render_sidebar_user_card(auth_user)
+            if len(allowed_profiles) > 1:
+                if "profile_selector" not in st.session_state or st.session_state["profile_selector"] not in allowed_profiles:
+                    if query_profile in allowed_profiles:
+                        st.session_state["profile_selector"] = query_profile
+                    else:
+                        st.session_state["profile_selector"] = allowed_profiles[0]
+                elif query_profile != prev_qp.get("profile") and query_profile in allowed_profiles:
+                    st.session_state["profile_selector"] = query_profile
+
+                active_profile = st.radio(
+                    "🌐 Nguồn dữ liệu (Profile)",
+                    options=allowed_profiles,
+                    format_func=lambda p: "Dữ liệu Thực tế (Data Warehouse)" if p == "real" else "Dữ liệu Mô phỏng (Synthetic)",
+                    key="profile_selector",
+                )
+            else:
+                active_profile = allowed_profiles[0]
+                profile_label = "Thực tế (Data Warehouse)" if active_profile == "real" else "Mô phỏng (Synthetic)"
+                st.caption(f"🌐 Nguồn dữ liệu: **{profile_label}**")
+
+            nav_screen = st.session_state.pop("nav_screen", None)
+            qp_screen_changed = (
+                query_screen != prev_qp.get("screen")
+                or query_dashboard != prev_qp.get("dashboard")
+                or query_kpi != prev_qp.get("kpi")
+            )
+            if nav_screen and nav_screen in SCREEN_OPTIONS:
+                st.session_state["screen_selector"] = nav_screen
+            elif "screen_selector" not in st.session_state:
+                initial_screen_idx = _resolve_screen_index(
+                    query_screen,
+                    has_kpi_or_dashboard=has_kpi_or_dashboard,
+                )
+                st.session_state["screen_selector"] = SCREEN_OPTIONS[initial_screen_idx]
+            elif qp_screen_changed and (query_screen is not None or has_kpi_or_dashboard):
+                target_idx = _resolve_screen_index(
+                    query_screen,
+                    has_kpi_or_dashboard=has_kpi_or_dashboard,
+                )
+                st.session_state["screen_selector"] = SCREEN_OPTIONS[target_idx]
+
+            st.session_state["_applied_qp"] = current_qp
+
+            active_screen = st.radio(
+                "📌 Chức năng",
+                options=SCREEN_OPTIONS,
+                key="screen_selector",
+            )
+
             st.divider()
+            if st.button("➕ Cuộc trò chuyện mới", use_container_width=True):
+                st.session_state.session_id = f"sess-{uuid.uuid4().hex[:12]}"
+                st.session_state.messages = []
+                st.rerun()
             if st.button("🔑 Đổi mật khẩu", key="sidebar_change_pw_btn", use_container_width=True):
                 st.session_state["show_change_password"] = True
                 st.rerun()
             if st.button("↩ Đăng xuất", key="sidebar_logout_btn", use_container_width=True):
                 _handle_logout(api_client)
 
-        _render_masthead(
-            logo_b64=logo_b64,
-            role=role,
-            extra_badge='<span class="gml-badge gml-badge-navy">Quản trị IAM</span>',
-        )
         flash_ok = st.session_state.pop("auth_flash_success", None)
         if flash_ok:
             st.success(flash_ok)
 
-        try:
-            if st.session_state.get("show_change_password"):
+        if st.session_state.get("show_change_password"):
+            _render_masthead(logo_b64=logo_b64, role=role, active_profile=active_profile)
+            try:
                 render_change_password_view(api_client, auth_user, forced=False)
-            else:
-                render_admin_panel(api_client, auth_user)
-        except ApiClientError as exc:
-            if exc.status_code == 401:
-                _handle_session_expired()
-            raise
-        return
+            except ApiClientError as exc:
+                if exc.status_code == 401:
+                    _handle_session_expired()
+                raise
+            return
 
-    # 5. Authenticated Business Roles (ceo, ke_toan_truong, quan_ly_kho) — Role Locked!
-    query_profile = qp.get("profile")
-    query_screen = qp.get("screen")
-    query_dashboard = qp.get("dashboard")
-    query_kpi = qp.get("kpi")
-    autoload_last = qp.get("autoload_last")
-    has_kpi_or_dashboard = bool(query_dashboard or query_kpi)
-
-    raw_allowed = auth_user.get("allowed_profiles") or ["real"]
-    allowed_profiles = [p for p in raw_allowed if p in ("real", "synth")] or ["real"]
-
-    current_qp = {
-        "profile": query_profile,
-        "screen": query_screen,
-        "dashboard": query_dashboard,
-        "kpi": query_kpi,
-    }
-    prev_qp = st.session_state.get("_applied_qp") or {}
-
-    with st.sidebar:
-        _render_sidebar_brand(logo_b64)
-        _render_sidebar_user_card(auth_user)
-
-        if len(allowed_profiles) > 1:
-            if "profile_selector" not in st.session_state or st.session_state["profile_selector"] not in allowed_profiles:
-                if query_profile in allowed_profiles:
-                    st.session_state["profile_selector"] = query_profile
-                else:
-                    st.session_state["profile_selector"] = allowed_profiles[0]
-            elif query_profile != prev_qp.get("profile") and query_profile in allowed_profiles:
-                st.session_state["profile_selector"] = query_profile
-
-            active_profile = st.radio(
-                "🌐 Nguồn dữ liệu (Profile)",
-                options=allowed_profiles,
-                format_func=lambda p: "Dữ liệu Thực tế (Data Warehouse)" if p == "real" else "Dữ liệu Mô phỏng (Synthetic)",
-                key="profile_selector",
-            )
-        else:
-            active_profile = allowed_profiles[0]
-            profile_label = "Thực tế (Data Warehouse)" if active_profile == "real" else "Mô phỏng (Synthetic)"
-            st.caption(f"🌐 Nguồn dữ liệu: **{profile_label}**")
-
-        nav_screen = st.session_state.pop("nav_screen", None)
-        qp_screen_changed = (
-            query_screen != prev_qp.get("screen")
-            or query_dashboard != prev_qp.get("dashboard")
-            or query_kpi != prev_qp.get("kpi")
+        _render_business_main(
+            api_client=api_client,
+            role=role,
+            active_profile=active_profile,
+            active_screen=active_screen,
+            query_dashboard=query_dashboard,
+            query_kpi=query_kpi,
+            autoload_last=autoload_last,
+            logo_b64=logo_b64,
+            handle_401=True,
         )
-        if nav_screen and nav_screen in SCREEN_OPTIONS:
-            st.session_state["screen_selector"] = nav_screen
-        elif "screen_selector" not in st.session_state:
-            initial_screen_idx = _resolve_screen_index(
-                query_screen,
-                has_kpi_or_dashboard=has_kpi_or_dashboard,
-            )
-            st.session_state["screen_selector"] = SCREEN_OPTIONS[initial_screen_idx]
-        elif qp_screen_changed and (query_screen is not None or has_kpi_or_dashboard):
-            target_idx = _resolve_screen_index(
-                query_screen,
-                has_kpi_or_dashboard=has_kpi_or_dashboard,
-            )
-            st.session_state["screen_selector"] = SCREEN_OPTIONS[target_idx]
-
-        st.session_state["_applied_qp"] = current_qp
-
-        active_screen = st.radio(
-            "📌 Chức năng",
-            options=SCREEN_OPTIONS,
-            key="screen_selector",
-        )
-
-        st.divider()
-        if st.button("➕ Cuộc trò chuyện mới", use_container_width=True):
-            st.session_state.session_id = f"sess-{uuid.uuid4().hex[:12]}"
-            st.session_state.messages = []
-            st.rerun()
-        if st.button("🔑 Đổi mật khẩu", key="sidebar_change_pw_btn", use_container_width=True):
-            st.session_state["show_change_password"] = True
-            st.rerun()
-        if st.button("↩ Đăng xuất", key="sidebar_logout_btn", use_container_width=True):
-            _handle_logout(api_client)
-
-    flash_ok = st.session_state.pop("auth_flash_success", None)
-    if flash_ok:
-        st.success(flash_ok)
-
-    if st.session_state.get("show_change_password"):
-        _render_masthead(logo_b64=logo_b64, role=role, active_profile=active_profile)
-        try:
-            render_change_password_view(api_client, auth_user, forced=False)
-        except ApiClientError as exc:
-            if exc.status_code == 401:
-                _handle_session_expired()
-            raise
-        return
-
-    _render_business_main(
-        api_client=api_client,
-        role=role,
-        active_profile=active_profile,
-        active_screen=active_screen,
-        query_dashboard=query_dashboard,
-        query_kpi=query_kpi,
-        autoload_last=autoload_last,
-        logo_b64=logo_b64,
-        handle_401=True,
-    )
+    finally:
+        api_client.close()
 
 
 def main() -> None:

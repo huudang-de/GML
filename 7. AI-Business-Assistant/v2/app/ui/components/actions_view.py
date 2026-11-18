@@ -10,7 +10,7 @@ Specifications:
 from typing import Any
 import streamlit as st
 
-from app.ui.api_client import HttpApiClient
+from app.ui.api_client import HttpApiClient, raise_if_unauthorized
 from app.ui.theme import ROLE_SHORT_VI, STATUS_LABELS_VI, format_vi_date
 
 STATUS_OPTIONS = ["open", "in_progress", "done", "dismissed"]
@@ -35,6 +35,7 @@ def render_actions_view(api_client: HttpApiClient, profile: str) -> None:
     try:
         actions: list[dict[str, Any]] = api_client.list_actions(profile=profile, status=status_param)
     except Exception as e:
+        raise_if_unauthorized(e)
         st.error(f"Lỗi khi tải danh sách hành động: {e}")
         return
 
@@ -86,4 +87,5 @@ def render_actions_view(api_client: HttpApiClient, profile: str) -> None:
                         st.success(f"Đã cập nhật trạng thái #{act_id} sang {STATUS_LABELS_VI.get(new_status, new_status)}")
                         st.rerun()
                     except Exception as e:
+                        raise_if_unauthorized(e)
                         st.error(f"Lỗi cập nhật: {e}")

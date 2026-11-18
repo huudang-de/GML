@@ -12,7 +12,7 @@ import json
 from typing import Any
 import streamlit as st
 
-from app.ui.api_client import HttpApiClient
+from app.ui.api_client import HttpApiClient, raise_if_unauthorized
 from app.ui.theme import (
     DOMAIN_LABELS_VI,
     ML_CRIMSON,
@@ -92,6 +92,7 @@ def render_alert_center(api_client: HttpApiClient, profile: str) -> None:
                 status=status_param,
             )
         except Exception as e:
+            raise_if_unauthorized(e)
             st.error(f"Lỗi khi tải danh sách cảnh báo: {e}")
             return
 
@@ -234,6 +235,7 @@ def render_alert_center(api_client: HttpApiClient, profile: str) -> None:
                             st.success("Đã tạo hành động thành công!")
                             st.rerun()
                         except Exception as exc:
+                            raise_if_unauthorized(exc)
                             st.error(f"Lỗi tạo hành động: {exc}")
 
         st.divider()
@@ -256,6 +258,7 @@ def render_alert_center(api_client: HttpApiClient, profile: str) -> None:
                         st.success(f"Đã xác nhận [{rule_id}]")
                         st.rerun()
                     except Exception as exc:
+                        raise_if_unauthorized(exc)
                         st.error(f"Lỗi xác nhận: {exc}")
             else:
                 st.markdown("✅ *Đã xác nhận*")

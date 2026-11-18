@@ -3,7 +3,7 @@
 from typing import Any
 import streamlit as st
 
-from app.ui.api_client import HttpApiClient
+from app.ui.api_client import HttpApiClient, raise_if_unauthorized
 from app.ui.theme import format_vi_datetime
 
 
@@ -21,11 +21,13 @@ def render_history_view(api_client: HttpApiClient, profile: str) -> None:
                 st.success("Đã xoá toàn bộ lịch sử hội thoại.")
                 st.rerun()
             except Exception as e:
+                raise_if_unauthorized(e)
                 st.error(f"Lỗi khi xoá lịch sử: {e}")
 
     try:
         turns: list[dict[str, Any]] = api_client.get_history(profile=profile)
     except Exception as e:
+        raise_if_unauthorized(e)
         st.error(f"Lỗi tải lịch sử hội thoại: {e}")
         return
 

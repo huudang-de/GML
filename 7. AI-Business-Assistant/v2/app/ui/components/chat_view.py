@@ -15,7 +15,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from app.ui.api_client import ApiClientError, HttpApiClient
+from app.ui.api_client import ApiClientError, HttpApiClient, raise_if_unauthorized
 from app.ui.theme import (
     ML_NAVY,
     build_trend_plotly,
@@ -97,6 +97,7 @@ def render_assistant_response(
                             api_client.add_pin(kpi_key=k_key, profile=profile)
                             st.success(f"Đã ghim `{k_key}` vào Tổng quan!")
                         except Exception as e:
+                            raise_if_unauthorized(e)
                             st.error(f"Lỗi khi ghim: {e}")
 
     # 4. Trend (Directly displayed - NOT inside expander)
@@ -152,6 +153,7 @@ def render_assistant_response(
                                 )
                                 st.success("Đã tạo hành động từ cuộc trò chuyện!")
                             except Exception as e:
+                                raise_if_unauthorized(e)
                                 st.error(f"Lỗi tạo hành động: {e}")
                 disclaimer = adv.get(
                     "disclaimer",
@@ -199,6 +201,7 @@ def render_assistant_response(
                 api_client.submit_feedback(request_id=request_id, rating="up", note="", profile=profile)
                 st.session_state[f"fb_done_{request_id}"] = "up"
             except Exception as e:
+                raise_if_unauthorized(e)
                 st.error(f"Lỗi gửi phản hồi: {e}")
 
     with fb_col2:
@@ -217,6 +220,7 @@ def render_assistant_response(
                 st.session_state[f"show_down_form_{request_id}"] = False
                 st.success("Đã ghi nhận phản hồi! Cảm ơn bạn.")
             except Exception as e:
+                raise_if_unauthorized(e)
                 st.error(f"Lỗi gửi phản hồi: {e}")
 
 
@@ -257,7 +261,8 @@ def render_chat_view(api_client: HttpApiClient, profile: str, role: str | None =
             try:
                 ov = api_client.get_overview(profile=profile)
                 sq_cache[cache_key] = ov.get("suggested_questions", [])
-            except Exception:
+            except Exception as exc:
+                raise_if_unauthorized(exc)
                 sq_cache[cache_key] = []
 
         suggested = sq_cache.get(cache_key, [])
@@ -308,6 +313,7 @@ def render_chat_view(api_client: HttpApiClient, profile: str, role: str | None =
                         kpi_keys=resp_kpis,
                     )
                 except ApiClientError as e:
+                    raise_if_unauthorized(e)
                     st.error(str(e))
                 except Exception:
                     st.error("Không thể kết nối máy chủ Trợ lý AI. Vui lòng thử lại sau ít phút.")

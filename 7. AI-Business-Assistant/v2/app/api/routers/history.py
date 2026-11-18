@@ -13,6 +13,7 @@ from app.api.deps import (
     check_rate_limit,
     get_current_user,
     get_request_id,
+    resolve_profile,
 )
 from app.api.schemas import (
     HistoryDeleteResponse,
@@ -38,7 +39,7 @@ def get_user_history(
 ) -> HistoryListResponse:
     """Retrieve conversation history strictly isolated by caller's user_id."""
     req_id = get_request_id(request)
-    target_profile = (profile or settings.data_profile).strip().lower()
+    target_profile = resolve_profile(profile, settings, user=user)
     app_engine = get_app_engine(profile=target_profile)
     store = SessionStore(engine=app_engine, data_profile=target_profile, ttl_days=settings.session_ttl_days)
     records = store.list_user_turns(user_id=user.user_id, session_id=session_id, limit=limit)
@@ -82,7 +83,7 @@ def delete_user_history(
 ) -> HistoryDeleteResponse:
     """Delete conversation history strictly scoped to caller's user_id."""
     req_id = get_request_id(request)
-    target_profile = (profile or settings.data_profile).strip().lower()
+    target_profile = resolve_profile(profile, settings, user=user)
     app_engine = get_app_engine(profile=target_profile)
     store = SessionStore(engine=app_engine, data_profile=target_profile, ttl_days=settings.session_ttl_days)
     deleted_cnt = store.delete_user_history(user_id=user.user_id, session_id=session_id)

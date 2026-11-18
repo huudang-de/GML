@@ -57,7 +57,7 @@ def resolve_profile(
             message=f"Hồ sơ dữ liệu '{target_profile}' không hợp lệ (chỉ chấp nhận 'real' hoặc 'synth').",
         )
     if user is not None:
-        allowed = user.allowed_profiles or ["real"]
+        allowed = user.allowed_profiles if user.allowed_profiles is not None else ["real"]
         if target_profile not in allowed:
             raise ApiException(
                 status_code=403,
@@ -190,7 +190,7 @@ def get_current_user(
             message=e.message,
         ) from e
 
-    if principal.must_change_password and not request.url.path.startswith("/v1/auth"):
+    if principal.must_change_password and not request.url.path.startswith("/v1/auth/"):
         raise ApiException(
             status_code=403,
             code="PASSWORD_CHANGE_REQUIRED",

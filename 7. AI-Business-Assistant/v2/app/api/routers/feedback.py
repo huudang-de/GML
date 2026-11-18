@@ -13,6 +13,7 @@ from app.api.deps import (
     check_rate_limit,
     get_current_user,
     get_request_id,
+    resolve_profile,
 )
 from app.api.schemas import FeedbackRequest, FeedbackResponse
 from app.core.auth import UserPrincipal
@@ -32,7 +33,7 @@ def submit_feedback(
 ) -> FeedbackResponse:
     """Submit qualitative feedback (rating: up/down) for a query turn."""
     req_id = get_request_id(request)
-    target_profile = (profile or settings.data_profile).strip().lower()
+    target_profile = resolve_profile(profile, settings, user=user)
     app_engine = get_app_engine(app_uri=settings.get_app_uri(profile=target_profile))
 
     stmt = sa.text("""

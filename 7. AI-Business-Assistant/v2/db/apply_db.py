@@ -8,6 +8,7 @@ Specifications:
 
 import csv
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 import sys
 
@@ -68,32 +69,38 @@ def ensure_database_exists(admin_uri: str) -> None:
     maint_engine.dispose()
 
 
+@lru_cache(maxsize=16)
+def _get_cached_engine(uri: str) -> Engine:
+    """Return a cached SQLAlchemy engine with pool_pre_ping enabled."""
+    return sa.create_engine(uri, pool_pre_ping=True)
+
+
 def get_admin_engine(admin_uri: str | None = None, profile: str | None = None) -> Engine:
     """Return SQLAlchemy engine for administrative tasks (dev/admin)."""
     settings = _get_settings()
     uri = admin_uri or settings.get_admin_uri(profile=profile)
-    return sa.create_engine(uri, pool_pre_ping=True)
+    return _get_cached_engine(uri)
 
 
 def get_ro_engine(ro_uri: str | None = None, profile: str | None = None) -> Engine:
     """Return SQLAlchemy engine for AI read-only queries (gml_ai_ro)."""
     settings = _get_settings()
     uri = ro_uri or settings.get_ro_uri(profile=profile)
-    return sa.create_engine(uri, pool_pre_ping=True)
+    return _get_cached_engine(uri)
 
 
 def get_app_engine(app_uri: str | None = None, profile: str | None = None) -> Engine:
     """Return SQLAlchemy engine for application state logging (gml_ai_app)."""
     settings = _get_settings()
     uri = app_uri or settings.get_app_uri(profile=profile)
-    return sa.create_engine(uri, pool_pre_ping=True)
+    return _get_cached_engine(uri)
 
 
 def get_iam_engine(app_uri: str | None = None) -> Engine:
     """Return SQLAlchemy engine for internal IAM state on the primary 'real' database."""
     settings = _get_settings()
     uri = app_uri or settings.get_app_uri(profile="real")
-    return sa.create_engine(uri, pool_pre_ping=True)
+    return _get_cached_engine(uri)
 
 
 # ==============================================================================

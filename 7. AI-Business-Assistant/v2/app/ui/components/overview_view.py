@@ -18,7 +18,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.ui.api_client import HttpApiClient
+from app.ui.api_client import HttpApiClient, raise_if_unauthorized
 from app.ui.theme import (
     DOMAIN_LABELS_VI,
     ML_AMBER,
@@ -321,6 +321,7 @@ def _render_kpi_card(
                     api_client.remove_pin(kpi_key=kpi_key, profile=profile)
                     st.rerun()
                 except Exception as exc:
+                    raise_if_unauthorized(exc)
                     st.error(f"Lỗi bỏ ghim: {exc}")
 
 
@@ -478,6 +479,7 @@ def render_overview(api_client: HttpApiClient, profile: str, role: str = "ceo") 
     try:
         data = api_client.get_overview(profile=profile)
     except Exception as e:
+        raise_if_unauthorized(e)
         st.error(f"Lỗi khi tải tổng quan: {e}")
         return
 

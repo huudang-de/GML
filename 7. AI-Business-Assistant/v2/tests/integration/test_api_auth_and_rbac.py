@@ -342,13 +342,16 @@ def test_profile_forbidden_on_get_and_chat_when_user_lacks_synth(client, iam_use
     assert client.get("/v1/overview?profile=real", headers=hdr).status_code == 200
     assert client.post("/v1/chat", json={"query": "Dư nợ?", "data_profile": "real"}, headers=hdr).status_code == 200
 
-    # Forbidden synth profile blocked with 403 PROFILE_FORBIDDEN across GET/POST routes
+    # Forbidden synth profile blocked with 403 PROFILE_FORBIDDEN across GET/POST/DELETE routes
     for method, url, kwargs in (
         ("GET", "/v1/overview?profile=synth", {}),
         ("GET", "/v1/kpi/du_no_ngan_han?profile=synth", {}),
         ("GET", "/v1/alerts?profile=synth", {}),
         ("GET", "/v1/actions?profile=synth", {}),
         ("GET", "/v1/pins?profile=synth", {}),
+        ("GET", "/v1/history?profile=synth", {}),
+        ("DELETE", "/v1/history?profile=synth", {}),
+        ("POST", "/v1/feedback?profile=synth", {"json": {"request_id": "req-t2-fb", "rating": "up", "comment": ""}}),
         ("POST", "/v1/chat", {"json": {"query": "Dư nợ?", "data_profile": "synth"}}),
     ):
         res = client.request(method, url, headers=hdr, **kwargs)
