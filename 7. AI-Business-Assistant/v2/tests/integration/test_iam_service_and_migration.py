@@ -289,6 +289,16 @@ def test_session_idle_and_absolute_expiry_and_immediate_revoke(iam_eng, clean_ia
     idle_events = list_auth_events(iam_eng, user_id=user["user_id"], event_type="session_expired")
     assert len(idle_events) >= 1
 
+    # Unrevoked session with last_seen_at > 2h ago must be excluded from list_active_sessions
+    _, idle_sess = create_session(iam_eng, user_id=user["user_id"], ttl_hours=12)
+    with get_admin_engine(profile="real").begin() as conn:
+        conn.execute(
+            sa.text("UPDATE iam.user_session SET last_seen_at = :old WHERE id = :sid"),
+            {"old": datetime.now(timezone.utc) - timedelta(hours=2, minutes=5), "sid": idle_sess["session_id"]},
+        )
+    active_ids = {s["session_id"] for s in list_active_sessions(iam_eng, user_id=user["user_id"])}
+    assert idle_sess["session_id"] not in active_ids
+
     # Absolute expiry (12h) even if last_seen_at kept fresh via periodic activity
     raw_tok2, sess2 = create_session(iam_eng, user_id=user["user_id"], ttl_hours=12)
     t2_base = sess2["created_at"]

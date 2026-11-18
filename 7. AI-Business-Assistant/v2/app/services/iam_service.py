@@ -1139,10 +1139,16 @@ def list_active_sessions(
     engine: Engine,
     user_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """List all currently active (non-revoked, non-expired) sessions."""
+    """List all currently active (non-revoked, non-expired, non-idle, active-user) sessions."""
     now = _utc_now()
-    clauses = ["s.revoked_at IS NULL", "s.expires_at > :now"]
-    params: dict[str, Any] = {"now": now}
+    idle_cutoff = now - timedelta(hours=SESSION_IDLE_HOURS)
+    clauses = [
+        "s.revoked_at IS NULL",
+        "s.expires_at > :now",
+        "s.last_seen_at > :idle_cutoff",
+        "u.is_active = TRUE",
+    ]
+    params: dict[str, Any] = {"now": now, "idle_cutoff": idle_cutoff}
     if user_id:
         clauses.append("s.user_id = :uid")
         params["uid"] = user_id
@@ -1273,7 +1279,7 @@ def seed_default_demo_users(
 ) -> list[dict[str, Any]]:
     """Idempotently ensure the 4 dev demo accounts exist with legacy user_ids."""
     validate_password_strength(demo_password)
-    pw_hash = hash_password(demo_password)
+    pw_hash: str | None = None
     now = _utc_now()
 
     with engine.begin() as conn:
@@ -1286,6 +1292,8 @@ def seed_default_demo_users(
                 {"uid": spec["user_id"], "uname": spec["username"]},
             ).fetchone()
             if existing is None:
+                if pw_hash is None:
+                    pw_hash = hash_password(demo_password)
                 conn.execute(
                     sa.text(
                         "INSERT INTO iam.app_user "

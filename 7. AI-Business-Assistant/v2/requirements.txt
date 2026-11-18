@@ -12,6 +12,7 @@ pydantic>=2.7.0
 pydantic-settings>=2.2.0
 python-dotenv>=1.0.0
 python-multipart>=0.0.9
+argon2-cffi>=23.1.0
 
 # --- [T4 & T3] Agent Orchestration & LLM Providers ---
 langgraph>=0.1.0
