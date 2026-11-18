@@ -142,14 +142,17 @@ def inject_minh_long_theme() -> None:
         }}
 
         /* Minh Long Primary Buttons */
-        button[kind="primary"], [data-testid="baseButton-primary"] {{
+        button[kind="primary"], [data-testid="baseButton-primary"], [data-testid="stBaseButton-primary"] {{
             background-color: {ML_CRIMSON} !important;
             border-color: {ML_CRIMSON} !important;
             color: #FFFFFF !important;
             border-radius: 6px !important;
             font-weight: 600 !important;
         }}
-        button[kind="primary"]:hover, [data-testid="baseButton-primary"]:hover {{
+        button[kind="primary"] *, [data-testid="baseButton-primary"] *, [data-testid="stBaseButton-primary"] * {{
+            color: #FFFFFF !important;
+        }}
+        button[kind="primary"]:hover, [data-testid="baseButton-primary"]:hover, [data-testid="stBaseButton-primary"]:hover {{
             background-color: #961F01 !important;
             border-color: #961F01 !important;
         }}
