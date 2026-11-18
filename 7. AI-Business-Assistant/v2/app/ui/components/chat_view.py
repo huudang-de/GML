@@ -15,18 +15,19 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from app.ui.api_client import HttpApiClient
+from app.ui.api_client import ApiClientError, HttpApiClient
+from app.ui.theme import (
+    ML_NAVY,
+    build_trend_plotly,
+    format_vi_date,
+    format_vi_number,
+    format_vi_period,
+)
 
 
-def _format_figure_value(val: Any) -> str:
-    """Format numeric values with comma separators."""
-    try:
-        fval = float(val)
-        if fval.is_integer():
-            return f"{int(fval):,}"
-        return f"{fval:,.2f}"
-    except (ValueError, TypeError):
-        return str(val)
+def _format_figure_value(val: Any, unit: str | None = None) -> str:
+    """Format numeric values in Vietnamese locale."""
+    return format_vi_number(val, unit=unit)
 
 
 def render_assistant_response(
@@ -59,12 +60,15 @@ def render_assistant_response(
         st.markdown(summary)
 
     # 2. Figures: st.metric grid + dataframe
+    first_unit: str | None = None
     if figures:
         fig_cols = st.columns(min(len(figures), 3))
         for idx, f in enumerate(figures):
             if isinstance(f, dict):
+                if first_unit is None and f.get("unit"):
+                    first_unit = str(f.get("unit"))
                 col = fig_cols[idx % 3]
-                val_formatted = f"{_format_figure_value(f.get('value', 0))} {f.get('unit', '')}".strip()
+                val_formatted = _format_figure_value(f.get("value"), unit=f.get("unit"))
                 col.metric(label=f.get("name", "Chỉ số"), value=val_formatted)
 
         fig_rows = []
@@ -72,13 +76,13 @@ def render_assistant_response(
             if isinstance(f, dict):
                 fig_rows.append({
                     "Chỉ số": f.get("name", "N/A"),
-                    "Giá trị": _format_figure_value(f.get("value", 0)),
+                    "Giá trị": _format_figure_value(f.get("value"), unit=f.get("unit")),
                     "Đơn vị": f.get("unit", ""),
-                    "Ngày chốt": str(f.get("as_of", "")),
+                    "Ngày chốt": format_vi_date(f.get("as_of")),
                 })
         if fig_rows:
             df = pd.DataFrame(fig_rows)
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, use_container_width=True, hide_index=True)
 
     # 3. Pin buttons for KPIs (max 3 columns per row)
     if effective_kpis:
@@ -101,19 +105,25 @@ def render_assistant_response(
         if trend.get("summary_text"):
             st.markdown(trend.get("summary_text"))
         series = trend.get("series") or []
+        anomalies = trend.get("anomalies") or []
         if series:
             try:
-                trend_df = pd.DataFrame(series)
-                if "period" in trend_df.columns and "value" in trend_df.columns:
-                    trend_df = trend_df.set_index("period")
-                    st.line_chart(trend_df["value"])
+                fig = build_trend_plotly(
+                    series=series,
+                    unit=first_unit,
+                    line_color=ML_NAVY,
+                    anomalies=anomalies,
+                    height=270,
+                )
+                if fig.data:
+                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
             except Exception:
                 pass
-        anomalies = trend.get("anomalies") or []
         for anom in anomalies:
             if isinstance(anom, dict):
                 sev = str(anom.get("severity", "")).upper()
-                st.warning(f"⚠️ [{anom.get('period')}] Bất thường ({sev}): {anom.get('reason')}")
+                anom_period = format_vi_period(anom.get("period"))
+                st.warning(f"⚠️ [{anom_period}] Bất thường ({sev}): {anom.get('reason')}")
 
     # 5. Advice (Directly displayed - NOT inside expander)
     if advice:
@@ -297,5 +307,7 @@ def render_chat_view(api_client: HttpApiClient, profile: str, role: str | None =
                         profile=profile,
                         kpi_keys=resp_kpis,
                     )
-                except Exception as e:
-                    st.error(f"Lỗi kết nối máy chủ: {e}")
+                except ApiClientError as e:
+                    st.error(str(e))
+                except Exception:
+                    st.error("Không thể kết nối máy chủ Trợ lý AI. Vui lòng thử lại sau ít phút.")

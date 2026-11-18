@@ -80,6 +80,7 @@ def row_to_alert_item(r: Any) -> AlertItem:
         evidence=ev_dict,
         domain=row_domain,
         escalated_at=esc_str,
+        occurrence_count=int(getattr(r, "occurrence_count", 1) or 1),
     )
 
 
@@ -224,13 +225,27 @@ def build_briefing(
         )
         cards.append(card)
 
-    # 5. Open alerts and top alerts (Task 2 ordering)
+    # 5. Open alerts and top alerts (deduplicated per rule_id, kpi_key, severity, is_acknowledged)
     alerts_stmt = sa.text("""
+        WITH ranked AS (
+            SELECT id, rule_id, kpi_key, severity, message, value, threshold,
+                   is_acknowledged, acknowledged_by, acknowledged_at, created_at,
+                   period, evidence, escalated_at,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY rule_id, kpi_key, severity, is_acknowledged
+                       ORDER BY created_at DESC, id DESC
+                   ) AS rn,
+                   COUNT(*) OVER (
+                       PARTITION BY rule_id, kpi_key, severity, is_acknowledged
+                   ) AS occurrence_count
+            FROM app.alert_event
+            WHERE is_acknowledged = FALSE
+        )
         SELECT id, rule_id, kpi_key, severity, message, value, threshold,
                is_acknowledged, acknowledged_by, acknowledged_at, created_at,
-               period, evidence, escalated_at
-        FROM app.alert_event
-        WHERE is_acknowledged = FALSE
+               period, evidence, escalated_at, occurrence_count
+        FROM ranked
+        WHERE rn = 1
         ORDER BY CASE WHEN severity IN ('nghiem_trong', 'critical') THEN 0 ELSE 1 END ASC,
                  created_at DESC, id DESC;
     """)

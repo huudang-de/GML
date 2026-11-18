@@ -89,6 +89,7 @@ class AlertItem(BaseModel):
     evidence: dict[str, Any] | None = None
     domain: str | None = None
     escalated_at: str | None = None
+    occurrence_count: int = 1
 
 
 class AlertListResponse(BaseModel):

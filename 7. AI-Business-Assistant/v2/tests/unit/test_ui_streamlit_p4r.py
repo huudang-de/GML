@@ -380,3 +380,185 @@ def test_cross_screen_navigation_persists_with_screen_query_param(app_test_facto
     at.chat_input[0].set_value("Dư nợ ngắn hạn hiện tại là bao nhiêu?").run(timeout=35)
     assert not at.exception
     assert len(at.chat_input) > 0, "Must stay on Chat screen instead of reverting to ?screen=overview"
+
+
+def test_http_api_client_chat_timeout_and_friendly_error():
+    """HttpApiClient sets chat_timeout=60.0 and converts httpx.ReadTimeout into friendly Vietnamese ApiClientError."""
+    from app.ui.api_client import ApiClientError, HttpApiClient
+
+    observed_timeouts: list[float | None] = []
+
+    def timeout_handler(request: httpx.Request) -> httpx.Response:
+        observed_timeouts.append(request.extensions.get("timeout", {}).get("read"))
+        raise httpx.ReadTimeout("Simulated read timeout", request=request)
+
+    client = HttpApiClient(transport=httpx.MockTransport(timeout_handler))
+    assert client.chat_timeout == 60.0
+
+    with pytest.raises(ApiClientError) as exc_info:
+        client.chat("Dư nợ ngắn hạn?")
+
+    assert exc_info.value.status_code == 504
+    assert "Hết thời gian chờ phản hồi từ Trợ lý AI" in str(exc_info.value)
+    assert observed_timeouts == [60.0]
+
+
+def test_vietnamese_formatters_and_logo_in_theme():
+    """Verify pure Vietnamese locale formatters and embedded Logo GML loader in theme.py."""
+    from app.ui.theme import (
+        DOMAIN_LABELS_VI,
+        ROLE_SHORT_VI,
+        STATUS_LABELS_VI,
+        format_vi_date,
+        format_vi_datetime,
+        format_vi_delta,
+        format_vi_number,
+        format_vi_period,
+        get_logo_base64,
+    )
+
+    assert format_vi_number(236_070_000_000, "VNĐ") == "236,07 tỷ VNĐ"
+    assert format_vi_number(236_070_000_000, "tỷ VNĐ") == "236,07 tỷ VNĐ"
+    assert format_vi_number(341_690_000_000) == "341,69 tỷ"
+    assert format_vi_number(12_500_000, "VNĐ") == "12,50 tr VNĐ"
+    assert format_vi_number(26824) == "26.824"
+    assert format_vi_number(1234.5) == "1.234,50"
+    assert format_vi_number(0.885, "%") == "88,5%"
+    assert format_vi_number(0.0, "%") == "0,0%"
+    assert format_vi_number(None) == "Chưa có dữ liệu"
+
+    assert format_vi_delta(-0.168) == "-16,8%"
+    assert format_vi_delta(0.052) == "+5,2%"
+    assert format_vi_delta(0.0) == "0,0%"
+    assert format_vi_delta(None) is None
+
+    assert format_vi_date("2026-07-31") == "31/07/2026"
+    assert format_vi_date("2026-07") == "T07/2026"
+    assert format_vi_date("") == "—"
+    assert format_vi_datetime("2026-11-17T08:00:00") == "08:00 · 17/11/2026"
+    assert format_vi_period("2026-07") == "T07/2026"
+
+    assert DOMAIN_LABELS_VI["no_vay"] == "Hoạt động Tài chính"
+    assert STATUS_LABELS_VI["open"] == "Chờ xử lý"
+    assert ROLE_SHORT_VI["ceo"] == "Tổng Giám đốc"
+
+    logo_b64 = get_logo_base64()
+    assert isinstance(logo_b64, str) and len(logo_b64) > 100
+
+
+def test_alert_center_renders_occurrence_count_badge(app_test_factory):
+    """Alert Center renders '×N lần' badge in list and detail when grouped occurrence_count > 1."""
+    engine = get_app_engine(profile="real")
+    with engine.begin() as conn:
+        conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id = 'AL-DUP-UX'"))
+        for _ in range(3):
+            conn.execute(
+                sa.text("""
+                    INSERT INTO app.alert_event (
+                        rule_id, kpi_key, severity, message, value, threshold,
+                        is_acknowledged, period, created_at
+                    ) VALUES (
+                        'AL-DUP-UX', 'ty_le_su_dung_han_muc', 'critical',
+                        'Cảnh báo trùng lặp hạn mức tín dụng',
+                        0.92, 0.85, false, '2026-07', now()
+                    )
+                """)
+            )
+
+    try:
+        at = app_test_factory(screen="alerts")
+        at.run(timeout=35)
+        assert not at.exception
+
+        dup_buttons = [b for b in at.button if "AL-DUP-UX" in b.label]
+        assert len(dup_buttons) == 1, f"Expected deduplicated single button for AL-DUP-UX, got {len(dup_buttons)}"
+        assert "×3 lần" in dup_buttons[0].label
+
+        # Click the button to inspect detail header and formatted metrics
+        dup_buttons[0].click().run(timeout=35)
+        assert not at.exception
+        all_md = " ".join(m.value for m in at.markdown)
+        all_cap = " ".join(c.value for c in at.caption)
+        assert "×3 lần" in all_md
+        assert "×3 lần" in all_cap
+        metric_vals = [m.value for m in at.metric]
+        assert "92,0%" in metric_vals
+        assert "85,0%" in metric_vals
+        assert "T07/2026" in metric_vals
+    finally:
+        with engine.begin() as conn:
+            conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id = 'AL-DUP-UX'"))
+
+
+def test_overview_powerbi_simplifica_plotly_and_vi_formatting(app_test_factory):
+    """Overview renders Power BI Simplifica Plotly charts, Vietnamese numbers ('236,07 tỷ'), and date ('31/07/2026')."""
+    at = app_test_factory(role="ceo", profile="real", screen="overview")
+    at.run(timeout=35)
+    assert not at.exception
+
+    # Executive greeting + formatted Vietnamese date
+    all_captions = " ".join(c.value for c in at.caption)
+    assert "31/07/2026" in all_captions, f"Expected Vietnamese date '31/07/2026' in captions, got: {all_captions}"
+
+    # Vietnamese formatted numbers in st.metric (e.g. '236,07 tỷ')
+    metric_values = " ".join(str(m.value) for m in at.metric)
+    assert "236,07 tỷ" in metric_values, f"Expected '236,07 tỷ' in Overview metrics, got: {metric_values}"
+
+    # Interactive Plotly charts rendered (card sparklines + asymmetric combo chart)
+    plotly_charts = at.get("plotly_chart")
+    assert len(plotly_charts) >= 1, "Expected at least 1 interactive Plotly chart on Overview"
+
+    # Comparison table rendered in right asymmetric column
+    assert len(at.dataframe) >= 1, "Expected period comparison dataframe on Overview"
+
+
+def test_overview_chapter_navigator_filters_kpis_and_preserves_kho_count(app_test_factory):
+    """Power BI Chapter Navigator filters KPIs by domain and restores full set on '📊 Tổng hợp điều hành'."""
+    # 1. Verify quan_ly_kho keeps exact 3 metrics + Plotly charts
+    at_kho = app_test_factory(role="quan_ly_kho", profile="synth", screen="overview")
+    at_kho.run(timeout=35)
+    assert not at_kho.exception
+    assert len(at_kho.metric) == 3
+    assert len(at_kho.get("plotly_chart")) >= 1
+
+    # 2. Verify CEO chapter filtering narrows KPIs and returns cleanly to all-chapters view
+    at_ceo = app_test_factory(role="ceo", profile="real", screen="overview")
+    at_ceo.run(timeout=35)
+    assert not at_ceo.exception
+    total_metrics = len(at_ceo.metric)
+    assert total_metrics > 1
+
+    chap_radio = next((r for r in at_ceo.radio if r.key == "overview_chapter_selector"), None)
+    assert chap_radio is not None, "Expected overview_chapter_selector radio"
+    assert "📊 Tổng hợp điều hành" in chap_radio.options
+    assert "🏦 Hoạt động Tài chính" in chap_radio.options
+
+    chap_radio.set_value("🏦 Hoạt động Tài chính").run(timeout=35)
+    assert not at_ceo.exception
+    filtered_metrics = len(at_ceo.metric)
+    assert 1 <= filtered_metrics < total_metrics
+
+    chap_radio_after = next((r for r in at_ceo.radio if r.key == "overview_chapter_selector"), None)
+    chap_radio_after.set_value("📊 Tổng hợp điều hành").run(timeout=35)
+    assert not at_ceo.exception
+    assert len(at_ceo.metric) == total_metrics
+
+
+def test_overview_only_ceo_sees_executive_summary_tab(app_test_factory):
+    """Only CEO sees '📊 Tổng hợp điều hành'; KTT and Kho jump straight into domain chapters without it."""
+    at_ktt = app_test_factory(role="ke_toan_truong", profile="synth", screen="overview")
+    at_ktt.run(timeout=35)
+    assert not at_ktt.exception
+    ktt_chap = next((r for r in at_ktt.radio if r.key == "overview_chapter_selector"), None)
+    assert ktt_chap is not None
+    assert "📊 Tổng hợp điều hành" not in ktt_chap.options
+    assert "🏦 Hoạt động Tài chính" in ktt_chap.options
+
+    at_kho = app_test_factory(role="quan_ly_kho", profile="synth", screen="overview")
+    at_kho.run(timeout=35)
+    assert not at_kho.exception
+    assert next((r for r in at_kho.radio if r.key == "overview_chapter_selector"), None) is None
+    assert len(at_kho.metric) == 3
+
+
+

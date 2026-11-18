@@ -79,6 +79,8 @@ class GeminiTextLLMClient:
                 model=self.settings.llm_model or "gemini-3.8-flash",
                 google_api_key=self.settings.google_api_key,
                 temperature=0.0,
+                timeout=12.0,
+                max_retries=1,
             )
             res = llm.invoke([SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)])
             return str(res.content).strip()

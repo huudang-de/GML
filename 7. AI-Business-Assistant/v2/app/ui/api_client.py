@@ -40,9 +40,12 @@ class HttpApiClient:
         token: str = "gml-dev-token-ceo",
         transport: httpx.BaseTransport | None = None,
         timeout: float = 30.0,
+        chat_timeout: float = 60.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
+        self.timeout = timeout
+        self.chat_timeout = chat_timeout
         effective_transport = transport if transport is not None else _DEFAULT_TEST_TRANSPORT
         headers: dict[str, str] = {}
         if token:
@@ -54,6 +57,18 @@ class HttpApiClient:
             transport=effective_transport,
             timeout=timeout,
         )
+
+    def _request(self, method: str, url: str, **kwargs: Any) -> Any:
+        try:
+            resp = self._client.request(method, url, **kwargs)
+        except httpx.TimeoutException as exc:
+            raise ApiClientError(
+                "Hết thời gian chờ phản hồi từ Trợ lý AI. Vui lòng thử lại hoặc thu gọn câu hỏi.",
+                status_code=504,
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise ApiClientError(f"HTTP error: {exc}") from exc
+        return self._handle_response(resp)
 
     def _handle_response(self, resp: httpx.Response) -> Any:
         try:
@@ -81,16 +96,14 @@ class HttpApiClient:
         if data_profile:
             payload["data_profile"] = data_profile
 
-        resp = self._client.post("/v1/chat", json=payload)
-        return self._handle_response(resp)
+        return self._request("POST", "/v1/chat", json=payload, timeout=self.chat_timeout)
 
     def get_overview(self, profile: str | None = None) -> dict[str, Any]:
         """Retrieve executive overview from GET /v1/overview."""
         params: dict[str, str] = {}
         if profile:
             params["profile"] = profile
-        resp = self._client.get("/v1/overview", params=params)
-        return self._handle_response(resp)
+        return self._request("GET", "/v1/overview", params=params)
 
     def get_kpi(
         self,
@@ -104,8 +117,7 @@ class HttpApiClient:
             params["profile"] = profile
         if include_series:
             params["include"] = "series"
-        resp = self._client.get(f"/v1/kpi/{kpi_key}", params=params)
-        return self._handle_response(resp)
+        return self._request("GET", f"/v1/kpi/{kpi_key}", params=params)
 
     def list_alerts(
         self,
@@ -113,6 +125,7 @@ class HttpApiClient:
         domain: str | None = None,
         severity: str | None = None,
         status: str | None = None,
+        dedup: bool = True,
     ) -> list[dict[str, Any]]:
         """Retrieve operational alerts from GET /v1/alerts."""
         params: dict[str, str] = {}
@@ -124,8 +137,9 @@ class HttpApiClient:
             params["severity"] = severity
         if status:
             params["status"] = status
-        resp = self._client.get("/v1/alerts", params=params)
-        data = self._handle_response(resp)
+        if dedup is False:
+            params["dedup"] = "false"
+        data = self._request("GET", "/v1/alerts", params=params)
         return data.get("alerts", [])
 
     def ack_alert(self, alert_id: int, profile: str | None = None) -> dict[str, Any]:
@@ -133,8 +147,7 @@ class HttpApiClient:
         params: dict[str, str] = {}
         if profile:
             params["profile"] = profile
-        resp = self._client.post(f"/v1/alerts/{alert_id}/ack", params=params)
-        return self._handle_response(resp)
+        return self._request("POST", f"/v1/alerts/{alert_id}/ack", params=params)
 
     def list_actions(
         self,
@@ -147,8 +160,7 @@ class HttpApiClient:
             params["profile"] = profile
         if status:
             params["status"] = status
-        resp = self._client.get("/v1/actions", params=params)
-        data = self._handle_response(resp)
+        data = self._request("GET", "/v1/actions", params=params)
         return data.get("actions", [])
 
     def create_action(self, payload: dict[str, Any], profile: str | None = None) -> dict[str, Any]:
@@ -156,8 +168,7 @@ class HttpApiClient:
         params: dict[str, str] = {}
         if profile:
             params["profile"] = profile
-        resp = self._client.post("/v1/actions", json=payload, params=params)
-        return self._handle_response(resp)
+        return self._request("POST", "/v1/actions", json=payload, params=params)
 
     def update_action(
         self,
@@ -169,16 +180,14 @@ class HttpApiClient:
         params: dict[str, str] = {}
         if profile:
             params["profile"] = profile
-        resp = self._client.patch(f"/v1/actions/{action_id}", json=payload, params=params)
-        return self._handle_response(resp)
+        return self._request("PATCH", f"/v1/actions/{action_id}", json=payload, params=params)
 
     def list_pins(self, profile: str | None = None) -> list[dict[str, Any]]:
         """Retrieve pinned KPIs from GET /v1/pins."""
         params: dict[str, str] = {}
         if profile:
             params["profile"] = profile
-        resp = self._client.get("/v1/pins", params=params)
-        data = self._handle_response(resp)
+        data = self._request("GET", "/v1/pins", params=params)
         return data.get("pins", [])
 
     def add_pin(self, kpi_key: str, profile: str | None = None) -> dict[str, Any]:
@@ -186,16 +195,14 @@ class HttpApiClient:
         params: dict[str, str] = {}
         if profile:
             params["profile"] = profile
-        resp = self._client.post("/v1/pins", json={"kpi_key": kpi_key}, params=params)
-        return self._handle_response(resp)
+        return self._request("POST", "/v1/pins", json={"kpi_key": kpi_key}, params=params)
 
     def remove_pin(self, kpi_key: str, profile: str | None = None) -> dict[str, Any]:
         """Unpin a KPI via DELETE /v1/pins/{kpi_key}."""
         params: dict[str, str] = {}
         if profile:
             params["profile"] = profile
-        resp = self._client.delete(f"/v1/pins/{kpi_key}", params=params)
-        return self._handle_response(resp)
+        return self._request("DELETE", f"/v1/pins/{kpi_key}", params=params)
 
     def submit_feedback(
         self,
@@ -213,8 +220,7 @@ class HttpApiClient:
             "rating": rating,
             "comment": note,
         }
-        resp = self._client.post("/v1/feedback", json=payload, params=params)
-        return self._handle_response(resp)
+        return self._request("POST", "/v1/feedback", json=payload, params=params)
 
     def get_history(
         self,
@@ -227,8 +233,7 @@ class HttpApiClient:
             params["session_id"] = session_id
         if profile:
             params["profile"] = profile
-        resp = self._client.get("/v1/history", params=params)
-        data = self._handle_response(resp)
+        data = self._request("GET", "/v1/history", params=params)
         return data.get("turns", [])
 
     def clear_history(
@@ -242,13 +247,11 @@ class HttpApiClient:
             params["session_id"] = session_id
         if profile:
             params["profile"] = profile
-        resp = self._client.delete("/v1/history", params=params)
-        return self._handle_response(resp)
+        return self._request("DELETE", "/v1/history", params=params)
 
     def health(self) -> dict[str, Any]:
         """Check API gateway health via GET /health."""
-        resp = self._client.get("/health")
-        return self._handle_response(resp)
+        return self._request("GET", "/health")
 
     def close(self) -> None:
         """Close HTTP client connection."""

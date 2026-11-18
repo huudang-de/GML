@@ -35,6 +35,7 @@ def list_alerts(
     severity: str | None = Query(default=None),
     status: Literal["open", "acked"] | None = Query(default=None),
     profile: str | None = Query(default=None),
+    dedup: bool = Query(default=True),
     user: UserPrincipal = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> AlertListResponse:
@@ -63,17 +64,45 @@ def list_alerts(
 
     where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
-    stmt = sa.text(f"""
-        SELECT id, rule_id, kpi_key, severity, message, value, threshold,
-               is_acknowledged, acknowledged_by, acknowledged_at, created_at,
-               period, evidence, escalated_at
-        FROM app.alert_event
-        {where_sql}
-        ORDER BY is_acknowledged ASC,
-                 CASE WHEN severity IN ('nghiem_trong', 'critical') THEN 0 ELSE 1 END ASC,
-                 created_at DESC, id DESC
-        LIMIT 100;
-    """)
+    if dedup:
+        stmt = sa.text(f"""
+            WITH ranked AS (
+                SELECT id, rule_id, kpi_key, severity, message, value, threshold,
+                       is_acknowledged, acknowledged_by, acknowledged_at, created_at,
+                       period, evidence, escalated_at,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY rule_id, kpi_key, severity, is_acknowledged
+                           ORDER BY created_at DESC, id DESC
+                       ) AS rn,
+                       COUNT(*) OVER (
+                           PARTITION BY rule_id, kpi_key, severity, is_acknowledged
+                       ) AS occurrence_count
+                FROM app.alert_event
+                {where_sql}
+            )
+            SELECT id, rule_id, kpi_key, severity, message, value, threshold,
+                   is_acknowledged, acknowledged_by, acknowledged_at, created_at,
+                   period, evidence, escalated_at, occurrence_count
+            FROM ranked
+            WHERE rn = 1
+            ORDER BY is_acknowledged ASC,
+                     CASE WHEN severity IN ('nghiem_trong', 'critical') THEN 0 ELSE 1 END ASC,
+                     created_at DESC, id DESC
+            LIMIT 100;
+        """)
+    else:
+        stmt = sa.text(f"""
+            SELECT id, rule_id, kpi_key, severity, message, value, threshold,
+                   is_acknowledged, acknowledged_by, acknowledged_at, created_at,
+                   period, evidence, escalated_at,
+                   1 AS occurrence_count
+            FROM app.alert_event
+            {where_sql}
+            ORDER BY is_acknowledged ASC,
+                     CASE WHEN severity IN ('nghiem_trong', 'critical') THEN 0 ELSE 1 END ASC,
+                     created_at DESC, id DESC
+            LIMIT 100;
+        """)
 
     with app_engine.connect() as conn:
         rows = conn.execute(stmt, params).fetchall()
@@ -117,7 +146,7 @@ def acknowledge_alert(
 
     # 1. Fetch alert
     select_stmt = sa.text("""
-        SELECT id, kpi_key, is_acknowledged
+        SELECT id, rule_id, kpi_key, severity, is_acknowledged
         FROM app.alert_event
         WHERE id = :id;
     """)
@@ -146,20 +175,29 @@ def acknowledge_alert(
             message=f"Vai trò '{user.role}' không có quyền xác nhận cảnh báo trên KPI '{alert_row.kpi_key}'.",
         )
 
-    # 3. Update alert acknowledgment
+    # 3. Update alert acknowledgment (including unacknowledged siblings in same dedup group)
     ack_now = datetime.now(timezone.utc)
     update_stmt = sa.text("""
         UPDATE app.alert_event
         SET is_acknowledged = true,
             acknowledged_by = :user_id,
             acknowledged_at = :now
-        WHERE id = :id;
+        WHERE id = :id
+           OR (
+               is_acknowledged = FALSE
+               AND rule_id IS NOT DISTINCT FROM :rule_id
+               AND kpi_key = :kpi_key
+               AND severity = :severity
+           );
     """)
     with app_engine.begin() as conn:
         conn.execute(
             update_stmt,
             {
                 "id": alert_id,
+                "rule_id": alert_row.rule_id,
+                "kpi_key": alert_row.kpi_key,
+                "severity": alert_row.severity,
                 "user_id": user.user_id,
                 "now": ack_now,
             },

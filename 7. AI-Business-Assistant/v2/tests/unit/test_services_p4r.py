@@ -269,4 +269,91 @@ def test_row_to_alert_item_handles_non_dict_json_evidence():
     item = row_to_alert_item(row)
     assert item.evidence is None
     assert item.domain == "no_vay"
+    assert item.occurrence_count == 1
+
+
+def test_build_briefing_deduplicates_open_alerts(cache, settings):
+    """Repeated unacknowledged alerts with same (rule_id, kpi_key, severity) are grouped in build_briefing."""
+    app_engine = get_app_engine(profile="synth")
+    rule_id = "TEST_DEDUP_BRIEFING"
+    inserted_ids: list[int] = []
+    try:
+        with app_engine.begin() as conn:
+            conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id = :rid"), {"rid": rule_id})
+            for i in range(3):
+                aid = conn.execute(
+                    sa.text("""
+                        INSERT INTO app.alert_event (
+                            rule_id, kpi_key, severity, message, value, threshold, is_acknowledged, created_at
+                        )
+                        VALUES (
+                            :rid, 'du_no_ngan_han', 'nghiem_trong', :msg, :val, 200.0, FALSE,
+                            now() + (:offset * interval '1 second')
+                        )
+                        RETURNING id;
+                    """),
+                    {"rid": rule_id, "msg": f"Alert #{i}", "val": 210.0 + i, "offset": i},
+                ).scalar()
+                inserted_ids.append(aid)
+
+        # Also clean other TEST_UNCAT duplicates if any, or check delta by ensuring baseline is consistent
+        user = UserPrincipal(user_id="usr_ceo", role="ceo", display_name="CEO")
+        resp = build_briefing(user=user, profile="synth", settings=settings, cache=cache, app_engine=app_engine)
+
+        matching_top = [a for a in resp.top_alerts if a.rule_id == rule_id]
+        assert len(matching_top) == 1
+        assert matching_top[0].occurrence_count == 3
+        assert matching_top[0].id == inserted_ids[-1]
+    finally:
+        with app_engine.begin() as conn:
+            conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id = :rid"), {"rid": rule_id})
+
+
+def test_gemini_clients_pass_fast_fail_timeout_and_fallback(monkeypatch):
+    """GeminiTextLLMClient & GeminiSqlLLMClient pass timeout=12.0, max_retries=1 and fall back cleanly."""
+    from types import SimpleNamespace
+    from datetime import date
+    import langchain_google_genai
+    from app.agents.llm_text import GeminiTextLLMClient
+    from app.sql.context import SqlPromptContext
+    from app.sql.generator import GeminiSqlLLMClient
+
+    captured_kwargs: list[dict] = []
+
+    class HangingChatGemini:
+        def __init__(self, **kwargs):
+            captured_kwargs.append(kwargs)
+
+        def invoke(self, _messages):
+            raise TimeoutError("Simulated Gemini API timeout")
+
+    monkeypatch.setattr(langchain_google_genai, "ChatGoogleGenerativeAI", HangingChatGemini)
+
+    cfg = Settings(google_api_key="test-key-12345678901234567890", llm_model="gemini-2.5-flash")
+
+    text_client = GeminiTextLLMClient(settings=cfg)
+    text_out = text_client.generate_text("sys", "KPI: du_no_ngan_han\nValue: 236 tỷ")
+    assert "KPI: du_no_ngan_han" in text_out
+
+    sql_client = GeminiSqlLLMClient(settings=cfg)
+    ctx = SqlPromptContext(
+        question="Dư nợ ngắn hạn?",
+        role="ceo",
+        data_profile="synth",
+        as_of_date=date(2026, 7, 31),
+        allowed_views={"ai_v_no_vay"},
+        catalog_markdown="- ai_v_no_vay",
+        c1_caveats=[],
+        golden_matches=[],
+    )
+    drafts = sql_client.generate_candidates(ctx, n=1)
+    assert len(drafts) == 1
+    repaired = sql_client.repair_sql(ctx, "SELECT * FROM silver.tbl;", "invalid schema")
+    assert "ai_views." in repaired
+
+    assert len(captured_kwargs) == 3
+    for kw in captured_kwargs:
+        assert kw.get("timeout") == 12.0
+        assert kw.get("max_retries") == 1
+
 

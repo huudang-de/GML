@@ -222,7 +222,7 @@ async def _wait_streamlit_idle_and_text(
     ws,
     msg_id_counter: list[int],
     expected_texts: list[str],
-    timeout_sec: float = 30.0,
+    timeout_sec: float = 45.0,
 ) -> None:
     """Poll CDP DOM until Streamlit is idle (no running indicator/skeleton/spinner) and expected texts appear."""
     expected_js = json.dumps(expected_texts)
@@ -275,7 +275,7 @@ async def capture_url_cdp(
     expected_texts: list[str],
     click_button_text: str | None = None,
     post_click_texts: list[str] | None = None,
-    timeout_sec: float = 30.0,
+    timeout_sec: float = 45.0,
 ) -> None:
     """Capture pixel-perfect screenshot via Chrome DevTools Protocol after Streamlit completes rendering."""
     cdp_port = find_free_port()
@@ -431,7 +431,7 @@ def capture_screens() -> None:
             "warning",
         ]
         api_proc = subprocess.Popen(api_cmd, cwd=str(V2_DIR), env=env)
-        wait_for_http_ready(f"http://127.0.0.1:{api_port}/health", timeout_sec=25.0, label="FastAPI")
+        wait_for_http_ready(f"http://127.0.0.1:{api_port}/health", timeout_sec=45.0, label="FastAPI")
 
         # 2. Start Streamlit frontend
         print(f"Starting Streamlit on port {st_port}...")
@@ -484,7 +484,14 @@ def capture_screens() -> None:
             (
                 "05_overview.png",
                 f"http://127.0.0.1:{st_port}/?screen=overview&profile=synth",
-                ["DỮ LIỆU MÔ PHỎNG", "Chỉ số trọng yếu", "Phát hiện hôm nay", "Câu hỏi gợi ý"],
+                [
+                    "DỮ LIỆU MÔ PHỎNG",
+                    "Tổng hợp điều hành",
+                    "Chỉ số trọng yếu",
+                    "Xu hướng & Biến động theo kỳ",
+                    "Phát hiện hôm nay",
+                    "Câu hỏi gợi ý",
+                ],
                 None,
                 None,
             ),
@@ -493,7 +500,7 @@ def capture_screens() -> None:
                 f"http://127.0.0.1:{st_port}/?screen=alerts&profile=real",
                 ["Trung tâm Cảnh báo Nghiệp vụ", "[AL-001]", "[AL-002]"],
                 "[AL-002]",
-                ["[AL-002] Dư nợ ngắn hạn đạt đỉnh", "236.07 tỷ", "Diễn biến chuỗi thời gian"],
+                ["[AL-002] Dư nợ ngắn hạn đạt đỉnh", "236,07 tỷ", "Diễn biến chuỗi thời gian"],
             ),
             (
                 "07_actions.png",
