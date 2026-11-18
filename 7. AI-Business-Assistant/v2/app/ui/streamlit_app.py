@@ -311,7 +311,7 @@ def main() -> None:
 
     # 8. Render Selected Screen (5 Screens)
     if active_screen == SCREEN_OPTIONS[0]:
-        render_overview(api_client=api_client, profile=active_profile)
+        render_overview(api_client=api_client, profile=active_profile, role=role)
     elif active_screen == SCREEN_OPTIONS[1]:
         render_alert_center(api_client=api_client, profile=active_profile)
     elif active_screen == SCREEN_OPTIONS[2]:

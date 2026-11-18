@@ -544,4 +544,21 @@ def test_overview_chapter_navigator_filters_kpis_and_preserves_kho_count(app_tes
     assert len(at_ceo.metric) == total_metrics
 
 
+def test_overview_only_ceo_sees_executive_summary_tab(app_test_factory):
+    """Only CEO sees '📊 Tổng hợp điều hành'; KTT and Kho jump straight into domain chapters without it."""
+    at_ktt = app_test_factory(role="ke_toan_truong", profile="synth", screen="overview")
+    at_ktt.run(timeout=35)
+    assert not at_ktt.exception
+    ktt_chap = next((r for r in at_ktt.radio if r.key == "overview_chapter_selector"), None)
+    assert ktt_chap is not None
+    assert "📊 Tổng hợp điều hành" not in ktt_chap.options
+    assert "🏦 Hoạt động Tài chính" in ktt_chap.options
+
+    at_kho = app_test_factory(role="quan_ly_kho", profile="synth", screen="overview")
+    at_kho.run(timeout=35)
+    assert not at_kho.exception
+    assert next((r for r in at_kho.radio if r.key == "overview_chapter_selector"), None) is None
+    assert len(at_kho.metric) == 3
+
+
 

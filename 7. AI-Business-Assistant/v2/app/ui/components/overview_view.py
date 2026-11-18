@@ -193,10 +193,14 @@ def _render_masthead(data: dict[str, Any]) -> None:
         )
 
 
-def _render_chapter_navigator(kpis: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Render Power BI pageNavigator radio strip and return KPIs in active chapter."""
+def _render_chapter_navigator(kpis: list[dict[str, Any]], role: str = "ceo") -> list[dict[str, Any]]:
+    """Render Power BI pageNavigator radio strip and return KPIs in active chapter.
+
+    Only ``ceo`` gets the cross-domain "📊 Tổng hợp điều hành" tab; department roles
+    (``ke_toan_truong``, ``quan_ly_kho``) start directly in their domain chapters.
+    """
     present_domains = {str(c.get("domain")) for c in kpis if c.get("domain")}
-    chapter_options: list[str] = [ALL_CHAPTER_LABEL]
+    chapter_options: list[str] = [ALL_CHAPTER_LABEL] if role == "ceo" else []
     label_to_domain: dict[str, str] = {}
 
     for dom_code, dom_label in CHAPTER_ORDER:
@@ -210,12 +214,15 @@ def _render_chapter_navigator(kpis: list[dict[str, Any]]) -> list[dict[str, Any]
         chapter_options.append(extra_label)
         label_to_domain[extra_label] = extra_dom
 
+    if not chapter_options:
+        return kpis
+
     if len(chapter_options) > 1:
         if (
             "overview_chapter_selector" in st.session_state
             and st.session_state["overview_chapter_selector"] not in chapter_options
         ):
-            st.session_state["overview_chapter_selector"] = ALL_CHAPTER_LABEL
+            st.session_state["overview_chapter_selector"] = chapter_options[0]
 
         selected_chapter = st.radio(
             "Chương báo cáo",
@@ -225,7 +232,7 @@ def _render_chapter_navigator(kpis: list[dict[str, Any]]) -> list[dict[str, Any]
             key="overview_chapter_selector",
         )
     else:
-        selected_chapter = ALL_CHAPTER_LABEL
+        selected_chapter = chapter_options[0]
 
     selected_domain = label_to_domain.get(selected_chapter)
     if selected_domain is None:
@@ -466,7 +473,7 @@ def _render_suggested_questions(suggested: list[str]) -> None:
                         st.rerun()
 
 
-def render_overview(api_client: HttpApiClient, profile: str) -> None:
+def render_overview(api_client: HttpApiClient, profile: str, role: str = "ceo") -> None:
     """Render Executive Overview dashboard modeled on Power BI Simplifica 5-Chapter template."""
     try:
         data = api_client.get_overview(profile=profile)
@@ -488,7 +495,7 @@ def render_overview(api_client: HttpApiClient, profile: str) -> None:
     if not kpis:
         st.info("Tài khoản Quản trị hệ thống không có KPI tài chính/vận hành được gán.")
     else:
-        visible_kpis = _render_chapter_navigator(kpis)
+        visible_kpis = _render_chapter_navigator(kpis, role=role)
         st.markdown("### 📊 Chỉ số trọng yếu")
         for i in range(0, len(visible_kpis), 3):
             chunk = visible_kpis[i : i + 3]
