@@ -1266,5 +1266,70 @@ def test_invalid_profile_returns_422_across_routers(client_ceo):
         assert err.get("code") == "VALIDATION_ERROR", f"Expected VALIDATION_ERROR for {method} {url}, got {err}"
 
 
+def test_alerts_dedup_occurrence_count_and_group_ack(client_ceo):
+    """GET /v1/alerts groups identical alerts with occurrence_count, ?dedup=false returns all, and ack resolves group."""
+    engine = get_app_engine(profile="real")
+    rule_id = "TEST_DEDUP_GROUP"
+    created_ids: list[int] = []
+    try:
+        with engine.begin() as conn:
+            conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id = :rid"), {"rid": rule_id})
+            for i in range(3):
+                aid = conn.execute(
+                    sa.text("""
+                        INSERT INTO app.alert_event (
+                            rule_id, kpi_key, severity, message, value, threshold,
+                            is_acknowledged, period, created_at
+                        )
+                        VALUES (
+                            :rid, 'ty_le_su_dung_han_muc', 'critical', :msg, :val, 0.90,
+                            false, '2026-07', now() + (:offset * interval '1 second')
+                        )
+                        RETURNING id;
+                    """),
+                    {"rid": rule_id, "msg": f"Grouped alert #{i}", "val": 0.91 + 0.01 * i, "offset": i},
+                ).scalar()
+                created_ids.append(aid)
+
+        # 1. Default dedup=true groups into 1 item with occurrence_count=3 and latest id
+        res_dedup = client_ceo.get("/v1/alerts")
+        assert res_dedup.status_code == 200
+        grouped = [a for a in res_dedup.json()["alerts"] if a["rule_id"] == rule_id]
+        assert len(grouped) == 1
+        assert grouped[0]["occurrence_count"] == 3
+        assert grouped[0]["id"] == created_ids[-1]
+
+        # 2. ?dedup=false returns all 3 rows with occurrence_count=1
+        res_raw = client_ceo.get("/v1/alerts?dedup=false")
+        assert res_raw.status_code == 200
+        ungrouped = [a for a in res_raw.json()["alerts"] if a["rule_id"] == rule_id]
+        assert len(ungrouped) == 3
+        assert all(a["occurrence_count"] == 1 for a in ungrouped)
+
+        # 3. POST /v1/alerts/{latest_id}/ack acknowledges all 3 sibling open rows
+        ack_res = client_ceo.post(f"/v1/alerts/{created_ids[-1]}/ack")
+        assert ack_res.status_code == 200
+        ack_body = ack_res.json()
+        assert ack_body["id"] == created_ids[-1]
+        assert ack_body["is_acknowledged"] is True
+
+        # 4. No open alerts remain for this rule_id
+        res_open = client_ceo.get("/v1/alerts?status=open")
+        assert res_open.status_code == 200
+        remaining_open = [a for a in res_open.json()["alerts"] if a["rule_id"] == rule_id]
+        assert remaining_open == []
+
+        # 5. Acked view groups all 3 acked alerts with occurrence_count=3
+        res_acked = client_ceo.get("/v1/alerts?status=acked")
+        assert res_acked.status_code == 200
+        acked_grouped = [a for a in res_acked.json()["alerts"] if a["rule_id"] == rule_id]
+        assert len(acked_grouped) == 1
+        assert acked_grouped[0]["occurrence_count"] == 3
+    finally:
+        with engine.begin() as conn:
+            conn.execute(sa.text("DELETE FROM app.alert_event WHERE rule_id = :rid"), {"rid": rule_id})
+
+
+
 
 

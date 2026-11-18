@@ -380,3 +380,25 @@ def test_cross_screen_navigation_persists_with_screen_query_param(app_test_facto
     at.chat_input[0].set_value("Dư nợ ngắn hạn hiện tại là bao nhiêu?").run(timeout=35)
     assert not at.exception
     assert len(at.chat_input) > 0, "Must stay on Chat screen instead of reverting to ?screen=overview"
+
+
+def test_http_api_client_chat_timeout_and_friendly_error():
+    """HttpApiClient sets chat_timeout=60.0 and converts httpx.ReadTimeout into friendly Vietnamese ApiClientError."""
+    from app.ui.api_client import ApiClientError, HttpApiClient
+
+    observed_timeouts: list[float | None] = []
+
+    def timeout_handler(request: httpx.Request) -> httpx.Response:
+        observed_timeouts.append(request.extensions.get("timeout", {}).get("read"))
+        raise httpx.ReadTimeout("Simulated read timeout", request=request)
+
+    client = HttpApiClient(transport=httpx.MockTransport(timeout_handler))
+    assert client.chat_timeout == 60.0
+
+    with pytest.raises(ApiClientError) as exc_info:
+        client.chat("Dư nợ ngắn hạn?")
+
+    assert exc_info.value.status_code == 504
+    assert "Hết thời gian chờ phản hồi từ Trợ lý AI" in str(exc_info.value)
+    assert observed_timeouts == [60.0]
+

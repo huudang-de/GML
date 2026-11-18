@@ -256,6 +256,17 @@ class GeminiSqlLLMClient:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
 
+    def _create_llm(self) -> Any:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        return ChatGoogleGenerativeAI(
+            model=self.settings.llm_model,
+            google_api_key=self.settings.google_api_key,
+            temperature=0.0,
+            timeout=12.0,
+            max_retries=1,
+        )
+
     def generate_candidates(self, ctx: SqlPromptContext, n: int = 3) -> list[SqlDraft]:
         if ctx.known_missing_data_reason:
             return [
@@ -267,14 +278,9 @@ class GeminiSqlLLMClient:
             ]
 
         try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
             from langchain_core.messages import SystemMessage, HumanMessage
 
-            llm = ChatGoogleGenerativeAI(
-                model=self.settings.llm_model,
-                google_api_key=self.settings.google_api_key,
-                temperature=0.0,
-            )
+            llm = self._create_llm()
 
             system_prompt = (
                 "Bạn là chuyên gia cơ sở dữ liệu và kế toán của Công ty Cổ phần Gỗ Minh Long.\n"
@@ -307,14 +313,9 @@ class GeminiSqlLLMClient:
 
     def repair_sql(self, ctx: SqlPromptContext, broken_sql: str, sanitized_error: str) -> str:
         try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            from langchain_core.messages import SystemMessage, HumanMessage
+            from langchain_core.messages import HumanMessage
 
-            llm = ChatGoogleGenerativeAI(
-                model=self.settings.llm_model,
-                google_api_key=self.settings.google_api_key,
-                temperature=0.0,
-            )
+            llm = self._create_llm()
 
             prompt = (
                 "Bạn là chuyên gia sửa lỗi SQL PostgreSQL cho schema ai_views.\n"
