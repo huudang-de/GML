@@ -252,16 +252,6 @@ def _render_business_main(
     """Render business masthead, banners, Quick Ask, and the active business screen."""
     _render_masthead(logo_b64=logo_b64, role=role, active_profile=active_profile)
 
-    # Persistent Synthetic Data Warning Banner (TC-T6-02)
-    has_synth_warning = any(
-        "SYNTHETIC_DATA" in (msg.get("warnings") or [])
-        for msg in st.session_state.messages
-    )
-    if active_profile == "synth" or has_synth_warning:
-        st.warning(
-            "⚠️ DỮ LIỆU MÔ PHỎNG (SYNTHETIC DATA) — Chỉ dùng cho kiểm thử & phân tích kịch bản, không dùng cho quyết định tài chính thực tế."
-        )
-
     # Power BI Quick Ask Pre-loaded Context Banner (Ruling #7)
     if query_dashboard or query_kpi:
         actual_dash_key = DASHBOARD_ALIASES.get(query_dashboard, query_dashboard)

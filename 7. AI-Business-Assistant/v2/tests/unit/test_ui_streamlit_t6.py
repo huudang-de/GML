@@ -84,24 +84,24 @@ def test_tc_t6_01_chat_displays_dual_output():
 
 
 def test_tc_t6_02_synthetic_profile_always_renders_simulation_banner():
-    """TC-T6-02: Profile synth (or URL param profile=synth) ALWAYS renders warning banner containing exact substring 'DỮ LIỆU MÔ PHỎNG'."""
+    """TC-T6-02: Profile synth shows the 'Dữ liệu Mô phỏng' masthead badge without a redundant st.warning banner."""
     at = AppTest.from_file(APP_PATH)
     at.query_params["screen"] = "chat"
     at.query_params["profile"] = "synth"
     at.run(timeout=35)
     assert not at.exception
 
-    # Before chat: warning banner must contain 'DỮ LIỆU MÔ PHỎNG'
-    warnings = [w.value for w in at.warning]
-    assert any("DỮ LIỆU MÔ PHỎNG" in w for w in warnings), "Expected 'DỮ LIỆU MÔ PHỎNG' warning before chat"
+    # Before chat: masthead badge indicates 'Dữ liệu Mô phỏng' and no redundant warning banner is shown
+    assert any("Dữ liệu Mô phỏng" in m.value for m in at.markdown), "Expected 'Dữ liệu Mô phỏng' masthead badge before chat"
+    assert not any("DỮ LIỆU MÔ PHỎNG" in w.value for w in at.warning)
 
     # Submit a message on synth profile
     at.chat_input[0].set_value("Dư nợ ngắn hạn hiện tại là bao nhiêu?").run(timeout=35)
     assert not at.exception
 
-    # After chat: warning banner must still contain 'DỮ LIỆU MÔ PHỎNG'
-    warnings_post = [w.value for w in at.warning]
-    assert any("DỮ LIỆU MÔ PHỎNG" in w for w in warnings_post), "Expected 'DỮ LIỆU MÔ PHỎNG' warning after chat"
+    # After chat: masthead badge still indicates 'Dữ liệu Mô phỏng' and no redundant warning banner is shown
+    assert any("Dữ liệu Mô phỏng" in m.value for m in at.markdown), "Expected 'Dữ liệu Mô phỏng' masthead badge after chat"
+    assert not any("DỮ LIỆU MÔ PHỎNG" in w.value for w in at.warning)
 
 
 def test_tc_t6_03_alert_center_ack_calls_post_ack_and_updates_status():
